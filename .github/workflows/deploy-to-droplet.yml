@@ -46,7 +46,10 @@ jobs:
           if [ ! -d "/root/5t" ]; then
             echo "First deployment - cloning repository..."
             cd /root
-            GIT_TERMINAL_PROMPT=0 git clone https://github.com/saurabh257257/5t.git 5t
+            git config --global credential.helper cache
+            git config --global url."https://github.com/".insteadOf git://
+            GIT_TERMINAL_PROMPT=0 git -c credential.helper=cache clone --depth 1 https://github.com/saurabh257257/5t.git 5t || \
+            curl -L https://github.com/saurabh257257/5t/archive/main.zip -o 5t.zip && unzip -q 5t.zip && mv 5t-main 5t
           else
             echo "Updating existing installation..."
             cd /root/5t
