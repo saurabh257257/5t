@@ -59,17 +59,19 @@ jobs:
           fi
           cd /root/5t/server
 
-          # Install Node.js if not present
-          if ! command -v npm &> /dev/null; then
-            echo "Installing Node.js..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-            apt-get install -y nodejs
+          # Install Python3 and pip if not present
+          if ! command -v python3 &> /dev/null; then
+            echo "Installing Python3..."
+            apt-get install -y python3 python3-pip python3-venv
           fi
 
-          npm install --production
+          # Create virtual environment
+          python3 -m venv venv
+          source venv/bin/activate
 
-          # Install PM2 globally if not present
-          npm install -g pm2
+          # Install Python dependencies
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
           if [ ! -f ".env" ]; then
             cat > .env << 'EOF'
@@ -83,8 +85,11 @@ jobs:
           NODE_ENV=production
           EOF
           fi
+          # Install PM2 if not present (for Python)
+          npm install -g pm2 2>/dev/null || apt-get install -y npm && npm install -g pm2
+
           pm2 delete trading-bot 2>/dev/null || true
-          pm2 start app.js --name trading-bot --instances 1
+          pm2 start "python3 app.py" --name trading-bot --interpreter none
           pm2 save
           echo "✅ Bot deployed successfully!"
           sleep 2
