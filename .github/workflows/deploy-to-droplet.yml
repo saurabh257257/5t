@@ -1,0 +1,77 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 167.71.234.116 >> ~/.ssh/known_hosts
+
+      - name: Deploy Bot
+        run: |
+          ssh -i ~/.ssh/deploy_key root@167.71.234.116 << 'EOFSH'
+          set -e
+
+          echo "🤖 Deploying 5T Trading Bot..."
+
+          # Navigate to app directory
+          cd /root/5t/server || {
+            echo "First deployment - setting up..."
+            cd /root
+            rm -rf 5t || true
+            git clone https://github.com/saurabh257257/5t.git 5t
+            cd /root/5t/server
+          }
+
+          # Pull latest code
+          cd /root/5t
+          git pull origin main
+          cd server
+
+          # Install dependencies
+          npm install --production
+
+          # Restart bot
+          pm2 restart trading-bot || pm2 start app.js --name trading-bot
+          pm2 save
+
+          echo "✅ Bot deployed successfully!"
+          echo "Status:"
+          pm2 status
+
+          EOFSH
+
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for bot to start..."
+          sleep 5
+
+          STATUS=$(curl -s http://167.71.234.116:3000/api/status 2>/dev/null || echo "offline")
+          echo "Bot Status: $STATUS"
+
+          if [[ $STATUS == *"running"* ]]; then
+            echo "✅ Bot is running!"
+          else
+            echo "⚠️ Bot may still be starting..."
+          fi
+
+      - name: Deployment Complete
+        run: |
+          echo "🎉 Deployment Complete!"
+          echo ""
+          echo "Server: http://167.71.234.116:3000"
+          echo "Check logs: ssh root@167.71.234.116"
+          echo "              pm2 logs trading-bot"
