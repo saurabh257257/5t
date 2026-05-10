@@ -58,6 +58,14 @@ jobs:
             git pull origin main || echo "Git pull skipped"
           fi
           cd /root/5t/server
+
+          # Install Node.js if not present
+          if ! command -v npm &> /dev/null; then
+            echo "Installing Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            apt-get install -y nodejs
+          fi
+
           npm install --production
           if [ ! -f ".env" ]; then
             cat > .env << 'EOF'
