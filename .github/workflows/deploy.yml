@@ -1,0 +1,122 @@
+name: Auto Deploy to Droplet
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Droplet
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.DROPLET_IP }} << 'EOFSH'
+          set -e
+
+          echo "🚀 Deploying 5T Trading Bot..."
+
+          # Wait for network
+          echo "⏳ Waiting for network..."
+          for i in {1..30}; do
+            if ping -c 1 8.8.8.8 &> /dev/null; then
+              echo "✅ Network ready"
+              break
+            fi
+            sleep 2
+          done
+
+          # Clone or update repo
+          if [ ! -d "/root/5t" ]; then
+            echo "📥 Cloning repository..."
+            cd /root
+            git clone https://github.com/saurabh257257/5t.git
+          else
+            echo "🔄 Updating repository..."
+            cd /root/5t
+            git pull origin main
+          fi
+
+          cd /root/5t/server
+
+          # Install Python if needed
+          if ! command -v python3 &> /dev/null; then
+            echo "📦 Installing Python3..."
+            apt-get update
+            apt-get install -y python3 python3-pip python3-venv npm
+          fi
+
+          # Create virtual environment
+          echo "🔧 Setting up environment..."
+          python3 -m venv venv || true
+          source venv/bin/activate
+
+          # Install dependencies
+          echo "📚 Installing dependencies..."
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+          # Install PM2 if needed
+          if ! command -v pm2 &> /dev/null; then
+            npm install -g pm2
+          fi
+
+          # Setup .env
+          if [ ! -f ".env" ]; then
+            echo "⚙️ Creating .env file..."
+            cat > .env << 'EOF'
+          APP_NAME=5P58004979
+          APP_SOURCE=24930
+          USER_ID=47xt4VnND2x
+          PASSWORD=B356hBPBrAK
+          USER_KEY=PyA72PuyUjYUiNavyRlN0bdLnc7aFeKp
+          ENCRYPTION_KEY=wnzELKnWbdH3KYdgAyW0EwLdVpnk2O1D
+          EOF
+          fi
+
+          # Restart bot
+          echo "🤖 Starting bot..."
+          pm2 delete trading-bot 2>/dev/null || true
+          pm2 start "python3 app.py" --name trading-bot
+          pm2 save
+
+          sleep 2
+
+          echo ""
+          echo "✅ Deployment complete!"
+          echo ""
+          echo "📊 Dashboard: http://${{ secrets.DROPLET_IP }}:3000"
+          echo ""
+          pm2 status
+
+          EOFSH
+
+      - name: Verify Deployment
+        run: |
+          echo "⏳ Waiting for bot to start..."
+          sleep 3
+
+          for i in {1..5}; do
+            if curl -s http://${{ secrets.DROPLET_IP }}:3000 > /dev/null 2>&1; then
+              echo "✅ Dashboard is online!"
+              echo "🌐 http://${{ secrets.DROPLET_IP }}:3000"
+              exit 0
+            fi
+            echo "Attempt $i/5..."
+            sleep 2
+          done
+
+          echo "⚠️ Dashboard may still be starting, check logs:"
+          echo "ssh root@${{ secrets.DROPLET_IP }}"
+          echo "pm2 logs trading-bot"
