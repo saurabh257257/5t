@@ -19,9 +19,9 @@ cred = {
 
 try:
     client = FivePaisaClient(cred=cred)
-    print("✅ 5Paisa Connected")
+    print("[OK] 5Paisa Connected")
 except Exception as e:
-    print(f"❌ Error: {e}")
+    print(f"[ERROR] {e}")
     client = None
 
 HTML = '''
@@ -236,7 +236,7 @@ def get_holdings():
         if not client:
             return jsonify({"error": "5Paisa client not connected"}), 500
 
-        holdings = client.get_holdings()
+        holdings = client.holdings()
 
         if not holdings:
             return jsonify({"holdings": []})
@@ -255,6 +255,6 @@ def get_holdings():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    print("🚀 5Paisa Holdings Server")
-    print("📍 http://0.0.0.0:3000")
-    app.run(host='0.0.0.0', port=3000, debug=False)
+    print("[START] 5Paisa Holdings Server")
+    print("[URL] http://localhost:5000")
+    app.run(host='127.0.0.1', port=5000, debug=False)
