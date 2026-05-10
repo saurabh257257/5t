@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5T Trading Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-title {
+            font-size: 0.9em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-running {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-stopped {
+            background: #ef4444;
+            color: white;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: scale(1.05);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .settings-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .settings-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .trades-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .trades-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .trade-item {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .trade-item.profit {
+            border-left-color: #10b981;
+        }
+
+        .trade-item.loss {
+            border-left-color: #ef4444;
+        }
+
+        .trade-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .trade-type {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .trade-pnl {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .trade-pnl.profit {
+            color: #10b981;
+        }
+
+        .trade-pnl.loss {
+            color: #ef4444;
+        }
+
+        .trade-detail {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .error {
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .card-value {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 5T Trading Bot</h1>
+            <p>Real-time Sensex Trading Dashboard</p>
+        </header>
+
+        <!-- Status Cards -->
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-title">Bot Status</div>
+                <div class="card-value" id="botStatus">Loading...</div>
+                <span class="status-badge" id="statusBadge">Connecting</span>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Sensex Price</div>
+                <div class="card-value" id="sensexPrice">₹ --</div>
+                <div class="card-title" style="color: #999; margin-top: 10px;">Live Updates</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Active Trades</div>
+                <div class="card-value" id="activeTrades">0</div>
+                <div class="card-title" style="color: #999; margin-top: 10px;">Currently Running</div>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="alertContainer"></div>
+
+        <!-- Settings Section -->
+        <div class="settings-section">
+            <div class="settings-title">⚙️ Bot Settings</div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="support">Support Level</label>
+                    <input type="number" id="support" placeholder="e.g., 70000" step="10">
+                </div>
+                <div class="form-group">
+                    <label for="resistance">Resistance Level</label>
+                    <input type="number" id="resistance" placeholder="e.g., 78000" step="10">
+                </div>
+                <div class="form-group">
+                    <label for="lotSize">Lot Size</label>
+                    <input type="number" id="lotSize" placeholder="e.g., 1" min="1" step="1">
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="updateSettings()">💾 Save Settings</button>
+                <button class="btn-secondary" onclick="loadStatus()">🔄 Refresh Status</button>
+            </div>
+        </div>
+
+        <!-- Control Section -->
+        <div class="settings-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="settings-title" style="color: white; border-bottom-color: rgba(255,255,255,0.3);">🎮 Trading Controls</div>
+            <div class="button-group">
+                <button class="btn-success" onclick="startTrading()">▶️ Start Trading</button>
+                <button class="btn-danger" onclick="stopTrading()">⏹️ Stop Trading</button>
+            </div>
+        </div>
+
+        <!-- Active Trades Section -->
+        <div class="trades-section">
+            <div class="trades-title">📊 Active Trades</div>
+            <div id="tradesList">
+                <p class="loading">Loading trades...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Load initial status
+        window.addEventListener('load', () => {
+            loadStatus();
+            setInterval(loadStatus, 5000); // Refresh every 5 seconds
+        });
+
+        async function loadStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/status`);
+                const data = await response.json();
+
+                document.getElementById('botStatus').textContent = data.status;
+                document.getElementById('sensexPrice').textContent = `₹ ${data.sensex.toLocaleString('en-IN', {maximumFractionDigits: 2})}`;
+                document.getElementById('activeTrades').textContent = data.activeTrades || 0;
+
+                const badge = document.getElementById('statusBadge');
+                if (data.status === 'running') {
+                    badge.className = 'status-badge status-running';
+                    badge.textContent = '🟢 Running';
+                } else {
+                    badge.className = 'status-badge status-stopped';
+                    badge.textContent = '🔴 Stopped';
+                }
+
+                // Load settings
+                document.getElementById('support').value = data.support || '';
+                document.getElementById('resistance').value = data.resistance || '';
+                document.getElementById('lotSize').value = data.lotSize || '';
+
+                // Load trades
+                loadTrades();
+            } catch (error) {
+                showAlert(`Error loading status: ${error.message}`, 'error');
+            }
+        }
+
+        async function updateSettings() {
+            const support = parseInt(document.getElementById('support').value);
+            const resistance = parseInt(document.getElementById('resistance').value);
+            const lotSize = parseInt(document.getElementById('lotSize').value);
+
+            if (!support || !resistance || !lotSize) {
+                showAlert('Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ support, resistance, lotSize })
+                });
+
+                if (response.ok) {
+                    showAlert('✅ Settings updated successfully!', 'success');
+                    loadStatus();
+                } else {
+                    showAlert('Failed to update settings', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function startTrading() {
+            try {
+                const response = await fetch(`${API_BASE}/api/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    showAlert('✅ Trading started!', 'success');
+                    loadStatus();
+                } else {
+                    showAlert('Failed to start trading', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopTrading() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    showAlert('✅ Trading stopped!', 'success');
+                    loadStatus();
+                } else {
+                    showAlert('Failed to stop trading', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadTrades() {
+            try {
+                const response = await fetch(`${API_BASE}/api/trades`);
+                const trades = await response.json();
+
+                const tradesList = document.getElementById('tradesList');
+
+                if (!trades || trades.length === 0) {
+                    tradesList.innerHTML = '<p style="color: #999; text-align: center;">No active trades</p>';
+                    return;
+                }
+
+                tradesList.innerHTML = trades.map(trade => {
+                    const isProfit = trade.profit_loss >= 0;
+                    return `
+                        <div class="trade-item ${isProfit ? 'profit' : 'loss'}">
+                            <div class="trade-info">
+                                <span class="trade-type">${trade.type} - ${trade.symbol}</span>
+                                <span class="trade-pnl ${isProfit ? 'profit' : 'loss'}">
+                                    ${isProfit ? '+' : ''}₹ ${trade.profit_loss.toFixed(2)}
+                                </span>
+                            </div>
+                            <div class="trade-detail">Strike: ₹${trade.strike_price} | Entry: ₹${trade.entry_price} | Qty: ${trade.quantity}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading trades:', error);
+            }
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = type === 'error' ? 'error' : 'success';
+            alert.textContent = message;
+            alert.style.animation = 'slideIn 0.3s ease';
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 4000);
+        }
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ const io = socketIo(server, {
 });
 
 app.use(express.json());
+app.use(express.static('public'));
 
 // Database setup
 const db = new sqlite3.Database('./trading.db');
