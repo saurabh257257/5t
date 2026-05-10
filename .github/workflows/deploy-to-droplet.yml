@@ -44,13 +44,14 @@ jobs:
           done
 
           if [ ! -d "/root/5t" ]; then
-            echo "First deployment - downloading repository..."
+            echo "First deployment - cloning repository..."
             cd /root
-            apt-get update -y && apt-get install -y unzip curl
-            curl -L https://github.com/saurabh257257/5t/archive/main.zip -o 5t.zip
-            unzip -q 5t.zip
-            mv 5t-main 5t
-            rm 5t.zip
+            apt-get update -y && apt-get install -y git
+            git clone --depth 1 https://github.com/saurabh257257/5t.git 5t 2>&1 || {
+              echo "Git clone failed, retrying..."
+              sleep 5
+              git clone --depth 1 https://github.com/saurabh257257/5t.git 5t
+            }
           else
             echo "Updating existing installation..."
             cd /root/5t
