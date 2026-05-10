@@ -18,14 +18,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sshpass
 
-      - name: Deploy Bot via SSH
-        env:
-          DROPLET_HOST: 167.71.234.116
-          DROPLET_USER: root
-          DROPLET_PASSWORD: ${{ secrets.DROPLET_PASSWORD }}
+      - name: Setup SSH Key
         run: |
-          export SSHPASS="$DROPLET_PASSWORD"
-          sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=no $DROPLET_USER@$DROPLET_HOST bash << 'EOFSH'
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 143.244.140.57 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy Bot via SSH
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 root@143.244.140.57 bash << 'EOFSH'
           set -e
           echo "🤖 Deploying 5T Trading Bot..."
           if [ ! -d "/root/5t" ]; then
@@ -65,7 +67,7 @@ jobs:
           sleep 5
 
           for i in {1..10}; do
-            STATUS=$(curl -s http://167.71.234.116:3000/api/status 2>/dev/null || echo "offline")
+            STATUS=$(curl -s http://143.244.140.57:3000/api/status 2>/dev/null || echo "offline")
             if [[ $STATUS == *"running"* ]]; then
               echo "✅ Bot is running!"
               echo "Response: $STATUS"
@@ -76,18 +78,18 @@ jobs:
           done
 
           echo "⚠️ Bot may still be starting, check logs with:"
-          echo "ssh root@167.71.234.116"
+          echo "ssh -i ~/.ssh/id_ed25519 root@143.244.140.57"
           echo "pm2 logs trading-bot"
 
       - name: Deployment Complete
         run: |
           echo "🎉 Deployment Complete!"
           echo ""
-          echo "✅ Server: http://167.71.234.116:3000"
+          echo "✅ Server: http://143.244.140.57:3000"
           echo ""
           echo "Check status:"
-          echo "  curl http://167.71.234.116:3000/api/status"
+          echo "  curl http://143.244.140.57:3000/api/status"
           echo ""
           echo "View logs:"
-          echo "  ssh root@167.71.234.116"
+          echo "  ssh -i ~/.ssh/id_ed25519 root@143.244.140.57"
           echo "  pm2 logs trading-bot"
