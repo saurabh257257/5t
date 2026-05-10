@@ -7,10 +7,11 @@
 1. Go to https://cloud.digitalocean.com/
 2. Click **Create** → **Droplets**
 3. Select:
+   - **Name:** `5t-trading-bot`
    - **Image:** Ubuntu 22.04 LTS
    - **Size:** $4-6/month (Basic)
    - **Region:** Nearest to you
-   - **Auth:** Password (simpler) or SSH Key
+   - **Auth:** SSH Key → Select your `githubaction-5t` key
 4. Click **Create Droplet**
 5. **Copy the IP address** when it's ready (e.g., `123.45.67.89`)
 
@@ -23,8 +24,10 @@
 3. Click **New repository secret**
 4. Create secret:
    - **Name:** `DROPLET_IP`
-   - **Value:** Paste your droplet IP (e.g., `123.45.67.89`)
+   - **Value:** Paste your new droplet IP (e.g., `123.45.67.89`)
 5. Click **Add secret**
+
+*(Your `githubaction-5t` SSH key is already configured)*
 
 ---
 
