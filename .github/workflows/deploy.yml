@@ -1,0 +1,67 @@
+name: Auto Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Droplet
+        run: |
+          apt-get update
+          apt-get install -y sshpass
+
+          sshpass -p "${{ secrets.DROPLET_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.DROPLET_IP }} << 'EOFSH'
+          set -e
+
+          echo "🚀 Deploying 5Paisa Holdings Server..."
+
+          # Clone or update repo
+          if [ ! -d "/root/5t" ]; then
+            cd /root
+            git clone https://github.com/saurabh257257/5t.git
+          else
+            cd /root/5t
+            git pull origin main
+          fi
+
+          # Install dependencies
+          apt-get update
+          apt-get install -y python3 python3-pip python3-venv npm
+
+          # Setup Python
+          cd /root/5t
+          python3 -m venv venv
+          source venv/bin/activate
+
+          # Install packages
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+          # Copy env file
+          cp .env.example .env
+
+          # Install PM2
+          npm install -g pm2
+
+          # Start server
+          pm2 delete app 2>/dev/null || true
+          pm2 start "python3 app.py" --name app
+          pm2 save
+
+          echo "✅ Deployment complete!"
+          echo "🌐 http://${{ secrets.DROPLET_IP }}:3000"
+
+          EOFSH
+
+      - name: Verify
+        run: |
+          sleep 3
+          curl -f http://${{ secrets.DROPLET_IP }}:3000 || echo "⚠️ Still starting..."
