@@ -1,0 +1,51 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create Droplet with Terraform
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+          terraform output droplet_ip > ../droplet_ip.txt
+
+      - name: Wait for Droplet to be ready
+        run: sleep 30
+
+      - name: Deploy to Droplet
+        env:
+          DROPLET_IP: ${{ env.DROPLET_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DIGITALOCEAN_TOKEN }}" > ~/.ssh/do_token
+          chmod 600 ~/.ssh/do_token
+
+          DROPLET_IP=$(cat droplet_ip.txt)
+
+          ssh -o StrictHostKeyChecking=no root@$DROPLET_IP << 'EOF'
+          cd /root
+          rm -rf 5t || true
+          git clone https://github.com/saurabh257257/5t.git
+          cd 5t/server
+          npm install
+          pm2 delete trading-bot || true
+          pm2 start app.js --name "trading-bot"
+          pm2 save
+          EOF
+
+      - name: Notify Deployment Success
+        run: |
+          echo "✅ Bot deployed successfully!"
+          echo "Server IP: $(cat droplet_ip.txt)"
+          echo "Access at: http://$(cat droplet_ip.txt):3000"
