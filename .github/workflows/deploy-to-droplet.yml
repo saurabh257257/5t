@@ -24,58 +24,40 @@ jobs:
           DROPLET_USER: root
           DROPLET_PASSWORD: ${{ secrets.DROPLET_PASSWORD }}
         run: |
-          # Create a temporary script for SSH commands
-          cat > /tmp/deploy.sh << 'EOFSH'
-set -e
-
-echo "🤖 Deploying 5T Trading Bot..."
-
-# Check if 5t directory exists
-if [ ! -d "/root/5t" ]; then
-  echo "First deployment - cloning repository..."
-  cd /root
-  git clone https://github.com/saurabh257257/5t.git 5t
-else
-  echo "Updating existing installation..."
-  cd /root/5t
-  git pull origin main
-fi
-
-cd /root/5t/server
-
-# Install dependencies
-npm install --production
-
-# Create .env if not exists
-if [ ! -f ".env" ]; then
-  cat > .env << 'EOF'
-APP_NAME=5P58004979
-APP_SOURCE=24930
-USER_ID=47xt4VnND2x
-PASSWORD=B356hBPBrAK
-USER_KEY=PyA72PuyUjYUiNavyRlN0bdLnc7aFeKp
-ENCRYPTION_KEY=wnzELKnWbdH3KYdgAyW0EwLdVpnk2O1D
-PORT=3000
-NODE_ENV=production
-EOF
-fi
-
-# Restart bot
-pm2 delete trading-bot 2>/dev/null || true
-pm2 start app.js --name trading-bot --instances 1
-pm2 save
-
-echo "✅ Bot deployed successfully!"
-sleep 2
-pm2 status
-EOFSH
-
-          # Execute remote script using sshpass
           export SSHPASS="$DROPLET_PASSWORD"
-          sshpass -e ssh -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 \
-            -o BatchMode=no \
-            $DROPLET_USER@$DROPLET_HOST 'bash -s' < /tmp/deploy.sh
+          sshpass -e ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=no $DROPLET_USER@$DROPLET_HOST bash << 'EOFSH'
+          set -e
+          echo "🤖 Deploying 5T Trading Bot..."
+          if [ ! -d "/root/5t" ]; then
+            echo "First deployment - cloning repository..."
+            cd /root
+            git clone https://github.com/saurabh257257/5t.git 5t
+          else
+            echo "Updating existing installation..."
+            cd /root/5t
+            git pull origin main
+          fi
+          cd /root/5t/server
+          npm install --production
+          if [ ! -f ".env" ]; then
+            cat > .env << 'EOF'
+          APP_NAME=5P58004979
+          APP_SOURCE=24930
+          USER_ID=47xt4VnND2x
+          PASSWORD=B356hBPBrAK
+          USER_KEY=PyA72PuyUjYUiNavyRlN0bdLnc7aFeKp
+          ENCRYPTION_KEY=wnzELKnWbdH3KYdgAyW0EwLdVpnk2O1D
+          PORT=3000
+          NODE_ENV=production
+          EOF
+          fi
+          pm2 delete trading-bot 2>/dev/null || true
+          pm2 start app.js --name trading-bot --instances 1
+          pm2 save
+          echo "✅ Bot deployed successfully!"
+          sleep 2
+          pm2 status
+          EOFSH
 
       - name: Verify Deployment
         run: |
