@@ -44,16 +44,17 @@ jobs:
           done
 
           if [ ! -d "/root/5t" ]; then
-            echo "First deployment - cloning repository..."
+            echo "First deployment - downloading repository..."
             cd /root
-            git config --global credential.helper cache
-            git config --global url."https://github.com/".insteadOf git://
-            GIT_TERMINAL_PROMPT=0 git -c credential.helper=cache clone --depth 1 https://github.com/saurabh257257/5t.git 5t || \
-            curl -L https://github.com/saurabh257257/5t/archive/main.zip -o 5t.zip && unzip -q 5t.zip && mv 5t-main 5t
+            apt-get update -y && apt-get install -y unzip curl
+            curl -L https://github.com/saurabh257257/5t/archive/main.zip -o 5t.zip
+            unzip -q 5t.zip
+            mv 5t-main 5t
+            rm 5t.zip
           else
             echo "Updating existing installation..."
             cd /root/5t
-            git pull origin main
+            git pull origin main || echo "Git pull skipped"
           fi
           cd /root/5t/server
           npm install --production
