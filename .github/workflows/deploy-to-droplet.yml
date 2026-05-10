@@ -31,10 +31,22 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 root@143.244.140.57 bash << 'EOFSH'
           set -e
           echo "🤖 Deploying 5T Trading Bot..."
+
+          # Wait for network to be ready
+          echo "Waiting for network connectivity..."
+          for i in {1..30}; do
+            if ping -c 1 8.8.8.8 &> /dev/null; then
+              echo "✅ Network ready"
+              break
+            fi
+            echo "Waiting... attempt $i/30"
+            sleep 2
+          done
+
           if [ ! -d "/root/5t" ]; then
             echo "First deployment - cloning repository..."
             cd /root
-            git clone https://github.com/saurabh257257/5t.git 5t
+            GIT_TERMINAL_PROMPT=0 git clone https://github.com/saurabh257257/5t.git 5t
           else
             echo "Updating existing installation..."
             cd /root/5t
