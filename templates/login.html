@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5Paisa — Authorize</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 400px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  .icon { font-size: 3em; margin-bottom: 12px; }
+  h1 { font-size: 1.5em; color: #1e1b4b; margin-bottom: 10px; }
+  p { color: #6b7280; font-size: 0.9em; line-height: 1.7; margin-bottom: 32px; }
+  .btn {
+    display: block; padding: 16px;
+    background: linear-gradient(135deg, #7c3aed, #4c1d95);
+    color: white; border-radius: 12px;
+    font-size: 1em; font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .note { margin-top: 20px; color: #9ca3af; font-size: 0.8em; }
+  .steps {
+    text-align: left;
+    background: #f5f3ff;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-size: 0.85em;
+    color: #4b5563;
+    line-height: 2;
+  }
+  .steps span { color: #7c3aed; font-weight: 700; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">&#x1F510;</div>
+  <h1>Authorize with 5Paisa</h1>
+  <div class="steps">
+    <div><span>1.</span>Click the button below</div>
+    <div><span>2.</span>Log in with your 5Paisa credentials</div>
+    <div><span>3.</span>You'll be redirected back automatically</div>
+  </div>
+  <a class="btn" href="{{ login_url }}">Login with 5Paisa &rarr;</a>
+  <div class="note">Your credentials are handled securely by 5Paisa. We never store your password.</div>
+</div>
+</body>
+</html>

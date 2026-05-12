@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5Paisa — Login</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 360px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  .icon { font-size: 3em; margin-bottom: 12px; }
+  h1 { font-size: 1.6em; color: #1e1b4b; margin-bottom: 6px; }
+  p { color: #6b7280; font-size: 0.9em; margin-bottom: 32px; }
+  .pin-inputs {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .pin-inputs input {
+    width: 52px; height: 58px;
+    text-align: center;
+    font-size: 1.5em; font-weight: 700;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+    caret-color: transparent;
+  }
+  .pin-inputs input:focus { border-color: #7c3aed; background: #faf5ff; }
+  .pin-inputs input.filled { border-color: #7c3aed; }
+  button[type="submit"] {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #7c3aed, #4c1d95);
+    color: white; border: none; border-radius: 10px;
+    font-size: 1em; font-weight: 600; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  button[type="submit"]:hover { opacity: 0.9; }
+  .error {
+    margin-top: 16px; padding: 10px 14px;
+    background: #fef2f2; border: 1px solid #fca5a5;
+    border-radius: 8px; color: #dc2626; font-size: 0.85em;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">&#x1F4BC;</div>
+  <h1>5Paisa Dashboard</h1>
+  <p>Enter your 4-digit PIN to continue</p>
+  <form method="POST" action="/verify-pin" id="pinForm">
+    <div class="pin-inputs">
+      <input type="password" maxlength="1" class="pin-digit" autofocus>
+      <input type="password" maxlength="1" class="pin-digit">
+      <input type="password" maxlength="1" class="pin-digit">
+      <input type="password" maxlength="1" class="pin-digit">
+    </div>
+    <input type="hidden" name="pin" id="pinValue">
+    <button type="submit">Continue &rarr;</button>
+  </form>
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+</div>
+<script>
+  const digits = document.querySelectorAll('.pin-digit');
+  const pinVal = document.getElementById('pinValue');
+
+  digits.forEach((input, i) => {
+    input.addEventListener('input', () => {
+      if (input.value) {
+        input.classList.add('filled');
+        if (i < digits.length - 1) digits[i + 1].focus();
+      }
+      pinVal.value = [...digits].map(d => d.value).join('');
+      if (pinVal.value.length === 4) document.getElementById('pinForm').submit();
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !input.value && i > 0) {
+        digits[i - 1].value = '';
+        digits[i - 1].classList.remove('filled');
+        digits[i - 1].focus();
+      }
+    });
+  });
+</script>
+</body>
+</html>
