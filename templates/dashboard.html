@@ -5,233 +5,125 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>5Paisa Dashboard</title>
 <style>
-/* ── Reset & Base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: #0f0e17;
-  color: #e2e8f0;
-  min-height: 100vh;
-}
-
-/* ── Layout ───────────────────────────────────────────────── */
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
 .app { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* ── Header ───────────────────────────────────────────────── */
+/* Header */
 header {
-  background: #1a1830;
-  border-bottom: 1px solid #2d2b4e;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
+  background: #1a1830; border-bottom: 1px solid #2d2b4e;
+  padding: 0 24px; display: flex; align-items: center;
+  justify-content: space-between; height: 60px;
   position: sticky; top: 0; z-index: 100;
 }
 .logo { display: flex; align-items: center; gap: 10px; font-size: 1.1em; font-weight: 700; color: #a78bfa; }
-.logo span { font-size: 1.4em; }
 .header-right { display: flex; align-items: center; gap: 10px; }
-.btn-sm {
-  padding: 6px 14px; border-radius: 8px; font-size: 0.82em;
-  font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;
-}
+.btn-sm { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
 .btn-ghost { background: transparent; color: #a78bfa; border: 1px solid #4c3f8a; }
 .btn-ghost:hover { background: #2d2b4e; }
 .btn-danger { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
 .btn-danger:hover { background: #7f1d1d; }
 
-/* ── Tab Bar ─────────────────────────────────────────────── */
-.tabs {
-  display: flex;
-  background: #1a1830;
-  border-bottom: 1px solid #2d2b4e;
-  padding: 0 24px;
-}
-.tab {
-  padding: 14px 20px;
-  cursor: pointer;
-  font-size: 0.88em;
-  font-weight: 600;
-  color: #6b7280;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-  user-select: none;
-}
+/* Tab Bar */
+.tabs { display: flex; background: #1a1830; border-bottom: 1px solid #2d2b4e; padding: 0 24px; }
+.tab { padding: 14px 20px; cursor: pointer; font-size: 0.88em; font-weight: 600; color: #6b7280; border-bottom: 2px solid transparent; transition: all 0.2s; user-select: none; }
 .tab:hover { color: #a78bfa; }
 .tab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
 
-/* ── Main Content ─────────────────────────────────────────── */
-.content { flex: 1; padding: 24px; max-width: 1300px; margin: 0 auto; width: 100%; }
+/* Content */
+.content { flex: 1; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* ── Summary Cards ───────────────────────────────────────── */
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.stat-card {
-  background: #1a1830;
-  border: 1px solid #2d2b4e;
-  border-radius: 14px;
-  padding: 20px;
-}
+/* Summary Cards */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; padding: 20px; }
 .stat-label { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.8px; color: #6b7280; margin-bottom: 8px; }
 .stat-value { font-size: 1.6em; font-weight: 700; color: #e2e8f0; }
 .stat-value.profit { color: #34d399; }
-.stat-value.loss { color: #f87171; }
+.stat-value.loss   { color: #f87171; }
 
-/* ── Table ───────────────────────────────────────────────── */
-.table-card {
-  background: #1a1830;
-  border: 1px solid #2d2b4e;
-  border-radius: 14px;
-  overflow: hidden;
-}
-.table-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #2d2b4e;
-}
+/* Table Card */
+.table-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
+.table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2d2b4e; }
 .table-title { font-weight: 700; font-size: 0.95em; color: #a78bfa; }
 table { width: 100%; border-collapse: collapse; }
 thead { background: #12111f; }
-th {
-  padding: 12px 16px; text-align: left;
-  font-size: 0.75em; text-transform: uppercase;
-  letter-spacing: 0.6px; color: #6b7280;
-  border-bottom: 1px solid #2d2b4e;
-  white-space: nowrap;
-}
-td {
-  padding: 13px 16px;
-  border-bottom: 1px solid #1e1c35;
-  font-size: 0.88em; color: #cbd5e1;
-}
+th { padding: 12px 16px; text-align: left; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.6px; color: #6b7280; border-bottom: 1px solid #2d2b4e; white-space: nowrap; }
+td { padding: 13px 16px; border-bottom: 1px solid #1e1c35; font-size: 0.88em; color: #cbd5e1; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: #1e1c35; }
 .symbol-cell { font-weight: 700; color: #e2e8f0; }
 .profit { color: #34d399; font-weight: 600; }
-.loss { color: #f87171; font-weight: 600; }
+.loss   { color: #f87171; font-weight: 600; }
 
-/* ── Search Tab ──────────────────────────────────────────── */
-.search-layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
-@media (max-width: 768px) { .search-layout { grid-template-columns: 1fr; } }
+/* Search Layout */
+.search-layout { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .search-layout { grid-template-columns: 1fr; } }
 
-.search-panel {
-  background: #1a1830;
-  border: 1px solid #2d2b4e;
-  border-radius: 14px;
-  overflow: hidden;
-}
-.search-box { padding: 14px; border-bottom: 1px solid #2d2b4e; }
-.search-input {
-  width: 100%; padding: 10px 14px;
-  background: #12111f; border: 1px solid #2d2b4e;
-  border-radius: 8px; color: #e2e8f0; font-size: 0.9em; outline: none;
-  transition: border-color 0.2s;
-}
+/* Left Panel */
+.search-panel { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
+.cat-bar { display: flex; flex-wrap: wrap; gap: 0; background: #12111f; border-bottom: 1px solid #2d2b4e; padding: 8px 8px 0; }
+.cat-btn { padding: 7px 12px; font-size: 0.77em; font-weight: 600; border: none; border-radius: 6px 6px 0 0; cursor: pointer; background: transparent; color: #6b7280; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.cat-btn:hover { color: #a78bfa; }
+.cat-btn.active { color: #a78bfa; border-bottom-color: #7c3aed; background: #1a1830; }
+.search-box { padding: 10px; border-bottom: 1px solid #2d2b4e; }
+.search-input { width: 100%; padding: 9px 13px; background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px; color: #e2e8f0; font-size: 0.88em; outline: none; transition: border-color 0.2s; }
 .search-input:focus { border-color: #7c3aed; }
-.search-results { max-height: 480px; overflow-y: auto; }
-.result-item {
-  padding: 12px 14px; cursor: pointer;
-  border-bottom: 1px solid #1e1c35;
-  transition: background 0.15s;
-}
+.results-meta { padding: 7px 14px; font-size: 0.73em; color: #4b5563; border-bottom: 1px solid #1e1c35; }
+.search-results { max-height: 520px; overflow-y: auto; }
+.result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #1e1c35; transition: background 0.12s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .result-item:last-child { border-bottom: none; }
 .result-item:hover, .result-item.selected { background: #2d2b4e; }
-.result-name { font-weight: 600; font-size: 0.88em; color: #e2e8f0; }
-.result-meta { font-size: 0.75em; color: #6b7280; margin-top: 3px; }
-.result-badge {
-  display: inline-block; padding: 2px 7px;
-  border-radius: 4px; font-size: 0.7em; font-weight: 700;
-  margin-left: 6px;
-}
-.badge-eq { background: #1e3a5f; color: #60a5fa; }
-.badge-fno { background: #3b1d6e; color: #c084fc; }
+.result-left { flex: 1; min-width: 0; }
+.result-name { font-weight: 600; font-size: 0.85em; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-meta { font-size: 0.72em; color: #6b7280; margin-top: 2px; }
+.result-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.68em; font-weight: 700; flex-shrink: 0; }
+.badge-eq  { background: #1e3a5f; color: #60a5fa; }
 .badge-fut { background: #1a3a2a; color: #4ade80; }
+.badge-opt { background: #3b2a00; color: #fbbf24; }
+.badge-fno { background: #3b1d6e; color: #c084fc; }
+.badge-com { background: #2a1800; color: #fb923c; }
+.load-more-btn { width: 100%; padding: 11px; background: #12111f; color: #7c3aed; font-size: 0.82em; font-weight: 600; border: none; border-top: 1px solid #2d2b4e; cursor: pointer; transition: background 0.15s; }
+.load-more-btn:hover { background: #1e1c35; }
 
-/* ── Scrip Detail ────────────────────────────────────────── */
-.detail-panel {
-  background: #1a1830;
-  border: 1px solid #2d2b4e;
-  border-radius: 14px;
-  padding: 20px;
-}
+/* Right Detail Panel */
+.detail-panel { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; padding: 20px; }
 .detail-header { margin-bottom: 20px; }
 .detail-symbol { font-size: 1.5em; font-weight: 800; color: #e2e8f0; }
 .detail-name { font-size: 0.85em; color: #6b7280; margin-top: 4px; }
-.price-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.price-card {
-  background: #12111f;
-  border: 1px solid #2d2b4e;
-  border-radius: 10px;
-  padding: 14px;
-}
+.price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.price-card { background: #12111f; border: 1px solid #2d2b4e; border-radius: 10px; padding: 14px; }
 .price-label { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; margin-bottom: 6px; }
 .price-value { font-size: 1.15em; font-weight: 700; color: #e2e8f0; }
 .price-value.ltp-value { font-size: 1.5em; color: #a78bfa; }
 
-/* ── Option Chain ────────────────────────────────────────── */
-.oc-controls {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 16px; flex-wrap: wrap;
-}
-.oc-select {
-  padding: 8px 12px; background: #12111f;
-  border: 1px solid #2d2b4e; border-radius: 8px;
-  color: #e2e8f0; font-size: 0.85em; outline: none; cursor: pointer;
-}
-.btn-load {
-  padding: 8px 16px; background: #7c3aed; color: white;
-  border: none; border-radius: 8px; font-size: 0.85em;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
-}
+/* Option Chain */
+.oc-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.oc-select { padding: 8px 12px; background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px; color: #e2e8f0; font-size: 0.85em; outline: none; cursor: pointer; }
+.btn-load { padding: 8px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; }
 .btn-load:hover { background: #6d28d9; }
 .oc-table-wrap { overflow-x: auto; }
 .oc-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
-.oc-table th {
-  padding: 10px 12px; text-align: right;
-  font-size: 0.72em; letter-spacing: 0.5px; color: #6b7280;
-  background: #12111f; border-bottom: 1px solid #2d2b4e;
-}
+.oc-table th { padding: 10px 12px; text-align: right; font-size: 0.72em; letter-spacing: 0.5px; color: #6b7280; background: #12111f; border-bottom: 1px solid #2d2b4e; }
 .oc-table th.strike-col { text-align: center; background: #1e1c35; color: #a78bfa; }
 .oc-table th.call-side { color: #34d399; }
-.oc-table th.put-side { color: #f87171; }
+.oc-table th.put-side  { color: #f87171; }
 .oc-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #1e1c35; color: #cbd5e1; }
 .oc-table td.strike-col { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
 .oc-table tr.atm td { background: #1e1c35 !important; }
 .oc-table tr.atm td.strike-col { background: #2d2b4e !important; }
 
-/* ── States ──────────────────────────────────────────────── */
-.state-box {
-  padding: 48px; text-align: center; color: #4b5563;
-  font-size: 0.9em;
-}
+/* States */
+.state-box { padding: 48px; text-align: center; color: #4b5563; font-size: 0.9em; }
 .state-icon { font-size: 2.5em; margin-bottom: 12px; }
-.spinner {
-  width: 32px; height: 32px;
-  border: 3px solid #2d2b4e;
-  border-top-color: #7c3aed;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin: 0 auto 12px;
-}
+.spinner { width: 32px; height: 32px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.empty-hint { margin-top: 8px; font-size: 0.8em; color: #4b5563; }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- Header -->
   <header>
     <div class="logo"><span>&#x1F4BC;</span> 5Paisa Dashboard</div>
     <div class="header-right">
@@ -240,68 +132,58 @@ tbody tr:hover td { background: #1e1c35; }
     </div>
   </header>
 
-  <!-- Tab Bar -->
   <nav class="tabs">
     <div class="tab active" data-tab="holdings">&#x1F4C8; Holdings</div>
     <div class="tab" data-tab="search">&#x1F50D; Search Scrip</div>
   </nav>
 
-  <!-- Content -->
   <main class="content">
 
-    <!-- ── Holdings Tab ───────────────────────────────────── -->
+    <!-- Holdings Tab -->
     <section class="tab-panel active" id="panel-holdings">
       <div class="summary-grid" id="summary" style="display:none">
-        <div class="stat-card">
-          <div class="stat-label">Total Invested</div>
-          <div class="stat-value" id="s-invested">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Current Value</div>
-          <div class="stat-value" id="s-value">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total P&amp;L</div>
-          <div class="stat-value" id="s-pnl">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Return</div>
-          <div class="stat-value" id="s-return">—</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Total Invested</div><div class="stat-value" id="s-invested">—</div></div>
+        <div class="stat-card"><div class="stat-label">Current Value</div><div class="stat-value" id="s-value">—</div></div>
+        <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-value" id="s-pnl">—</div></div>
+        <div class="stat-card"><div class="stat-label">Return</div><div class="stat-value" id="s-return">—</div></div>
       </div>
       <div class="table-card">
-        <div class="table-header">
-          <span class="table-title">Your Holdings</span>
-        </div>
-        <div id="holdings-body">
-          <div class="state-box"><div class="spinner"></div>Loading holdings…</div>
-        </div>
+        <div class="table-header"><span class="table-title">Your Holdings</span></div>
+        <div id="holdings-body"><div class="state-box"><div class="spinner"></div>Loading holdings…</div></div>
       </div>
     </section>
 
-    <!-- ── Search Tab ─────────────────────────────────────── -->
+    <!-- Search Tab -->
     <section class="tab-panel" id="panel-search">
       <div class="search-layout">
 
-        <!-- Left: Search + Results -->
+        <!-- Left: Browse + Search -->
         <div class="search-panel">
+          <div class="cat-bar">
+            <button class="cat-btn active" data-cat="all">All</button>
+            <button class="cat-btn" data-cat="equity">Equity</button>
+            <button class="cat-btn" data-cat="futures">Futures</button>
+            <button class="cat-btn" data-cat="options">Options</button>
+            <button class="cat-btn" data-cat="commodity">Commodity</button>
+          </div>
           <div class="search-box">
             <input type="text" class="search-input" id="searchInput"
-              placeholder="Search symbol, name…" autocomplete="off">
+              placeholder="&#x1F50D;  Search name, symbol or code…" autocomplete="off">
           </div>
+          <div class="results-meta" id="resultsMeta">Checking master data…</div>
           <div class="search-results" id="searchResults">
-            <div class="state-box">
-              <div class="state-icon">&#x1F50D;</div>
-              Type to search scrips
-            </div>
+            <div class="state-box"><div class="spinner"></div>Loading scrip master…</div>
           </div>
+          <button class="load-more-btn" id="loadMoreBtn" style="display:none" onclick="loadMore()">
+            Load more…
+          </button>
         </div>
 
         <!-- Right: Detail -->
         <div id="detailPanel">
           <div class="state-box">
             <div class="state-icon">&#x1F4CA;</div>
-            Select a scrip to view details
+            Select a scrip from the list to view price &amp; option chain
           </div>
         </div>
 
@@ -312,33 +194,35 @@ tbody tr:hover td { background: #1e1c35; }
 </div>
 
 <script>
-// ── Helpers ────────────────────────────────────────────────────────────────
-const fmt  = n => '₹' + parseFloat(n).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtN = n => parseInt(n).toLocaleString('en-IN');
-const pct  = n => (n >= 0 ? '+' : '') + parseFloat(n).toFixed(2) + '%';
-const cls  = n => parseFloat(n) >= 0 ? 'profit' : 'loss';
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const fmt  = n => '₹' + parseFloat(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtN = n => parseInt(n||0).toLocaleString('en-IN');
+const pct  = n => (parseFloat(n||0) >= 0 ? '+' : '') + parseFloat(n||0).toFixed(2) + '%';
+const cls  = n => parseFloat(n||0) >= 0 ? 'profit' : 'loss';
 
 async function api(url) {
   const r = await fetch(url);
   return r.json();
 }
 
-// ── Tabs ───────────────────────────────────────────────────────────────────
+// ── Tabs ───────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'search' && !browseState.loaded) initBrowse();
   });
 });
 
 function refreshCurrent() {
   const active = document.querySelector('.tab.active')?.dataset.tab;
   if (active === 'holdings') loadHoldings();
+  else browse(true);
 }
 
-// ── Holdings ───────────────────────────────────────────────────────────────
+// ── Holdings ───────────────────────────────────────────────────────────────────
 async function loadHoldings() {
   document.getElementById('holdings-body').innerHTML =
     '<div class="state-box"><div class="spinner"></div>Loading…</div>';
@@ -358,16 +242,12 @@ async function loadHoldings() {
 
   let invested = 0, curVal = 0;
   const rows = data.holdings.map(h => {
-    const val  = h.quantity * h.ltp;
-    const cost = h.quantity * h.cost;
-    const pnl  = val - cost;
-    const ret  = cost > 0 ? (pnl / cost * 100) : 0;
+    const val = h.quantity * h.ltp, cost = h.quantity * h.cost;
+    const pnl = val - cost, ret = cost > 0 ? pnl/cost*100 : 0;
     invested += cost; curVal += val;
     return `<tr>
       <td class="symbol-cell">${h.symbol}</td>
-      <td>${fmtN(h.quantity)}</td>
-      <td>${fmt(h.cost)}</td>
-      <td>${fmt(h.ltp)}</td>
+      <td>${fmtN(h.quantity)}</td><td>${fmt(h.cost)}</td><td>${fmt(h.ltp)}</td>
       <td>${fmt(val)}</td>
       <td class="${cls(pnl)}">${fmt(pnl)}</td>
       <td class="${cls(ret)}">${pct(ret)}</td>
@@ -383,8 +263,7 @@ async function loadHoldings() {
       <tbody>${rows}</tbody>
     </table>`;
 
-  const pnl = curVal - invested;
-  const ret = invested > 0 ? pnl / invested * 100 : 0;
+  const pnl = curVal - invested, ret = invested > 0 ? pnl/invested*100 : 0;
   document.getElementById('s-invested').innerHTML = fmt(invested);
   document.getElementById('s-value').innerHTML    = fmt(curVal);
   document.getElementById('s-pnl').className      = 'stat-value ' + cls(pnl);
@@ -394,57 +273,132 @@ async function loadHoldings() {
   document.getElementById('summary').style.display = 'grid';
 }
 
-// ── Search ─────────────────────────────────────────────────────────────────
+// ── Browse / Search ─────────────────────────────────────────────────────────────
+const browseState = { cat: 'all', q: '', page: 1, total: 0, loaded: false };
 let searchTimer;
-document.getElementById('searchInput').addEventListener('input', e => {
-  clearTimeout(searchTimer);
-  const q = e.target.value.trim();
-  if (q.length < 2) {
-    document.getElementById('searchResults').innerHTML =
-      '<div class="state-box"><div class="state-icon">&#x1F50D;</div>Type to search scrips</div>';
-    return;
-  }
-  document.getElementById('searchResults').innerHTML =
-    '<div class="state-box"><div class="spinner"></div>Searching…</div>';
-  searchTimer = setTimeout(() => doSearch(q), 300);
+
+// Category buttons
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    browseState.cat = btn.dataset.cat;
+    browseState.page = 1;
+    browse(true);
+  });
 });
 
-async function doSearch(q) {
-  const data = await api('/api/search?q=' + encodeURIComponent(q));
+// Search input
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  browseState.q = e.target.value.trim();
+  browseState.page = 1;
+  searchTimer = setTimeout(() => browse(true), 350);
+});
+
+async function initBrowse() {
+  // Check if master is loaded on server
+  const status = await api('/api/master/status');
+  if (!status.loaded) {
+    document.getElementById('resultsMeta').textContent = 'Downloading scrip master… (first load takes ~30s)';
+    // Poll until loaded
+    const poll = setInterval(async () => {
+      const s = await api('/api/master/status');
+      if (s.loaded) {
+        clearInterval(poll);
+        browse(true);
+      }
+    }, 3000);
+  } else {
+    browse(true);
+  }
+}
+
+async function browse(reset = false) {
+  if (reset) {
+    browseState.page = 1;
+    document.getElementById('searchResults').innerHTML =
+      '<div class="state-box"><div class="spinner"></div></div>';
+    document.getElementById('loadMoreBtn').style.display = 'none';
+  }
+
+  const { cat, q, page } = browseState;
+  const data = await api(`/api/browse?cat=${cat}&q=${encodeURIComponent(q)}&page=${page}`);
+
+  if (data.error) {
+    document.getElementById('searchResults').innerHTML =
+      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${data.error}</div>`;
+    return;
+  }
+
+  browseState.total  = data.total;
+  browseState.loaded = true;
+  document.getElementById('resultsMeta').textContent =
+    `${fmtN(data.total)} scrips${q ? ' matching "' + q + '"' : ''} — showing ${Math.min(page*50, data.total)} of ${fmtN(data.total)}`;
+
   if (!data.results?.length) {
     document.getElementById('searchResults').innerHTML =
       '<div class="state-box"><div class="state-icon">&#x1F914;</div>No results found</div>';
+    document.getElementById('loadMoreBtn').style.display = 'none';
     return;
   }
-  document.getElementById('searchResults').innerHTML = data.results.map((r, i) => {
-    const code = r.Scripcode || r.scripcode || '';
-    const name = r.Name || r.name || '';
-    const exch = r.Exch || r.exch || '';
-    const type = r.ExchType || r.exchtype || '';
-    const series = r.Series || r.series || '';
-    const isFno = type === 'D' || ['FUT','CE','PE'].includes(series);
-    const badge = isFno
-      ? `<span class="result-badge badge-fno">${series || 'FNO'}</span>`
-      : `<span class="result-badge badge-eq">${series || 'EQ'}</span>`;
-    return `<div class="result-item" onclick="selectScrip(${JSON.stringify(r).replace(/"/g,"&quot;")})" data-i="${i}">
-      <div class="result-name">${name}${badge}</div>
-      <div class="result-meta">${exch} &bull; Code: ${code}</div>
-    </div>`;
-  }).join('');
+
+  const html = data.results.map(r => renderResult(r)).join('');
+  if (reset) {
+    document.getElementById('searchResults').innerHTML = html;
+  } else {
+    document.getElementById('searchResults').insertAdjacentHTML('beforeend', html);
+  }
+
+  document.getElementById('loadMoreBtn').style.display = data.has_more ? 'block' : 'none';
+  if (data.has_more) document.getElementById('loadMoreBtn').textContent =
+    `Load more (${fmtN(data.total - page*50)} remaining)…`;
 }
 
-// ── Scrip Detail ───────────────────────────────────────────────────────────
+function loadMore() {
+  browseState.page++;
+  browse(false);
+}
+
+function renderResult(r) {
+  const code   = r.Scripcode || '';
+  const name   = r.Name || '';
+  const exch   = r.Exch || '';
+  const type   = r.ExchType || '';
+  const series = r.Series || '';
+
+  let badgeClass = 'badge-eq', badgeText = series || 'EQ';
+  if (series === 'FUT')               { badgeClass = 'badge-fut'; badgeText = 'FUT'; }
+  else if (['CE','PE'].includes(series)) { badgeClass = 'badge-opt'; badgeText = series; }
+  else if (type === 'D')              { badgeClass = 'badge-fno'; badgeText = 'FNO'; }
+  else if (['M','MCX'].includes(exch)){ badgeClass = 'badge-com'; badgeText = 'COM'; }
+
+  const strike = r.StrikeRate && r.StrikeRate !== '0' && r.StrikeRate !== 0 ? ` · Strike ${r.StrikeRate}` : '';
+  const expiry = r.Expiry ? ` · ${r.Expiry}` : '';
+
+  return `<div class="result-item" onclick='selectScrip(${JSON.stringify(r)})'>
+    <div class="result-left">
+      <div class="result-name">${name}</div>
+      <div class="result-meta">${exch} · Code: ${code}${expiry}${strike}</div>
+    </div>
+    <span class="result-badge ${badgeClass}">${badgeText}</span>
+  </div>`;
+}
+
+// ── Scrip Detail ──────────────────────────────────────────────────────────────
 async function selectScrip(r) {
   document.querySelectorAll('.result-item').forEach(el => el.classList.remove('selected'));
   event?.currentTarget?.classList.add('selected');
 
-  const code   = r.Scripcode || r.scripcode || '';
-  const name   = r.Name || r.name || '';
-  const exch   = r.Exch || r.exch || 'N';
-  const type   = r.ExchType || r.exchtype || 'C';
-  const series = r.Series || r.series || '';
+  const code   = r.Scripcode || '';
+  const name   = r.Name || '';
+  const exch   = r.Exch || 'N';
+  const type   = r.ExchType || 'C';
+  const series = r.Series || '';
+  const short  = r.ShortName || name;
   const isFno  = type === 'D' || ['FUT','CE','PE'].includes(series);
-  const short  = r.ShortName || r.shortname || name;
+  // For option chain, use the underlying symbol
+  const underlying = r.Underlyer || r.ShortName || (name.split(' ')[0]);
 
   document.getElementById('detailPanel').innerHTML =
     '<div class="detail-panel"><div class="state-box"><div class="spinner"></div>Loading price…</div></div>';
@@ -453,71 +407,47 @@ async function selectScrip(r) {
 
   let priceHtml = '';
   if (ltp.error) {
-    priceHtml = `<div class="state-box" style="padding:20px">&#x26A0; ${ltp.error}</div>`;
+    priceHtml = `<div style="padding:12px;color:#f87171;font-size:0.85em">&#x26A0; ${ltp.error}</div>`;
   } else {
-    const chgCls = cls(ltp.change);
-    priceHtml = `
-      <div class="price-grid">
-        <div class="price-card">
-          <div class="price-label">LTP</div>
-          <div class="price-value ltp-value">${fmt(ltp.ltp)}</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">Change</div>
-          <div class="price-value ${chgCls}">${fmt(ltp.change)} (${pct(ltp.change_pct)})</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">Open</div>
-          <div class="price-value">${fmt(ltp.open)}</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">High</div>
-          <div class="price-value profit">${fmt(ltp.high)}</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">Low</div>
-          <div class="price-value loss">${fmt(ltp.low)}</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">Prev Close</div>
-          <div class="price-value">${fmt(ltp.close)}</div>
-        </div>
-        <div class="price-card">
-          <div class="price-label">Volume</div>
-          <div class="price-value">${fmtN(ltp.volume)}</div>
-        </div>
-      </div>`;
+    priceHtml = `<div class="price-grid">
+      <div class="price-card"><div class="price-label">LTP</div><div class="price-value ltp-value">${fmt(ltp.ltp)}</div></div>
+      <div class="price-card"><div class="price-label">Change</div><div class="price-value ${cls(ltp.change)}">${fmt(ltp.change)} (${pct(ltp.change_pct)})</div></div>
+      <div class="price-card"><div class="price-label">Open</div><div class="price-value">${fmt(ltp.open)}</div></div>
+      <div class="price-card"><div class="price-label">High</div><div class="price-value profit">${fmt(ltp.high)}</div></div>
+      <div class="price-card"><div class="price-label">Low</div><div class="price-value loss">${fmt(ltp.low)}</div></div>
+      <div class="price-card"><div class="price-label">Prev Close</div><div class="price-value">${fmt(ltp.close)}</div></div>
+      <div class="price-card"><div class="price-label">Volume</div><div class="price-value">${fmtN(ltp.volume)}</div></div>
+    </div>`;
   }
 
-  // Option chain section (for any underlying that has FNO)
-  const ocSection = `
-    <div style="border-top:1px solid #2d2b4e; padding-top:20px; margin-top:4px;">
+  const ocSection = isFno ? `
+    <div style="border-top:1px solid #2d2b4e;padding-top:20px;margin-top:4px;">
       <div class="oc-controls">
-        <strong style="color:#a78bfa; font-size:0.9em;">&#x1F4CA; Option Chain</strong>
-        <select class="oc-select" id="expirySelect" onchange="loadOptionChain('${short}','${exch}')">
+        <strong style="color:#a78bfa;font-size:0.9em;">&#x1F4CA; Option Chain — ${underlying}</strong>
+        <select class="oc-select" id="expirySelect">
           <option value="">Loading expiries…</option>
         </select>
-        <button class="btn-load" onclick="loadOptionChain('${short}','${exch}')">Load Chain</button>
+        <button class="btn-load" onclick="loadOptionChain('${underlying}','${exch}')">Load</button>
       </div>
-      <div id="ocBody">
-        <div class="state-box" style="padding:24px">Select an expiry to view option chain</div>
-      </div>
+      <div id="ocBody"><div class="state-box" style="padding:20px">Select an expiry to load chain</div></div>
+    </div>` : `<div style="border-top:1px solid #2d2b4e;padding-top:16px;margin-top:4px;font-size:0.82em;color:#4b5563;text-align:center">
+      This is a cash segment instrument — no option chain available
     </div>`;
 
   document.getElementById('detailPanel').innerHTML = `
     <div class="detail-panel">
       <div class="detail-header">
         <div class="detail-symbol">${short}</div>
-        <div class="detail-name">${name} &bull; ${exch} &bull; Code: ${code}</div>
+        <div class="detail-name">${name} &bull; ${exch} &bull; ${series || type} &bull; Code: ${code}</div>
       </div>
       ${priceHtml}
       ${ocSection}
     </div>`;
 
-  loadExpiries(short, exch);
+  if (isFno) loadExpiries(underlying, exch);
 }
 
-// ── Expiry ─────────────────────────────────────────────────────────────────
+// ── Expiry ─────────────────────────────────────────────────────────────────────
 async function loadExpiries(symbol, exch) {
   const data = await api(`/api/expiry?exch=${exch}&symbol=${encodeURIComponent(symbol)}`);
   const sel  = document.getElementById('expirySelect');
@@ -526,23 +456,17 @@ async function loadExpiries(symbol, exch) {
     sel.innerHTML = '<option value="">No expiries available</option>';
     return;
   }
-  sel.innerHTML = data.expiries.map(e =>
-    `<option value="${e}">${e}</option>`
-  ).join('');
+  sel.innerHTML = data.expiries.map(e => `<option value="${e}">${e}</option>`).join('');
 }
 
-// ── Option Chain ───────────────────────────────────────────────────────────
+// ── Option Chain ───────────────────────────────────────────────────────────────
 async function loadOptionChain(symbol, exch) {
-  const sel    = document.getElementById('expirySelect');
-  const expiry = sel?.value;
+  const expiry = document.getElementById('expirySelect')?.value;
   if (!expiry) return;
-
   document.getElementById('ocBody').innerHTML =
-    '<div class="state-box" style="padding:24px"><div class="spinner"></div>Loading option chain…</div>';
+    '<div class="state-box" style="padding:24px"><div class="spinner"></div>Loading…</div>';
 
-  const data = await api(
-    `/api/option-chain?exch=${exch}&symbol=${encodeURIComponent(symbol)}&expiry=${encodeURIComponent(expiry)}`
-  );
+  const data = await api(`/api/option-chain?exch=${exch}&symbol=${encodeURIComponent(symbol)}&expiry=${encodeURIComponent(expiry)}`);
 
   if (data.error) {
     document.getElementById('ocBody').innerHTML =
@@ -551,19 +475,17 @@ async function loadOptionChain(symbol, exch) {
   }
   if (!data.option_chain?.length) {
     document.getElementById('ocBody').innerHTML =
-      '<div class="state-box" style="padding:20px">No option chain data</div>';
+      '<div class="state-box" style="padding:20px">No option chain data returned</div>';
     return;
   }
 
-  // Find ATM (strike closest to LTP)
   const ltpEl = document.querySelector('.ltp-value');
   const curLtp = ltpEl ? parseFloat(ltpEl.textContent.replace(/[^0-9.]/g,'')) : 0;
   const strikes = data.option_chain.map(r => r.strike);
-  const atm = strikes.reduce((a, b) => Math.abs(b - curLtp) < Math.abs(a - curLtp) ? b : a, strikes[0]);
+  const atm = strikes.reduce((a,b) => Math.abs(b-curLtp) < Math.abs(a-curLtp) ? b : a, strikes[0]);
 
-  const rows = data.option_chain.map(r => {
-    const isAtm = r.strike === atm;
-    return `<tr class="${isAtm ? 'atm' : ''}">
+  const rows = data.option_chain.map(r => `
+    <tr class="${r.strike===atm ? 'atm' : ''}">
       <td class="${cls(r.ce_change)}">${fmt(r.ce_ltp)}</td>
       <td>${fmtN(r.ce_oi)}</td>
       <td>${fmtN(r.ce_volume)}</td>
@@ -571,34 +493,23 @@ async function loadOptionChain(symbol, exch) {
       <td>${fmtN(r.pe_volume)}</td>
       <td>${fmtN(r.pe_oi)}</td>
       <td class="${cls(r.pe_change)}">${fmt(r.pe_ltp)}</td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 
   document.getElementById('ocBody').innerHTML = `
-    <div class="oc-table-wrap">
-      <table class="oc-table">
-        <thead>
-          <tr>
-            <th class="call-side" colspan="3">CALLS</th>
-            <th class="strike-col">STRIKE</th>
-            <th class="put-side" colspan="3">PUTS</th>
-          </tr>
-          <tr>
-            <th class="call-side">LTP</th>
-            <th class="call-side">OI</th>
-            <th class="call-side">Volume</th>
-            <th class="strike-col">&#x2B50;</th>
-            <th class="put-side">Volume</th>
-            <th class="put-side">OI</th>
-            <th class="put-side">LTP</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    <div class="oc-table-wrap"><table class="oc-table">
+      <thead>
+        <tr><th class="call-side" colspan="3">CALLS</th><th class="strike-col">STRIKE</th><th class="put-side" colspan="3">PUTS</th></tr>
+        <tr>
+          <th class="call-side">LTP</th><th class="call-side">OI</th><th class="call-side">Vol</th>
+          <th class="strike-col">&#x2B50;</th>
+          <th class="put-side">Vol</th><th class="put-side">OI</th><th class="put-side">LTP</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
+// ── Init ───────────────────────────────────────────────────────────────────────
 loadHoldings();
 setInterval(loadHoldings, 60000);
 </script>

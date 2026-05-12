@@ -58,6 +58,57 @@ def refresh_master():
     return _df
 
 
+def get_status():
+    return {"loaded": _df is not None, "rows": len(_df) if _df is not None else 0}
+
+
+def browse_scrips(cat='all', query='', page=1, limit=50):
+    df = load_master()
+    c = _columns
+
+    # Category filter
+    if cat == 'equity' and c['type']:
+        mask = df[c['type']].astype(str).str.upper() == 'C'
+    elif cat == 'futures' and c['type'] and c['series']:
+        mask = (df[c['type']].astype(str).str.upper() == 'D') & \
+               (df[c['series']].astype(str).str.upper() == 'FUT')
+    elif cat == 'options' and c['type'] and c['series']:
+        mask = (df[c['type']].astype(str).str.upper() == 'D') & \
+               (df[c['series']].astype(str).str.upper().isin(['CE', 'PE']))
+    elif cat == 'commodity' and c['exch']:
+        mask = df[c['exch']].astype(str).str.upper().isin(['M', 'MCX', 'N', 'B']) & \
+               df[c['type']].astype(str).str.upper().isin(['U', 'Y', 'G']) \
+               if c['type'] else df[c['exch']].astype(str).str.upper().isin(['M', 'MCX'])
+    else:
+        mask = pd.Series([True] * len(df), index=df.index)
+
+    filtered = df[mask]
+
+    # Search filter
+    if query and len(query.strip()) >= 1:
+        q = query.upper().strip()
+        qmask = pd.Series([False] * len(filtered), index=filtered.index)
+        if c['name']:
+            qmask |= filtered[c['name']].astype(str).str.upper().str.contains(q, na=False)
+        if c['short']:
+            qmask |= filtered[c['short']].astype(str).str.upper().str.contains(q, na=False)
+        if c['code']:
+            qmask |= filtered[c['code']].astype(str).str.contains(q, na=False)
+        filtered = filtered[qmask]
+
+    if c['name']:
+        filtered = filtered.sort_values(c['name'])
+
+    total = len(filtered)
+    start = (page - 1) * limit
+    page_data = filtered.iloc[start:start + limit]
+    keep = [v for v in [c['code'], c['name'], c['short'], c['exch'], c['type'], c['series'], c['expiry'], c['strike'], c['lot']] if v]
+    return {
+        'results': page_data[keep].fillna('').to_dict('records'),
+        'total': total, 'page': page, 'has_more': (start + limit) < total
+    }
+
+
 def search_scrips(query, limit=25):
     df = load_master()
     c = _columns

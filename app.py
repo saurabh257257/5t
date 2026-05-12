@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred
 from modules.holdings import get_holdings_data
-from modules.master import search_scrips, refresh_master, get_scrip_info
+from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
 from modules.market import get_ltp, get_expiry_dates, get_option_chain_data
 
 load_dotenv()
@@ -127,6 +127,21 @@ def api_option_chain():
     ))
 
 
+@app.route('/api/browse')
+def api_browse():
+    return jsonify(browse_scrips(
+        cat=request.args.get('cat', 'all'),
+        query=request.args.get('q', ''),
+        page=int(request.args.get('page', 1)),
+        limit=50
+    ))
+
+
+@app.route('/api/master/status')
+def api_master_status():
+    return jsonify(get_status())
+
+
 @app.route('/api/master/refresh')
 def api_master_refresh():
     try:
@@ -137,6 +152,15 @@ def api_master_refresh():
 
 
 if __name__ == '__main__':
+    import threading
+    def _preload():
+        from modules.master import load_master
+        try:
+            load_master()
+            print("[MASTER] Scrip master loaded")
+        except Exception as e:
+            print(f"[MASTER] Load failed: {e}")
+    threading.Thread(target=_preload, daemon=True).start()
     print("[START] 5Paisa Dashboard")
     print("[URL]   http://0.0.0.0:3000")
     app.run(host='0.0.0.0', port=3000, debug=False)
