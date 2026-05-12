@@ -385,7 +385,7 @@ def verify_pin():
         state = secrets.token_urlsafe(24)
         pending_states[state] = True
         session['pin_verified'] = True
-        callback_url = f"http://{DROPLET_IP}:3000/callback?state={state}"
+        callback_url = f"http://{DROPLET_IP}:3000/callback"
         login_url = (
             f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index"
             f"?VendorKey={cred['USER_KEY']}"
@@ -397,14 +397,15 @@ def verify_pin():
 
 @app.route('/callback')
 def callback():
-    state = request.args.get('state')
-    valid = pending_states.pop(state, False) if state else False
-    if not valid and not session.get('pin_verified'):
-        return redirect('/')
-
-    request_token = request.args.get('RequestToken') or request.args.get('requestToken')
+    request_token = (
+        request.args.get('RequestToken') or
+        request.args.get('requestToken') or
+        request.args.get('request_token')
+    )
     if not request_token:
-        return render_template_string(PIN_PAGE, error="Login failed: no token received.")
+        # Show all received args to help debug if token param name differs
+        args_received = dict(request.args)
+        return render_template_string(PIN_PAGE, error=f"No token received. Params: {args_received}")
 
     try:
         c = FivePaisaClient(cred=cred)
