@@ -2,6 +2,7 @@ from flask import Flask, request, session, redirect, jsonify, render_template_st
 from py5paisa import FivePaisaClient
 import os
 import uuid
+import secrets
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +23,7 @@ cred = {
 }
 
 authenticated_clients = {}
+pending_states = {}  # state_token -> True, for mobile OAuth flow
 
 PIN_PAGE = '''<!DOCTYPE html>
 <html>
@@ -348,12 +350,12 @@ HOLDINGS_PAGE = '''<!DOCTYPE html>
                 const totalRet = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(2) : '0.00';
                 const pnlCls = totalPnl >= 0 ? 'profit' : 'loss';
 
-                document.getElementById('stat-invested').textContent = '&#8377;' + totalInvested.toFixed(2);
-                document.getElementById('stat-value').textContent = '&#8377;' + totalValue.toFixed(2);
+                document.getElementById('stat-invested').innerHTML = '&#8377;' + totalInvested.toFixed(2);
+                document.getElementById('stat-value').innerHTML = '&#8377;' + totalValue.toFixed(2);
                 document.getElementById('stat-pnl').className = 'stat-value ' + pnlCls;
-                document.getElementById('stat-pnl').textContent = (totalPnl >= 0 ? '+' : '') + '&#8377;' + totalPnl.toFixed(2);
+                document.getElementById('stat-pnl').innerHTML = (totalPnl >= 0 ? '+' : '') + '&#8377;' + totalPnl.toFixed(2);
                 document.getElementById('stat-return').className = 'stat-value ' + pnlCls;
-                document.getElementById('stat-return').textContent = (totalRet >= 0 ? '+' : '') + totalRet + '%';
+                document.getElementById('stat-return').innerHTML = (totalPnl >= 0 ? '+' : '') + totalRet + '%';
                 document.getElementById('summary').style.display = 'grid';
 
             } catch (err) {
@@ -380,11 +382,14 @@ def index():
 def verify_pin():
     pin = request.form.get('pin', '').strip()
     if pin == PIN:
+        state = secrets.token_urlsafe(24)
+        pending_states[state] = True
         session['pin_verified'] = True
+        callback_url = f"http://{DROPLET_IP}:3000/callback?state={state}"
         login_url = (
             f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index"
             f"?VendorKey={cred['USER_KEY']}"
-            f"&ResponseURL=http://{DROPLET_IP}:3000/callback"
+            f"&ResponseURL={callback_url}"
         )
         return render_template_string(LOGIN_PAGE, login_url=login_url)
     return render_template_string(PIN_PAGE, error="Incorrect PIN. Please try again.")
@@ -392,7 +397,9 @@ def verify_pin():
 
 @app.route('/callback')
 def callback():
-    if not session.get('pin_verified'):
+    state = request.args.get('state')
+    valid = pending_states.pop(state, False) if state else False
+    if not valid and not session.get('pin_verified'):
         return redirect('/')
 
     request_token = request.args.get('RequestToken') or request.args.get('requestToken')
