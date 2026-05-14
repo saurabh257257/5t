@@ -21,7 +21,7 @@ header {
 .btn-danger:hover { background: #7f1d1d; }
 
 /* Page */
-.page { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+.page { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
 
 /* Live Ticker */
 .ticker {
@@ -64,10 +64,16 @@ header {
 .btn-load:hover { background: #6d28d9; }
 .status-txt { font-size: 0.78em; color: #6b7280; }
 
-/* Option Chain */
+/* Chain + AI two-column layout */
+.chain-ai-wrap {
+  display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px;
+}
+.chain-ai-wrap .chain-card { flex: 1; min-width: 0; margin-bottom: 0; }
+
+/* Option Chain card */
 .chain-card {
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; margin-bottom: 14px;
+  overflow: hidden;
 }
 .chain-scroll { overflow-x: auto; max-height: 560px; overflow-y: auto; }
 .sx-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
@@ -98,6 +104,88 @@ header {
 .ce-ltp  { font-weight: 700; color: #a3e635; }
 .pe-ltp  { font-weight: 700; color: #fb7185; }
 
+/* AI Side Panel */
+.ai-panel {
+  width: 360px; flex-shrink: 0;
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
+  overflow: hidden; position: sticky; top: 70px;
+  max-height: calc(100vh - 90px);
+  display: flex; flex-direction: column;
+  animation: slideIn 0.2s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
+
+.ai-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f;
+  flex-shrink: 0;
+}
+.ai-header-left { display: flex; align-items: center; gap: 8px; }
+.ai-title { font-weight: 700; font-size: 0.9em; color: #e2e8f0; }
+.ai-badge {
+  font-size: 0.6em; padding: 2px 7px; border-radius: 10px;
+  background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a;
+  font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+}
+.ai-header-right { display: flex; align-items: center; gap: 6px; }
+.ai-refresh {
+  padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
+  transition: all 0.15s;
+}
+.ai-refresh:hover { border-color: #7c3aed; color: #a78bfa; }
+.btn-close {
+  padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600;
+  cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa;
+}
+.btn-close:hover { background: #2d2b4e; }
+
+.ai-body {
+  padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; color: #cbd5e1;
+}
+.ai-loading { padding: 40px; text-align: center; color: #4b5563; }
+.ai-loading .spinner {
+  width: 26px; height: 26px; border: 2px solid #2d2b4e; border-top-color: #7c3aed;
+  border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px;
+}
+.ai-loading-text { font-size: 0.82em; color: #6b7280; }
+.ai-loading-sub  { font-size: 0.72em; color: #4b5563; margin-top: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* AI Content sections */
+.ai-strike-bar {
+  padding: 10px 16px; background: rgba(124,58,237,0.08);
+  border-bottom: 1px solid #2d2b4e;
+  display: flex; gap: 14px; flex-wrap: wrap;
+}
+.ai-strike-info { font-size: 0.78em; }
+.ai-strike-info .lbl { color: #6b7280; font-size: 0.85em; }
+.ai-strike-info .val { font-weight: 700; }
+.ai-strike-info .val.ce { color: #34d399; }
+.ai-strike-info .val.pe { color: #f87171; }
+.ai-strike-info .val.str { color: #a78bfa; }
+
+.ai-content { padding: 14px 16px; }
+.ai-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #1e1c35; }
+.ai-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.ai-section-title {
+  font-size: 0.7em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #7c3aed; margin-bottom: 5px;
+  display: flex; align-items: center; gap: 5px;
+}
+.ai-section-body { color: #cbd5e1; font-size: 0.88em; line-height: 1.65; }
+.ai-section-body strong { color: #e2e8f0; }
+.ai-section-body .bull { color: #34d399; font-weight: 600; }
+.ai-section-body .bear { color: #f87171; font-weight: 600; }
+.ai-section-body .neu  { color: #fbbf24; font-weight: 600; }
+.ai-error { padding: 20px 16px; color: #f87171; font-size: 0.82em; }
+.ai-trade-box {
+  background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a;
+  border-radius: 8px; padding: 10px 12px; margin-top: 6px;
+  font-size: 0.88em; color: #c4b5fd; line-height: 1.6;
+}
+.ai-trade-box strong { color: #a78bfa; }
+
 /* Chart */
 .chart-card {
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
@@ -110,8 +198,8 @@ header {
 }
 .chart-title { font-weight: 700; font-size: 0.92em; color: #a78bfa; }
 .chart-sub   { font-size: 0.75em; color: #6b7280; margin-top: 2px; }
-.btn-close { padding: 5px 12px; border-radius: 7px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
-.btn-close:hover { background: #2d2b4e; }
+.chart-close { padding: 5px 12px; border-radius: 7px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
+.chart-close:hover { background: #2d2b4e; }
 .chart-toolbar {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 10px 20px; border-bottom: 1px solid #1e1c35; background: #15131f;
@@ -139,7 +227,12 @@ header {
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
 .state-icon { font-size: 2.4em; margin-bottom: 12px; }
 .spinner { width: 30px; height: 30px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .chain-ai-wrap { flex-direction: column; }
+  .ai-panel { width: 100%; position: static; max-height: none; }
+}
 </style>
 </head>
 <body>
@@ -179,14 +272,39 @@ header {
     <span class="status-txt" id="statusTxt"></span>
   </div>
 
-  <!-- Option Chain -->
-  <div class="chain-card">
-    <div id="chainBody">
-      <div class="state-box">
-        <div class="state-icon">&#x1F4CA;</div>
-        Select an expiry and click Load Chain
+  <!-- Option Chain + AI Panel (side by side) -->
+  <div class="chain-ai-wrap">
+
+    <!-- Option Chain -->
+    <div class="chain-card">
+      <div id="chainBody">
+        <div class="state-box">
+          <div class="state-icon">&#x1F4CA;</div>
+          Select an expiry and click Load Chain
+        </div>
       </div>
     </div>
+
+    <!-- AI Analysis Side Panel -->
+    <div class="ai-panel" id="aiPanel" style="display:none">
+      <div class="ai-header">
+        <div class="ai-header-left">
+          <span class="ai-title" id="aiTitle">Analysis</span>
+          <span class="ai-badge">Claude AI</span>
+        </div>
+        <div class="ai-header-right">
+          <button class="ai-refresh" onclick="reanalyze()" title="Re-analyze">&#x21BB; Refresh</button>
+          <button class="btn-close" onclick="closeAiPanel()">&#x2715;</button>
+        </div>
+      </div>
+      <div class="ai-body" id="aiBody">
+        <div class="ai-loading">
+          <div class="spinner"></div>
+          <div class="ai-loading-text">Analyzing…</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Chart (hidden until row clicked) -->
@@ -196,7 +314,7 @@ header {
         <div class="chart-title" id="chartTitle">—</div>
         <div class="chart-sub" id="chartSub">15-Min Candles · 2 Days</div>
       </div>
-      <button class="btn-close" onclick="closeChart()">&#x2715; Close</button>
+      <button class="chart-close" onclick="closeChart()">&#x2715; Close</button>
     </div>
 
     <!-- Toolbar -->
@@ -274,6 +392,9 @@ async function loadExpiries() {
 }
 
 // ── Option Chain ──────────────────────────────────────────────────────────────
+// Store chain data for AI panel access
+let chainData = [];
+
 async function loadChain() {
   const sel   = document.getElementById('expirySelect');
   const ts    = sel.value;
@@ -284,6 +405,7 @@ async function loadChain() {
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="spinner"></div>Loading option chain…</div>';
   closeChart();
+  closeAiPanel();
 
   const d = await get(`/api/option-chain?exch=B&symbol=SENSEX&expiry_ts=${ts}`);
   document.getElementById('statusTxt').textContent = '';
@@ -294,6 +416,8 @@ async function loadChain() {
     return;
   }
 
+  chainData = d.option_chain;
+
   // Find ATM
   const ltpVal = parseFloat(document.getElementById('sxLtp').textContent.replace(/,/g,'')) || 0;
   const strikes = d.option_chain.map(r => r.strike);
@@ -301,9 +425,10 @@ async function loadChain() {
 
   const rows = d.option_chain.map(r => {
     const isAtm = r.strike === atm;
-    const ce = r.ce_scrip ? `onclick="pick(this,'ce',${r.ce_scrip},'SENSEX ${r.strike} CE')"` : '';
-    const pe = r.pe_scrip ? `onclick="pick(this,'pe',${r.pe_scrip},'SENSEX ${r.strike} PE')"` : '';
-    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}">
+    const cs = r.ce_scrip || 0, ps = r.pe_scrip || 0;
+    const ce = cs ? `onclick="pick(this,'ce',${cs},'SENSEX ${r.strike} CE',${r.strike},${cs},${ps})"` : '';
+    const pe = ps ? `onclick="pick(this,'pe',${ps},'SENSEX ${r.strike} PE',${r.strike},${cs},${ps})"` : '';
+    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}" data-ce="${cs}" data-pe="${ps}">
       <td class="ce-td ce-cell" ${ce}>${fmtChg(r.ce_chg_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_vol)}</td>
@@ -336,7 +461,7 @@ async function loadChain() {
     </div>`;
 
   document.getElementById('statusTxt').textContent =
-    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell to view 1-min chart`;
+    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell`;
 
   setTimeout(() => {
     document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -346,6 +471,9 @@ async function loadChain() {
 // ── Chart state ───────────────────────────────────────────────────────────────
 let chartScrip = null, chartName = '', chartIv = '15m', chartDays = 2;
 let arEnabled = true, arTimer = null, arCountdown = 60, arTick = null;
+
+// AI state
+let currentStrike = null, currentCeScrip = null, currentPeScrip = null, currentName = '';
 
 function setInterval_(iv) {
   chartIv = iv;
@@ -383,11 +511,18 @@ function stopArCountdown() {
   document.getElementById('arCount').textContent = '—';
 }
 
-function pick(cell, side, scripCode, name) {
+function pick(cell, side, scripCode, name, strike, ceScrip, peScrip) {
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
   cell.closest('tr').classList.add(side === 'ce' ? 'sel-ce' : 'sel-pe');
+
   chartScrip = scripCode; chartName = name;
+  currentStrike = strike; currentCeScrip = ceScrip; currentPeScrip = peScrip; currentName = name;
+
+  // Find chain row for LTP display
+  const row = chainData.find(r => r.strike === strike);
+
   showChart(false);
+  showAnalysis(strike, ceScrip, peScrip, name, row);
 }
 
 async function refreshChart() { if (chartScrip) showChart(true); }
@@ -422,7 +557,6 @@ async function showChart(silent = false) {
   const closes = c.map(x => parseFloat(x.Close || x.close || 0));
   const vols   = c.map(x => parseInt  (x.Volume|| x.volume|| 0));
 
-  // Format x labels as HH:MM, prefix with "DD Mon" on first candle of each day
   const labels = raw.map((dt, i) => {
     const d  = new Date(dt);
     const hm = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
@@ -433,7 +567,6 @@ async function showChart(silent = false) {
       : hm;
   });
 
-  // Thin ticks so x-axis stays readable
   const tickStep = chartIv === '1m' ? 30 : chartIv === '5m' ? 12 : chartIv === '15m' ? 4 : 2;
   const tickvals = [], ticktext = [];
   labels.forEach((l, i) => { if (i % tickStep === 0) { tickvals.push(raw[i]); ticktext.push(l); } });
@@ -445,8 +578,8 @@ async function showChart(silent = false) {
       name: chartName,
       increasing: { line: { color: '#34d399' }, fillcolor: 'rgba(52,211,153,0.85)' },
       decreasing: { line: { color: '#f87171' }, fillcolor: 'rgba(248,113,113,0.85)' },
-      hovertext: raw.map((dt, i) => {
-        const d  = new Date(dt);
+      hovertext: raw.map(dt => {
+        const d = new Date(dt);
         return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' +
                d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
       }),
@@ -463,13 +596,8 @@ async function showChart(silent = false) {
     margin: { t: 10, b: 55, l: 68, r: 20 },
     showlegend: false,
     xaxis: {
-      type: 'category',
-      tickvals, ticktext,
-      tickangle: -35,
-      tickfont: { size: 10 },
-      gridcolor: '#1e1c35',
-      color: '#6b7280',
-      rangeslider: { visible: false },
+      type: 'category', tickvals, ticktext, tickangle: -35, tickfont: { size: 10 },
+      gridcolor: '#1e1c35', color: '#6b7280', rangeslider: { visible: false },
     },
     yaxis:  { gridcolor: '#1e1c35', color: '#6b7280', domain: [0.25, 1], tickprefix: '₹' },
     yaxis2: { gridcolor: '#1e1c35', color: '#6b7280', domain: [0, 0.2],
@@ -477,16 +605,12 @@ async function showChart(silent = false) {
   };
 
   const config = {
-    responsive: true,
-    displayModeBar: true,
-    displaylogo: false,
+    responsive: true, displayModeBar: true, displaylogo: false,
     modeBarButtonsToRemove: ['autoScale2d','lasso2d','select2d','toggleSpikelines',
                              'hoverClosestCartesian','hoverCompareCartesian'],
   };
 
   Plotly.react('chartDiv', traces, layout, config);
-
-  // restart countdown after manual refresh
   if (arEnabled) startArCountdown();
 }
 
@@ -496,6 +620,118 @@ function closeChart() {
   document.getElementById('chartCard').style.display = 'none';
   document.getElementById('chartDiv').innerHTML = '';
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
+}
+
+// ── AI Analysis Panel ─────────────────────────────────────────────────────────
+function inlineMd(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em style="color:#94a3b8">$1</em>')
+    .replace(/`(.+?)`/g, '<code style="background:#1e1c35;padding:1px 4px;border-radius:3px;color:#a78bfa">$1</code>')
+    .replace(/bullish/gi, '<span class="bull">Bullish</span>')
+    .replace(/bearish/gi, '<span class="bear">Bearish</span>')
+    .replace(/neutral/gi, '<span class="neu">Neutral</span>');
+}
+
+const SECTION_ICONS = {
+  'trend': '📈', 'key level': '🎯', 'volume': '📊',
+  'bias': '⚖️', 'market bias': '⚖️', 'trade': '💡', 'trade idea': '💡'
+};
+
+function renderAnalysis(text) {
+  if (!text) return '<div class="ai-error">No response received.</div>';
+
+  // Split into numbered sections like "1. **Trend** — ..."
+  const sectionRe = /^\d+\.\s+\*\*(.+?)\*\*\s*[—–-]?\s*([\s\S]*?)(?=^\d+\.\s+\*\*|\s*$)/gm;
+  const sections = [];
+  let match;
+  while ((match = sectionRe.exec(text + '\n')) !== null) {
+    sections.push({ title: match[1].trim(), body: match[2].trim() });
+  }
+
+  // If structured sections found, render them nicely
+  if (sections.length > 0) {
+    const html = sections.map(s => {
+      const iconKey = Object.keys(SECTION_ICONS).find(k => s.title.toLowerCase().includes(k));
+      const icon = iconKey ? SECTION_ICONS[iconKey] : '•';
+      const isTradeIdea = s.title.toLowerCase().includes('trade');
+      const bodyHtml = inlineMd(s.body.replace(/\n/g, ' '));
+      return `<div class="ai-section">
+        <div class="ai-section-title">${icon} ${s.title}</div>
+        ${isTradeIdea
+          ? `<div class="ai-trade-box">${bodyHtml}</div>`
+          : `<div class="ai-section-body">${bodyHtml}</div>`}
+      </div>`;
+    }).join('');
+    return `<div class="ai-content">${html}</div>`;
+  }
+
+  // Fallback: render as simple paragraphs
+  const lines = text.split('\n').filter(l => l.trim());
+  const html = lines.map(l => `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('');
+  return `<div class="ai-content">${html}</div>`;
+}
+
+async function showAnalysis(strike, ceScrip, peScrip, name, row) {
+  const panel = document.getElementById('aiPanel');
+  const body  = document.getElementById('aiBody');
+
+  panel.style.display = 'flex';
+  document.getElementById('aiTitle').textContent = `SENSEX ${strike}`;
+
+  // Show strike metadata bar + spinner
+  const ceLtp = row ? fmt2(row.ce_ltp) : '—';
+  const peLtp = row ? fmt2(row.pe_ltp) : '—';
+  body.innerHTML = `
+    <div class="ai-strike-bar">
+      <div class="ai-strike-info">
+        <div class="lbl">Strike</div>
+        <div class="val str">${strike}</div>
+      </div>
+      <div class="ai-strike-info">
+        <div class="lbl">CE LTP</div>
+        <div class="val ce">₹${ceLtp}</div>
+      </div>
+      <div class="ai-strike-info">
+        <div class="lbl">PE LTP</div>
+        <div class="val pe">₹${peLtp}</div>
+      </div>
+      <div class="ai-strike-info">
+        <div class="lbl">Interval</div>
+        <div class="val">${chartIv} · ${chartDays}D</div>
+      </div>
+    </div>
+    <div class="ai-loading">
+      <div class="spinner"></div>
+      <div class="ai-loading-text">Claude is analyzing…</div>
+      <div class="ai-loading-sub">Fetching CE &amp; PE history and running analysis</div>
+    </div>`;
+
+  const d = await get(
+    `/api/analyze?ce_scrip=${ceScrip}&pe_scrip=${peScrip}&strike=${strike}&interval=${chartIv}&days=${chartDays}`
+  );
+
+  // Preserve the metadata bar, replace only the loading area
+  const bar = body.querySelector('.ai-strike-bar')?.outerHTML || '';
+
+  if (d.error) {
+    body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`;
+    return;
+  }
+
+  body.innerHTML = bar + renderAnalysis(d.summary);
+}
+
+function closeAiPanel() {
+  document.getElementById('aiPanel').style.display = 'none';
+  currentStrike = null; currentCeScrip = null; currentPeScrip = null;
+}
+
+function reanalyze() {
+  if (currentStrike) {
+    const row = chainData.find(r => r.strike === currentStrike);
+    showAnalysis(currentStrike, currentCeScrip, currentPeScrip, currentName, row);
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

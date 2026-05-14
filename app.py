@@ -1,5 +1,6 @@
 from flask import Flask, request, session, redirect, jsonify, render_template
 import os
+import anthropic as _anthropic
 from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred
 from modules.holdings import get_holdings_data
@@ -170,6 +171,71 @@ def api_master_refresh():
     try:
         df = refresh_master()
         return jsonify({"success": True, "rows": len(df)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyze')
+def api_analyze():
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    ce_scrip = request.args.get('ce_scrip', 0, type=int)
+    pe_scrip = request.args.get('pe_scrip', 0, type=int)
+    strike   = request.args.get('strike', '')
+    interval = request.args.get('interval', '15m')
+    days     = request.args.get('days', 2, type=int)
+
+    def fmt_candles(data, label):
+        if 'error' in data or not data.get('candles'):
+            return f"{label}: No data available"
+        cs = data['candles'][-40:]
+        lines = [f"{label} ({len(cs)} candles, {interval} interval):"]
+        for c in cs:
+            lines.append(
+                f"  {c.get('Datetime','')} "
+                f"O:{float(c.get('Open',0)):.0f} "
+                f"H:{float(c.get('High',0)):.0f} "
+                f"L:{float(c.get('Low',0)):.0f} "
+                f"C:{float(c.get('Close',0)):.0f} "
+                f"V:{int(c.get('Volume',0))}"
+            )
+        return "\n".join(lines)
+
+    ce_text = fmt_candles(
+        get_historical_data(client, 'B', 'D', ce_scrip, interval, days),
+        f"SENSEX {strike} CE"
+    ) if ce_scrip else f"SENSEX {strike} CE: Not available"
+
+    pe_text = fmt_candles(
+        get_historical_data(client, 'B', 'D', pe_scrip, interval, days),
+        f"SENSEX {strike} PE"
+    ) if pe_scrip else f"SENSEX {strike} PE: Not available"
+
+    prompt = f"""You are a professional options trader. Analyze this {interval} OHLCV data for SENSEX {strike} strike and give a trading summary.
+
+{ce_text}
+
+{pe_text}
+
+Provide a concise analysis with exactly these sections:
+1. **Trend** — CE and PE price direction (rising/falling/sideways)
+2. **Key Levels** — notable support/resistance for each option
+3. **Volume Signal** — any significant volume spikes or dryup
+4. **Market Bias** — bullish / bearish / neutral with one-line reason
+5. **Trade Idea** — specific entry if a clear setup exists, otherwise "No clear setup"
+
+Max 250 words. Use ₹ for prices. Be direct and specific."""
+
+    try:
+        ac = _anthropic.Anthropic()
+        resp = ac.messages.create(
+            model="claude-opus-4-7",
+            max_tokens=700,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return jsonify({"summary": resp.content[0].text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
