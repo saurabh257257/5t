@@ -108,8 +108,10 @@ def get_option_chain_data(client, exch, symbol, expiry_ts):
 
 def get_historical_data(client, exch, exch_type, scrip_code, interval="1m"):
     try:
-        today = _date.today().strftime('%Y-%m-%d')
-        df = client.historical_data(exch, exch_type, int(scrip_code), interval, today, today)
+        from datetime import timedelta
+        today     = _date.today().strftime('%Y-%m-%d')
+        yesterday = (_date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+        df = client.historical_data(exch, exch_type, int(scrip_code), interval, yesterday, today)
         if df is None:
             return {"error": "No data returned"}
         return {"candles": df.to_dict(orient='records')}

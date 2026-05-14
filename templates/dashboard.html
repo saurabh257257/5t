@@ -3,822 +3,370 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>5Paisa Dashboard</title>
+<title>SENSEX Options</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
-.app { display: flex; flex-direction: column; min-height: 100vh; }
 
 /* Header */
 header {
   background: #1a1830; border-bottom: 1px solid #2d2b4e;
   padding: 0 24px; display: flex; align-items: center;
-  justify-content: space-between; height: 60px;
+  justify-content: space-between; height: 56px;
   position: sticky; top: 0; z-index: 100;
 }
-.logo { display: flex; align-items: center; gap: 10px; font-size: 1.1em; font-weight: 700; color: #a78bfa; }
-.header-right { display: flex; align-items: center; gap: 10px; }
-.btn-sm { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
-.btn-ghost { background: transparent; color: #a78bfa; border: 1px solid #4c3f8a; }
-.btn-ghost:hover { background: #2d2b4e; }
-.btn-danger { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+.logo { font-size: 1em; font-weight: 700; color: #a78bfa; }
+.btn-danger { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: none; background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
 .btn-danger:hover { background: #7f1d1d; }
 
-/* Tab Bar */
-.tabs { display: flex; background: #1a1830; border-bottom: 1px solid #2d2b4e; padding: 0 24px; }
-.tab { padding: 14px 20px; cursor: pointer; font-size: 0.88em; font-weight: 600; color: #6b7280; border-bottom: 2px solid transparent; transition: all 0.2s; user-select: none; }
-.tab:hover { color: #a78bfa; }
-.tab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
-
-/* Content */
-.content { flex: 1; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
-
-/* Summary Cards */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.stat-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; padding: 20px; }
-.stat-label { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.8px; color: #6b7280; margin-bottom: 8px; }
-.stat-value { font-size: 1.6em; font-weight: 700; color: #e2e8f0; }
-.stat-value.profit { color: #34d399; }
-.stat-value.loss   { color: #f87171; }
-
-/* Table Card */
-.table-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
-.table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2d2b4e; }
-.table-title { font-weight: 700; font-size: 0.95em; color: #a78bfa; }
-table { width: 100%; border-collapse: collapse; }
-thead { background: #12111f; }
-th { padding: 12px 16px; text-align: left; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.6px; color: #6b7280; border-bottom: 1px solid #2d2b4e; white-space: nowrap; }
-td { padding: 13px 16px; border-bottom: 1px solid #1e1c35; font-size: 0.88em; color: #cbd5e1; }
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover td { background: #1e1c35; }
-.symbol-cell { font-weight: 700; color: #e2e8f0; }
-.profit { color: #34d399; font-weight: 600; }
-.loss   { color: #f87171; font-weight: 600; }
-
-/* Search Layout */
-.search-layout { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
-@media (max-width: 900px) { .search-layout { grid-template-columns: 1fr; } }
-
-/* Left Panel */
-.search-panel { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
-.cat-bar { display: flex; flex-wrap: wrap; gap: 0; background: #12111f; border-bottom: 1px solid #2d2b4e; padding: 8px 8px 0; }
-.cat-btn { padding: 7px 12px; font-size: 0.77em; font-weight: 600; border: none; border-radius: 6px 6px 0 0; cursor: pointer; background: transparent; color: #6b7280; border-bottom: 2px solid transparent; transition: all 0.15s; }
-.cat-btn:hover { color: #a78bfa; }
-.cat-btn.active { color: #a78bfa; border-bottom-color: #7c3aed; background: #1a1830; }
-.search-box { padding: 10px; border-bottom: 1px solid #2d2b4e; }
-.search-input { width: 100%; padding: 9px 13px; background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px; color: #e2e8f0; font-size: 0.88em; outline: none; transition: border-color 0.2s; }
-.search-input:focus { border-color: #7c3aed; }
-.results-meta { padding: 7px 14px; font-size: 0.73em; color: #4b5563; border-bottom: 1px solid #1e1c35; }
-.search-results { max-height: 520px; overflow-y: auto; }
-.result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #1e1c35; transition: background 0.12s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.result-item:last-child { border-bottom: none; }
-.result-item:hover, .result-item.selected { background: #2d2b4e; }
-.result-left { flex: 1; min-width: 0; }
-.result-name { font-weight: 600; font-size: 0.85em; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.result-meta { font-size: 0.72em; color: #6b7280; margin-top: 2px; }
-.result-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.68em; font-weight: 700; flex-shrink: 0; }
-.badge-eq  { background: #1e3a5f; color: #60a5fa; }
-.badge-fut { background: #1a3a2a; color: #4ade80; }
-.badge-opt { background: #3b2a00; color: #fbbf24; }
-.badge-fno { background: #3b1d6e; color: #c084fc; }
-.badge-com { background: #2a1800; color: #fb923c; }
-.load-more-btn { width: 100%; padding: 11px; background: #12111f; color: #7c3aed; font-size: 0.82em; font-weight: 600; border: none; border-top: 1px solid #2d2b4e; cursor: pointer; transition: background 0.15s; }
-.load-more-btn:hover { background: #1e1c35; }
-
-/* Right Detail Panel */
-.detail-panel { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; padding: 20px; }
-.detail-header { margin-bottom: 20px; }
-.detail-symbol { font-size: 1.5em; font-weight: 800; color: #e2e8f0; }
-.detail-name { font-size: 0.85em; color: #6b7280; margin-top: 4px; }
-.price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
-.price-card { background: #12111f; border: 1px solid #2d2b4e; border-radius: 10px; padding: 14px; }
-.price-label { font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; margin-bottom: 6px; }
-.price-value { font-size: 1.15em; font-weight: 700; color: #e2e8f0; }
-.price-value.ltp-value { font-size: 1.5em; color: #a78bfa; }
-
-/* Option Chain (Search Tab) */
-.oc-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.oc-select { padding: 8px 12px; background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px; color: #e2e8f0; font-size: 0.85em; outline: none; cursor: pointer; }
-.btn-load { padding: 8px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; }
-.btn-load:hover { background: #6d28d9; }
-.oc-table-wrap { overflow-x: auto; }
-.oc-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
-.oc-table th { padding: 10px 12px; text-align: right; font-size: 0.72em; letter-spacing: 0.5px; color: #6b7280; background: #12111f; border-bottom: 1px solid #2d2b4e; }
-.oc-table th.strike-col { text-align: center; background: #1e1c35; color: #a78bfa; }
-.oc-table th.call-side { color: #34d399; }
-.oc-table th.put-side  { color: #f87171; }
-.oc-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #1e1c35; color: #cbd5e1; }
-.oc-table td.strike-col { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
-.oc-table tr.atm td { background: #1e1c35 !important; }
-.oc-table tr.atm td.strike-col { background: #2d2b4e !important; }
-
-/* ─── SENSEX TAB ─────────────────────────────────────────────────────────────── */
+/* Page */
+.page { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
 
 /* Live Ticker */
-.sensex-ticker {
+.ticker {
   background: linear-gradient(135deg, #1a1830 0%, #1e1c45 100%);
   border: 1px solid #2d2b4e; border-radius: 14px;
-  padding: 16px 24px; margin-bottom: 16px;
+  padding: 18px 24px; margin-bottom: 14px;
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
 }
-.ticker-left { display: flex; align-items: baseline; gap: 14px; }
-.ticker-label { font-size: 0.8em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
-.ticker-ltp { font-size: 2.2em; font-weight: 800; color: #e2e8f0; line-height: 1; }
+.ticker-left  { display: flex; align-items: baseline; gap: 14px; }
+.ticker-label { font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+.ticker-ltp   { font-size: 2.4em; font-weight: 800; color: #e2e8f0; line-height: 1; }
 .ticker-change { font-size: 1em; font-weight: 700; }
-.ticker-right { display: flex; align-items: center; gap: 16px; }
-.ticker-ohlc { font-size: 0.8em; color: #6b7280; }
+.ticker-right { display: flex; align-items: center; gap: 20px; }
+.ticker-ohlc  { font-size: 0.8em; color: #6b7280; line-height: 1.6; }
 .ticker-ohlc span { color: #94a3b8; font-weight: 600; }
-.live-badge {
+.live-dot {
   font-size: 0.72em; font-weight: 700; color: #34d399;
   display: flex; align-items: center; gap: 5px;
 }
-.live-badge::before {
+.live-dot::before {
   content: ''; display: inline-block; width: 7px; height: 7px;
-  background: #34d399; border-radius: 50%;
-  animation: pulse 1.5s infinite;
+  background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite;
 }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 .ticker-time { font-size: 0.75em; color: #4b5563; }
 
-/* SENSEX Controls */
-.sx-controls {
+/* Controls */
+.controls {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 10px;
-  padding: 12px 16px; margin-bottom: 16px;
+  padding: 12px 18px; margin-bottom: 14px;
 }
-.sx-controls label { font-size: 0.82em; color: #6b7280; font-weight: 600; }
+.controls label { font-size: 0.82em; color: #6b7280; font-weight: 600; }
 .sx-select {
   padding: 8px 14px; background: #12111f; border: 1px solid #2d2b4e;
-  border-radius: 8px; color: #e2e8f0; font-size: 0.85em; outline: none; cursor: pointer;
-  min-width: 220px;
+  border-radius: 8px; color: #e2e8f0; font-size: 0.85em; outline: none; cursor: pointer; min-width: 220px;
 }
 .sx-select:focus { border-color: #7c3aed; }
-.btn-sx { padding: 8px 18px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-.btn-sx:hover { background: #6d28d9; }
-.sx-status { font-size: 0.78em; color: #6b7280; }
+.btn-load { padding: 8px 20px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; }
+.btn-load:hover { background: #6d28d9; }
+.status-txt { font-size: 0.78em; color: #6b7280; }
 
-/* SENSEX Option Chain Table */
-.sx-chain-wrap {
+/* Option Chain */
+.chain-card {
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; margin-bottom: 16px;
+  overflow: hidden; margin-bottom: 14px;
 }
-.sx-chain-scroll { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+.chain-scroll { overflow-x: auto; max-height: 560px; overflow-y: auto; }
 .sx-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
 .sx-table thead { position: sticky; top: 0; z-index: 10; }
 .sx-table th {
-  padding: 10px 14px; font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.5px;
-  background: #12111f; border-bottom: 1px solid #2d2b4e; white-space: nowrap;
+  padding: 10px 14px; font-size: 0.7em; text-transform: uppercase;
+  letter-spacing: 0.5px; background: #12111f; border-bottom: 1px solid #2d2b4e; white-space: nowrap;
 }
-.sx-table th.ce-hd { text-align: right; color: #34d399; }
-.sx-table th.pe-hd { text-align: left;  color: #f87171; }
-.sx-table th.strike-hd { text-align: center; color: #a78bfa; background: #1e1c35; min-width: 90px; }
-.sx-table td { padding: 9px 14px; border-bottom: 1px solid #1e1c35; white-space: nowrap; color: #cbd5e1; }
-.sx-table td.ce-td { text-align: right; }
-.sx-table td.pe-td { text-align: left;  }
-.sx-table td.strike-td { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
-.sx-table tr.atm-row td { background: rgba(124,58,237,0.08) !important; }
-.sx-table tr.atm-row td.strike-td { background: rgba(124,58,237,0.25) !important; }
-.sx-table tr:hover td { background: #1e1c35; }
-.sx-table tr:hover td.strike-td { background: #2d2b4e; }
-.ce-click { cursor: pointer; }
-.pe-click { cursor: pointer; }
-.ce-click:hover { background: rgba(52,211,153,0.08) !important; }
-.pe-click:hover { background: rgba(248,113,113,0.08) !important; }
-.sx-table tr.selected-ce td.ce-td { background: rgba(52,211,153,0.12) !important; }
-.sx-table tr.selected-pe td.pe-td { background: rgba(248,113,113,0.12) !important; }
+.sx-table th.ce-hd    { text-align: right; color: #34d399; }
+.sx-table th.pe-hd    { text-align: left;  color: #f87171; }
+.sx-table th.str-hd   { text-align: center; color: #a78bfa; background: #1e1c35; min-width: 100px; }
+.sx-table td          { padding: 9px 14px; border-bottom: 1px solid #1e1c35; white-space: nowrap; color: #cbd5e1; }
+.sx-table td.ce-td    { text-align: right; }
+.sx-table td.pe-td    { text-align: left;  }
+.sx-table td.str-td   { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
+.sx-table tr.atm td   { background: rgba(124,58,237,0.08) !important; }
+.sx-table tr.atm td.str-td { background: rgba(124,58,237,0.22) !important; }
+.sx-table tr:hover td { background: #1e1c35; cursor: default; }
+.sx-table tr:hover td.str-td { background: #2d2b4e; }
+.ce-cell { cursor: pointer; }
+.pe-cell { cursor: pointer; }
+.ce-cell:hover { background: rgba(52,211,153,0.1) !important; }
+.pe-cell:hover { background: rgba(248,113,113,0.1) !important; }
+.sx-table tr.sel-ce td.ce-td { background: rgba(52,211,153,0.13) !important; }
+.sx-table tr.sel-pe td.pe-td { background: rgba(248,113,113,0.13) !important; }
 .chg-pos { color: #34d399; font-weight: 600; }
 .chg-neg { color: #f87171; font-weight: 600; }
+.ce-ltp  { font-weight: 700; color: #a3e635; }
+.pe-ltp  { font-weight: 700; color: #fb7185; }
 
-/* Chart Panel */
-.sx-chart-panel {
+/* Chart */
+.chart-card {
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; animation: slideUp 0.25s ease;
+  overflow: hidden; animation: slideUp 0.2s ease;
 }
-@keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 .chart-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; border-bottom: 1px solid #2d2b4e; background: #12111f;
+  padding: 13px 20px; border-bottom: 1px solid #2d2b4e; background: #12111f;
 }
 .chart-title { font-weight: 700; font-size: 0.92em; color: #a78bfa; }
-.chart-meta  { font-size: 0.78em; color: #6b7280; margin-left: 8px; }
-.chart-body  { padding: 8px; }
+.chart-sub   { font-size: 0.75em; color: #6b7280; margin-top: 2px; }
+.btn-close { padding: 5px 12px; border-radius: 7px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
+.btn-close:hover { background: #2d2b4e; }
 
 /* States */
-.state-box { padding: 48px; text-align: center; color: #4b5563; font-size: 0.9em; }
-.state-icon { font-size: 2.5em; margin-bottom: 12px; }
-.spinner { width: 32px; height: 32px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
+.state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
+.state-icon { font-size: 2.4em; margin-bottom: 12px; }
+.spinner { width: 30px; height: 30px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div class="app">
 
-  <header>
-    <div class="logo"><span>&#x1F4BC;</span> 5Paisa Dashboard</div>
-    <div class="header-right">
-      <button class="btn-sm btn-ghost" onclick="refreshCurrent()">&#x21BB; Refresh</button>
-      <a href="/logout"><button class="btn-sm btn-danger">Logout</button></a>
+<header>
+  <div class="logo">&#x1F4CA; SENSEX Options Dashboard</div>
+  <a href="/logout"><button class="btn-danger">Logout</button></a>
+</header>
+
+<div class="page">
+
+  <!-- Live Ticker -->
+  <div class="ticker">
+    <div class="ticker-left">
+      <span class="ticker-label">SENSEX</span>
+      <span class="ticker-ltp" id="sxLtp">—</span>
+      <span class="ticker-change" id="sxChange">—</span>
     </div>
-  </header>
-
-  <nav class="tabs">
-    <div class="tab active" data-tab="holdings">&#x1F4C8; Holdings</div>
-    <div class="tab" data-tab="search">&#x1F50D; Search Scrip</div>
-    <div class="tab" data-tab="sensex">&#x1F4CA; SENSEX Options</div>
-  </nav>
-
-  <main class="content">
-
-    <!-- ── Holdings Tab ──────────────────────────────────────────────────────── -->
-    <section class="tab-panel active" id="panel-holdings">
-      <div class="summary-grid" id="summary" style="display:none">
-        <div class="stat-card"><div class="stat-label">Total Invested</div><div class="stat-value" id="s-invested">—</div></div>
-        <div class="stat-card"><div class="stat-label">Current Value</div><div class="stat-value" id="s-value">—</div></div>
-        <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-value" id="s-pnl">—</div></div>
-        <div class="stat-card"><div class="stat-label">Return</div><div class="stat-value" id="s-return">—</div></div>
+    <div class="ticker-right">
+      <div class="ticker-ohlc">
+        O&nbsp;<span id="sxOpen">—</span>&nbsp;&nbsp;
+        H&nbsp;<span id="sxHigh" style="color:#34d399">—</span>&nbsp;&nbsp;
+        L&nbsp;<span id="sxLow" style="color:#f87171">—</span>
       </div>
-      <div class="table-card">
-        <div class="table-header"><span class="table-title">Your Holdings</span></div>
-        <div id="holdings-body"><div class="state-box"><div class="spinner"></div>Loading holdings…</div></div>
+      <span class="live-dot">LIVE</span>
+      <span class="ticker-time" id="sxTime">—</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <label>Expiry</label>
+    <select class="sx-select" id="expirySelect">
+      <option value="">Loading expiries…</option>
+    </select>
+    <button class="btn-load" onclick="loadChain()">Load Chain</button>
+    <span class="status-txt" id="statusTxt"></span>
+  </div>
+
+  <!-- Option Chain -->
+  <div class="chain-card">
+    <div id="chainBody">
+      <div class="state-box">
+        <div class="state-icon">&#x1F4CA;</div>
+        Select an expiry and click Load Chain
       </div>
-    </section>
+    </div>
+  </div>
 
-    <!-- ── Search Tab ────────────────────────────────────────────────────────── -->
-    <section class="tab-panel" id="panel-search">
-      <div class="search-layout">
-        <div class="search-panel">
-          <div class="cat-bar">
-            <button class="cat-btn active" data-cat="all">All</button>
-            <button class="cat-btn" data-cat="equity">Equity</button>
-            <button class="cat-btn" data-cat="futures">Futures</button>
-            <button class="cat-btn" data-cat="options">Options</button>
-            <button class="cat-btn" data-cat="commodity">Commodity</button>
-          </div>
-          <div class="search-box">
-            <input type="text" class="search-input" id="searchInput"
-              placeholder="&#x1F50D;  Search name, symbol or code…" autocomplete="off">
-          </div>
-          <div class="results-meta" id="resultsMeta">Checking master data…</div>
-          <div class="search-results" id="searchResults">
-            <div class="state-box"><div class="spinner"></div>Loading scrip master…</div>
-          </div>
-          <button class="load-more-btn" id="loadMoreBtn" style="display:none" onclick="loadMore()">Load more…</button>
-        </div>
-        <div id="detailPanel">
-          <div class="state-box">
-            <div class="state-icon">&#x1F4CA;</div>
-            Select a scrip from the list to view price &amp; option chain
-          </div>
-        </div>
+  <!-- Chart (hidden until row clicked) -->
+  <div class="chart-card" id="chartCard" style="display:none">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" id="chartTitle">—</div>
+        <div class="chart-sub">1-Min Candles &middot; Yesterday → Now</div>
       </div>
-    </section>
+      <button class="btn-close" onclick="closeChart()">&#x2715; Close</button>
+    </div>
+    <div style="padding:8px">
+      <div id="chartDiv" style="height:380px"></div>
+    </div>
+  </div>
 
-    <!-- ── SENSEX Options Tab ────────────────────────────────────────────────── -->
-    <section class="tab-panel" id="panel-sensex">
-
-      <!-- Live Ticker -->
-      <div class="sensex-ticker">
-        <div class="ticker-left">
-          <span class="ticker-label">SENSEX</span>
-          <span class="ticker-ltp" id="sxLtp">—</span>
-          <span class="ticker-change" id="sxChange">—</span>
-        </div>
-        <div class="ticker-right">
-          <div class="ticker-ohlc">
-            O:&nbsp;<span id="sxOpen">—</span>&nbsp;&nbsp;
-            H:&nbsp;<span id="sxHigh" style="color:#34d399">—</span>&nbsp;&nbsp;
-            L:&nbsp;<span id="sxLow" style="color:#f87171">—</span>
-          </div>
-          <span class="live-badge">LIVE</span>
-          <span class="ticker-time" id="sxTime">—</span>
-        </div>
-      </div>
-
-      <!-- Controls -->
-      <div class="sx-controls">
-        <label>Expiry</label>
-        <select class="sx-select" id="sxExpirySelect">
-          <option value="">Loading expiries…</option>
-        </select>
-        <button class="btn-sx" onclick="loadSensexChain()">Load Chain</button>
-        <span class="sx-status" id="sxStatus"></span>
-      </div>
-
-      <!-- Option Chain -->
-      <div class="sx-chain-wrap">
-        <div id="sxChainBody">
-          <div class="state-box">
-            <div class="state-icon">&#x1F4CA;</div>
-            Select an expiry and click Load Chain
-          </div>
-        </div>
-      </div>
-
-      <!-- Chart Panel -->
-      <div class="sx-chart-panel" id="sxChartPanel" style="display:none">
-        <div class="chart-header">
-          <div>
-            <span class="chart-title" id="chartTitle">—</span>
-            <span class="chart-meta" id="chartMeta">1-Min Candles · Today</span>
-          </div>
-          <button class="btn-sm btn-ghost" onclick="closeChart()">&#x2715; Close</button>
-        </div>
-        <div class="chart-body">
-          <div id="sxChart" style="height:360px"></div>
-        </div>
-      </div>
-
-    </section>
-
-  </main>
 </div>
 
 <script>
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const fmt  = n => '₹' + parseFloat(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtN = n => parseInt(n||0).toLocaleString('en-IN');
-const pct  = n => (parseFloat(n||0) >= 0 ? '+' : '') + parseFloat(n||0).toFixed(2) + '%';
-const cls  = n => parseFloat(n||0) >= 0 ? 'profit' : 'loss';
+const fmt2  = n => parseFloat(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtN  = n => parseInt(n||0).toLocaleString('en-IN');
 const fmtChg = n => {
   const v = parseInt(n||0);
-  const s = v >= 0 ? '+' : '';
-  return `<span class="${v>=0?'chg-pos':'chg-neg'}">${s}${v.toLocaleString('en-IN')}</span>`;
+  return `<span class="${v>=0?'chg-pos':'chg-neg'}">${v>=0?'+':''}${v.toLocaleString('en-IN')}</span>`;
 };
+const nowStr = () => new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
-async function api(url) {
+async function get(url) {
   const r = await fetch(url);
   return r.json();
 }
 
-function now() {
-  return new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+// ── Live SENSEX Price ─────────────────────────────────────────────────────────
+async function loadLtp() {
+  const d = await get('/api/sensex-ltp');
+  if (d.error) return;
+  const up = d.change >= 0;
+  document.getElementById('sxLtp').textContent  = fmt2(d.ltp);
+  document.getElementById('sxLtp').style.color  = up ? '#34d399' : '#f87171';
+  document.getElementById('sxChange').innerHTML =
+    `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
+  document.getElementById('sxOpen').textContent = fmt2(d.open);
+  document.getElementById('sxHigh').textContent = fmt2(d.high);
+  document.getElementById('sxLow').textContent  = fmt2(d.low);
+  document.getElementById('sxTime').textContent = nowStr();
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-let sxInitDone = false;
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-    if (tab.dataset.tab === 'search' && !browseState.loaded) initBrowse();
-    if (tab.dataset.tab === 'sensex' && !sxInitDone) { sxInitDone = true; initSensexTab(); }
-  });
-});
-
-function refreshCurrent() {
-  const active = document.querySelector('.tab.active')?.dataset.tab;
-  if (active === 'holdings') loadHoldings();
-  else if (active === 'search') browse(true);
-  else if (active === 'sensex') { loadSensexLtp(); }
-}
-
-// ── Holdings ──────────────────────────────────────────────────────────────────
-async function loadHoldings() {
-  document.getElementById('holdings-body').innerHTML =
-    '<div class="state-box"><div class="spinner"></div>Loading…</div>';
-  document.getElementById('summary').style.display = 'none';
-  const data = await api('/api/holdings');
-  if (data.error) {
-    document.getElementById('holdings-body').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${data.error}</div>`;
-    return;
-  }
-  if (!data.holdings?.length) {
-    document.getElementById('holdings-body').innerHTML =
-      '<div class="state-box"><div class="state-icon">&#x1F4ED;</div>No holdings found</div>';
-    return;
-  }
-  let invested = 0, curVal = 0;
-  const rows = data.holdings.map(h => {
-    const val = h.quantity * h.ltp, cost = h.quantity * h.cost;
-    const pnl = val - cost, ret = cost > 0 ? pnl/cost*100 : 0;
-    invested += cost; curVal += val;
-    return `<tr>
-      <td class="symbol-cell">${h.symbol}</td>
-      <td>${fmtN(h.quantity)}</td><td>${fmt(h.cost)}</td><td>${fmt(h.ltp)}</td>
-      <td>${fmt(val)}</td>
-      <td class="${cls(pnl)}">${fmt(pnl)}</td>
-      <td class="${cls(ret)}">${pct(ret)}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('holdings-body').innerHTML = `
-    <table>
-      <thead><tr>
-        <th>Symbol</th><th>Qty</th><th>Avg Cost</th>
-        <th>LTP</th><th>Curr Value</th><th>P&amp;L</th><th>Return %</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-  const pnl = curVal - invested, ret = invested > 0 ? pnl/invested*100 : 0;
-  document.getElementById('s-invested').innerHTML = fmt(invested);
-  document.getElementById('s-value').innerHTML    = fmt(curVal);
-  document.getElementById('s-pnl').className      = 'stat-value ' + cls(pnl);
-  document.getElementById('s-pnl').innerHTML      = fmt(pnl);
-  document.getElementById('s-return').className   = 'stat-value ' + cls(ret);
-  document.getElementById('s-return').innerHTML   = pct(ret);
-  document.getElementById('summary').style.display = 'grid';
-}
-
-// ── Browse / Search ───────────────────────────────────────────────────────────
-const browseState = { cat: 'all', q: '', page: 1, total: 0, loaded: false };
-let searchTimer;
-
-document.querySelectorAll('.cat-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    browseState.cat = btn.dataset.cat;
-    browseState.page = 1;
-    browse(true);
-  });
-});
-
-document.getElementById('searchInput').addEventListener('input', e => {
-  clearTimeout(searchTimer);
-  browseState.q = e.target.value.trim();
-  browseState.page = 1;
-  searchTimer = setTimeout(() => browse(true), 350);
-});
-
-async function initBrowse() {
-  const status = await api('/api/master/status');
-  if (!status.loaded) {
-    document.getElementById('resultsMeta').textContent = 'Downloading scrip master… (first load ~30s)';
-    const poll = setInterval(async () => {
-      const s = await api('/api/master/status');
-      if (s.loaded) { clearInterval(poll); browse(true); }
-    }, 3000);
-  } else {
-    browse(true);
-  }
-}
-
-async function browse(reset = false) {
-  if (reset) {
-    browseState.page = 1;
-    document.getElementById('searchResults').innerHTML =
-      '<div class="state-box"><div class="spinner"></div></div>';
-    document.getElementById('loadMoreBtn').style.display = 'none';
-  }
-  const { cat, q, page } = browseState;
-  const data = await api(`/api/browse?cat=${cat}&q=${encodeURIComponent(q)}&page=${page}`);
-  if (data.error) {
-    document.getElementById('searchResults').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${data.error}</div>`;
-    return;
-  }
-  browseState.total  = data.total;
-  browseState.loaded = true;
-  document.getElementById('resultsMeta').textContent =
-    `${fmtN(data.total)} scrips${q ? ' matching "'+q+'"' : ''} — showing ${Math.min(page*50, data.total)} of ${fmtN(data.total)}`;
-  if (!data.results?.length) {
-    document.getElementById('searchResults').innerHTML =
-      '<div class="state-box"><div class="state-icon">&#x1F914;</div>No results found</div>';
-    document.getElementById('loadMoreBtn').style.display = 'none';
-    return;
-  }
-  const html = data.results.map(r => renderResult(r)).join('');
-  if (reset) {
-    document.getElementById('searchResults').innerHTML = html;
-  } else {
-    document.getElementById('searchResults').insertAdjacentHTML('beforeend', html);
-  }
-  document.getElementById('loadMoreBtn').style.display = data.has_more ? 'block' : 'none';
-  if (data.has_more) document.getElementById('loadMoreBtn').textContent =
-    `Load more (${fmtN(data.total - page*50)} remaining)…`;
-}
-
-function loadMore() { browseState.page++; browse(false); }
-
-function renderResult(r) {
-  const code=r.Scripcode||'', name=r.Name||'', exch=r.Exch||'', type=r.ExchType||'', series=r.Series||'';
-  let badgeClass='badge-eq', badgeText=series||'EQ';
-  if (series==='FUT') { badgeClass='badge-fut'; badgeText='FUT'; }
-  else if (['CE','PE'].includes(series)) { badgeClass='badge-opt'; badgeText=series; }
-  else if (type==='D') { badgeClass='badge-fno'; badgeText='FNO'; }
-  else if (['M','MCX'].includes(exch)) { badgeClass='badge-com'; badgeText='COM'; }
-  const strike = r.StrikeRate && r.StrikeRate!=='0' && r.StrikeRate!==0 ? ` · Strike ${r.StrikeRate}` : '';
-  const expiry = r.Expiry ? ` · ${r.Expiry}` : '';
-  return `<div class="result-item" onclick='selectScrip(${JSON.stringify(r)})'>
-    <div class="result-left">
-      <div class="result-name">${name}</div>
-      <div class="result-meta">${exch} · Code: ${code}${expiry}${strike}</div>
-    </div>
-    <span class="result-badge ${badgeClass}">${badgeText}</span>
-  </div>`;
-}
-
-// ── Scrip Detail ──────────────────────────────────────────────────────────────
-async function selectScrip(r) {
-  document.querySelectorAll('.result-item').forEach(el => el.classList.remove('selected'));
-  event?.currentTarget?.classList.add('selected');
-  const code=r.Scripcode||'', name=r.Name||'', exch=r.Exch||'N', type=r.ExchType||'C';
-  const series=r.Series||'', short=r.ShortName||name;
-  const isFno = type==='D' || ['FUT','CE','PE'].includes(series);
-  const underlying = r.Underlyer || r.ShortName || name.split(' ')[0];
-
-  document.getElementById('detailPanel').innerHTML =
-    '<div class="detail-panel"><div class="state-box"><div class="spinner"></div>Loading price…</div></div>';
-
-  const ltp = await api(`/api/ltp?scripcode=${code}&exch=${exch}&exch_type=${type}`);
-
-  let priceHtml = '';
-  if (ltp.error) {
-    priceHtml = `<div style="padding:12px;color:#f87171;font-size:0.85em">&#x26A0; ${ltp.error}</div>`;
-  } else {
-    priceHtml = `<div class="price-grid">
-      <div class="price-card"><div class="price-label">LTP</div><div class="price-value ltp-value">${fmt(ltp.ltp)}</div></div>
-      <div class="price-card"><div class="price-label">Change</div><div class="price-value ${cls(ltp.change)}">${fmt(ltp.change)} (${pct(ltp.change_pct)})</div></div>
-      <div class="price-card"><div class="price-label">Open</div><div class="price-value">${fmt(ltp.open)}</div></div>
-      <div class="price-card"><div class="price-label">High</div><div class="price-value profit">${fmt(ltp.high)}</div></div>
-      <div class="price-card"><div class="price-label">Low</div><div class="price-value loss">${fmt(ltp.low)}</div></div>
-      <div class="price-card"><div class="price-label">Prev Close</div><div class="price-value">${fmt(ltp.close)}</div></div>
-      <div class="price-card"><div class="price-label">Volume</div><div class="price-value">${fmtN(ltp.volume)}</div></div>
-    </div>`;
-  }
-
-  const ocSection = isFno ? `
-    <div style="border-top:1px solid #2d2b4e;padding-top:20px;margin-top:4px;">
-      <div class="oc-controls">
-        <strong style="color:#a78bfa;font-size:0.9em;">&#x1F4CA; Option Chain — ${underlying}</strong>
-        <select class="oc-select" id="expirySelect">
-          <option value="">Loading expiries…</option>
-        </select>
-        <button class="btn-load" onclick="loadOptionChain('${underlying}','${exch}')">Load</button>
-      </div>
-      <div id="ocBody"><div class="state-box" style="padding:20px">Select an expiry to load chain</div></div>
-    </div>` : `<div style="border-top:1px solid #2d2b4e;padding-top:16px;margin-top:4px;font-size:0.82em;color:#4b5563;text-align:center">
-      Cash segment — no option chain available
-    </div>`;
-
-  document.getElementById('detailPanel').innerHTML = `
-    <div class="detail-panel">
-      <div class="detail-header">
-        <div class="detail-symbol">${short}</div>
-        <div class="detail-name">${name} &bull; ${exch} &bull; ${series||type} &bull; Code: ${code}</div>
-      </div>
-      ${priceHtml}
-      ${ocSection}
-    </div>`;
-
-  if (isFno) loadExpiries(underlying, exch);
-}
-
-async function loadExpiries(symbol, exch) {
-  const data = await api(`/api/expiry?exch=${exch}&symbol=${encodeURIComponent(symbol)}`);
-  const sel  = document.getElementById('expirySelect');
-  if (!sel) return;
-  if (data.error || !data.expiries?.length) {
-    sel.innerHTML = '<option value="">No expiries available</option>';
-    return;
-  }
-  sel.innerHTML = data.expiries.map(e => `<option value="${e.ts}">${e.label}</option>`).join('');
-}
-
-async function loadOptionChain(symbol, exch) {
-  const expiry_ts = document.getElementById('expirySelect')?.value;
-  if (!expiry_ts) return;
-  document.getElementById('ocBody').innerHTML =
-    '<div class="state-box" style="padding:24px"><div class="spinner"></div>Loading…</div>';
-  const data = await api(`/api/option-chain?exch=${exch}&symbol=${encodeURIComponent(symbol)}&expiry_ts=${expiry_ts}`);
-  if (data.error || !data.option_chain?.length) {
-    document.getElementById('ocBody').innerHTML =
-      `<div class="state-box" style="padding:20px">&#x26A0; ${data.error || 'No data'}</div>`;
-    return;
-  }
-  const ltpEl  = document.querySelector('.ltp-value');
-  const curLtp = ltpEl ? parseFloat(ltpEl.textContent.replace(/[^0-9.]/g,'')) : 0;
-  const strikes = data.option_chain.map(r => r.strike);
-  const atm     = strikes.reduce((a,b) => Math.abs(b-curLtp)<Math.abs(a-curLtp)?b:a, strikes[0]);
-  const rows = data.option_chain.map(r => `
-    <tr class="${r.strike===atm?'atm':''}">
-      <td class="${cls(r.ce_chg_oi)}">${fmt(r.ce_ltp)}</td>
-      <td>${fmtN(r.ce_oi)}</td>
-      <td>${fmtN(r.ce_vol)}</td>
-      <td class="strike-col">${r.strike}</td>
-      <td>${fmtN(r.pe_vol)}</td>
-      <td>${fmtN(r.pe_oi)}</td>
-      <td class="${cls(r.pe_chg_oi)}">${fmt(r.pe_ltp)}</td>
-    </tr>`).join('');
-  document.getElementById('ocBody').innerHTML = `
-    <div class="oc-table-wrap"><table class="oc-table">
-      <thead>
-        <tr><th class="call-side" colspan="3">CALLS</th><th class="strike-col">STRIKE</th><th class="put-side" colspan="3">PUTS</th></tr>
-        <tr>
-          <th class="call-side">LTP</th><th class="call-side">OI</th><th class="call-side">Vol</th>
-          <th class="strike-col">&#x2B50;</th>
-          <th class="put-side">Vol</th><th class="put-side">OI</th><th class="put-side">LTP</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
-}
-
-// ─── SENSEX TAB ───────────────────────────────────────────────────────────────
-
-let sxLtpInterval  = null;
-let sxCurrentExpiry = null;
-
-async function initSensexTab() {
-  loadSensexLtp();
-  sxLtpInterval = setInterval(loadSensexLtp, 5000);
-  await loadSensexExpiries();
-  // auto-load nearest expiry
-  const sel = document.getElementById('sxExpirySelect');
-  if (sel && sel.value) loadSensexChain();
-}
-
-async function loadSensexLtp() {
-  const data = await api('/api/sensex-ltp');
-  if (data.error) return;
-  const up = data.change >= 0;
-  document.getElementById('sxLtp').textContent    = data.ltp.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
-  document.getElementById('sxLtp').style.color    = up ? '#34d399' : '#f87171';
-  document.getElementById('sxChange').innerHTML   =
-    `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(data.change).toFixed(2)} (${up?'+':''}${data.change_pct.toFixed(2)}%)</span>`;
-  document.getElementById('sxOpen').textContent   = data.open?.toLocaleString('en-IN', {minimumFractionDigits:2}) || '—';
-  document.getElementById('sxHigh').textContent   = data.high?.toLocaleString('en-IN', {minimumFractionDigits:2}) || '—';
-  document.getElementById('sxLow').textContent    = data.low?.toLocaleString('en-IN',  {minimumFractionDigits:2}) || '—';
-  document.getElementById('sxTime').textContent   = now();
-}
-
-async function loadSensexExpiries() {
-  const data = await api('/api/expiry?exch=B&symbol=SENSEX');
-  const sel  = document.getElementById('sxExpirySelect');
-  if (data.error || !data.expiries?.length) {
+// ── Expiries ──────────────────────────────────────────────────────────────────
+async function loadExpiries() {
+  const d   = await get('/api/expiry?exch=B&symbol=SENSEX');
+  const sel = document.getElementById('expirySelect');
+  if (d.error || !d.expiries?.length) {
     sel.innerHTML = '<option value="">Failed to load expiries</option>';
     return;
   }
-  sel.innerHTML = data.expiries.map(e => `<option value="${e.ts}">${e.label}</option>`).join('');
+  sel.innerHTML = d.expiries.map(e => `<option value="${e.ts}">${e.label}</option>`).join('');
 }
 
-async function loadSensexChain() {
-  const sel  = document.getElementById('sxExpirySelect');
-  const ts   = sel?.value;
-  const label = sel?.options[sel.selectedIndex]?.text || '';
+// ── Option Chain ──────────────────────────────────────────────────────────────
+async function loadChain() {
+  const sel   = document.getElementById('expirySelect');
+  const ts    = sel.value;
+  const label = sel.options[sel.selectedIndex]?.text || '';
   if (!ts) return;
 
-  sxCurrentExpiry = ts;
-  document.getElementById('sxStatus').textContent = 'Loading…';
-  document.getElementById('sxChainBody').innerHTML =
+  document.getElementById('statusTxt').textContent = 'Loading…';
+  document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="spinner"></div>Loading option chain…</div>';
   closeChart();
 
-  const data = await api(`/api/option-chain?exch=B&symbol=SENSEX&expiry_ts=${ts}`);
-  document.getElementById('sxStatus').textContent = '';
+  const d = await get(`/api/option-chain?exch=B&symbol=SENSEX&expiry_ts=${ts}`);
+  document.getElementById('statusTxt').textContent = '';
 
-  if (data.error || !data.option_chain?.length) {
-    document.getElementById('sxChainBody').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${data.error || 'No data returned'}</div>`;
+  if (d.error || !d.option_chain?.length) {
+    document.getElementById('chainBody').innerHTML =
+      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${d.error || 'No data'}</div>`;
     return;
   }
 
-  const ltpText = document.getElementById('sxLtp').textContent.replace(/,/g,'');
-  const curLtp  = parseFloat(ltpText) || 0;
-  const strikes = data.option_chain.map(r => r.strike);
-  const atm     = strikes.reduce((a,b) => Math.abs(b-curLtp)<Math.abs(a-curLtp)?b:a, strikes[0]);
+  // Find ATM
+  const ltpVal = parseFloat(document.getElementById('sxLtp').textContent.replace(/,/g,'')) || 0;
+  const strikes = d.option_chain.map(r => r.strike);
+  const atm     = strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]);
 
-  const rows = data.option_chain.map(r => {
+  const rows = d.option_chain.map(r => {
     const isAtm = r.strike === atm;
-    const ceClick = r.ce_scrip ? `onclick="selectAndShowHistory(this,'ce',${r.ce_scrip},'SENSEX ${r.strike} CE')"` : '';
-    const peClick = r.pe_scrip ? `onclick="selectAndShowHistory(this,'pe',${r.pe_scrip},'SENSEX ${r.strike} PE')"` : '';
-    return `<tr class="${isAtm?'atm-row':''}" data-strike="${r.strike}">
-      <td class="ce-td ce-click" ${ceClick}>${fmtChg(r.ce_chg_oi)}</td>
-      <td class="ce-td ce-click" ${ceClick}>${fmtN(r.ce_oi)}</td>
-      <td class="ce-td ce-click" ${ceClick}>${fmtN(r.ce_vol)}</td>
-      <td class="ce-td ce-click" ${ceClick} style="font-weight:700;color:#a3e635">${r.ce_ltp > 0 ? fmt(r.ce_ltp) : '—'}</td>
-      <td class="strike-td">${r.strike}${isAtm ? ' <span style="font-size:0.65em;color:#7c3aed;vertical-align:middle">ATM</span>' : ''}</td>
-      <td class="pe-td pe-click" ${peClick} style="font-weight:700;color:#fb7185">${r.pe_ltp > 0 ? fmt(r.pe_ltp) : '—'}</td>
-      <td class="pe-td pe-click" ${peClick}>${fmtN(r.pe_vol)}</td>
-      <td class="pe-td pe-click" ${peClick}>${fmtN(r.pe_oi)}</td>
-      <td class="pe-td pe-click" ${peClick}>${fmtChg(r.pe_chg_oi)}</td>
+    const ce = r.ce_scrip ? `onclick="pick(this,'ce',${r.ce_scrip},'SENSEX ${r.strike} CE')"` : '';
+    const pe = r.pe_scrip ? `onclick="pick(this,'pe',${r.pe_scrip},'SENSEX ${r.strike} PE')"` : '';
+    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}">
+      <td class="ce-td ce-cell" ${ce}>${fmtChg(r.ce_chg_oi)}</td>
+      <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_oi)}</td>
+      <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_vol)}</td>
+      <td class="ce-td ce-cell ce-ltp" ${ce}>${r.ce_ltp > 0 ? fmt2(r.ce_ltp) : '—'}</td>
+      <td class="str-td">${r.strike}${isAtm ? '&nbsp;<span style="font-size:0.6em;color:#7c3aed">ATM</span>' : ''}</td>
+      <td class="pe-td pe-cell pe-ltp" ${pe}>${r.pe_ltp > 0 ? fmt2(r.pe_ltp) : '—'}</td>
+      <td class="pe-td pe-cell" ${pe}>${fmtN(r.pe_vol)}</td>
+      <td class="pe-td pe-cell" ${pe}>${fmtN(r.pe_oi)}</td>
+      <td class="pe-td pe-cell" ${pe}>${fmtChg(r.pe_chg_oi)}</td>
     </tr>`;
   }).join('');
 
-  document.getElementById('sxChainBody').innerHTML = `
-    <div class="sx-chain-scroll">
+  document.getElementById('chainBody').innerHTML = `
+    <div class="chain-scroll">
       <table class="sx-table">
         <thead>
           <tr>
             <th class="ce-hd" colspan="4">── CALLS (CE) ──</th>
-            <th class="strike-hd">STRIKE</th>
+            <th class="str-hd">STRIKE</th>
             <th class="pe-hd" colspan="4">── PUTS (PE) ──</th>
           </tr>
           <tr>
-            <th class="ce-hd">ChgOI</th>
-            <th class="ce-hd">OI</th>
-            <th class="ce-hd">Volume</th>
-            <th class="ce-hd">LTP</th>
-            <th class="strike-hd">&#9733;</th>
-            <th class="pe-hd">LTP</th>
-            <th class="pe-hd">Volume</th>
-            <th class="pe-hd">OI</th>
-            <th class="pe-hd">ChgOI</th>
+            <th class="ce-hd">ChgOI</th><th class="ce-hd">OI</th><th class="ce-hd">Volume</th><th class="ce-hd">LTP</th>
+            <th class="str-hd">&#9733;</th>
+            <th class="pe-hd">LTP</th><th class="pe-hd">Volume</th><th class="pe-hd">OI</th><th class="pe-hd">ChgOI</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
 
-  // Scroll ATM row into view
+  document.getElementById('statusTxt').textContent =
+    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell to view 1-min chart`;
+
   setTimeout(() => {
-    const atmRow = document.querySelector('#sxChainBody .atm-row');
-    if (atmRow) atmRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 100);
-
-  document.getElementById('sxStatus').textContent =
-    `${data.option_chain.length} strikes loaded · ${label} · Click any CE/PE cell to view 1-min chart`;
+    document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 120);
 }
 
-function selectAndShowHistory(cell, side, scripCode, name) {
-  // Clear previous selection
-  document.querySelectorAll('#sxChainBody tr').forEach(r => {
-    r.classList.remove('selected-ce', 'selected-pe');
-  });
-  const row = cell.closest('tr');
-  row.classList.add(side === 'ce' ? 'selected-ce' : 'selected-pe');
-  showHistory(scripCode, name);
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function pick(cell, side, scripCode, name) {
+  document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
+  cell.closest('tr').classList.add(side === 'ce' ? 'sel-ce' : 'sel-pe');
+  showChart(scripCode, name);
 }
 
-async function showHistory(scripCode, name) {
-  const panel = document.getElementById('sxChartPanel');
-  panel.style.display = 'block';
+async function showChart(scripCode, name) {
+  const card = document.getElementById('chartCard');
+  card.style.display = 'block';
   document.getElementById('chartTitle').textContent = name;
-  document.getElementById('sxChart').innerHTML =
+  document.getElementById('chartDiv').innerHTML =
     '<div class="state-box"><div class="spinner"></div>Loading 1-min candles…</div>';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const data = await api(`/api/history?exch=B&exch_type=D&scripcode=${scripCode}&interval=1m`);
+  const d = await get(`/api/history?exch=B&exch_type=D&scripcode=${scripCode}&interval=1m`);
 
-  if (data.error || !data.candles?.length) {
-    document.getElementById('sxChart').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${data.error || 'No candle data'}</div>`;
+  if (d.error || !d.candles?.length) {
+    document.getElementById('chartDiv').innerHTML =
+      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${d.error || 'No candle data'}</div>`;
     return;
   }
 
-  const candles = data.candles;
-  const times   = candles.map(c => c.Datetime || c.datetime || '');
-  const opens   = candles.map(c => c.Open  || c.open  || 0);
-  const highs   = candles.map(c => c.High  || c.high  || 0);
-  const lows    = candles.map(c => c.Low   || c.low   || 0);
-  const closes  = candles.map(c => c.Close || c.close || 0);
-  const vols    = candles.map(c => c.Volume|| c.volume|| 0);
+  const c = d.candles;
+  // Filter to only today's session if data spans multiple days — show all returned
+  const times  = c.map(x => x.Datetime || x.datetime || '');
+  const opens  = c.map(x => parseFloat(x.Open  || x.open  || 0));
+  const highs  = c.map(x => parseFloat(x.High  || x.high  || 0));
+  const lows   = c.map(x => parseFloat(x.Low   || x.low   || 0));
+  const closes = c.map(x => parseFloat(x.Close || x.close || 0));
+  const vols   = c.map(x => parseInt(x.Volume  || x.volume || 0));
 
   const candlestick = {
     type: 'candlestick', x: times,
     open: opens, high: highs, low: lows, close: closes,
     name: name,
-    increasing: { line: { color: '#34d399' }, fillcolor: '#34d399' },
-    decreasing: { line: { color: '#f87171' }, fillcolor: '#f87171' },
+    increasing: { line: { color: '#34d399' }, fillcolor: 'rgba(52,211,153,0.8)' },
+    decreasing: { line: { color: '#f87171' }, fillcolor: 'rgba(248,113,113,0.8)' },
   };
 
-  const volumeBar = {
-    type: 'bar', x: times, y: vols, name: 'Volume',
-    marker: { color: closes.map((c,i) => c >= opens[i] ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)') },
-    yaxis: 'y2',
+  const volume = {
+    type: 'bar', x: times, y: vols, name: 'Volume', yaxis: 'y2',
+    marker: { color: closes.map((cl,i) => cl >= opens[i] ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)') },
   };
 
-  const layout = {
+  Plotly.newPlot('chartDiv', [candlestick, volume], {
     paper_bgcolor: '#12111f', plot_bgcolor: '#12111f',
     font: { color: '#94a3b8', size: 11 },
-    margin: { t: 8, b: 48, l: 64, r: 48 },
+    margin: { t: 10, b: 50, l: 64, r: 20 },
     showlegend: false,
     xaxis: {
-      gridcolor: '#1e1c35', color: '#6b7280',
-      rangeslider: { visible: false },
-      type: 'category',
-      tickangle: -30,
-      tickfont: { size: 10 },
+      type: 'category', gridcolor: '#1e1c35', color: '#6b7280',
+      rangeslider: { visible: false }, tickangle: -35, tickfont: { size: 10 },
     },
-    yaxis: {
-      gridcolor: '#1e1c35', color: '#6b7280',
-      domain: [0.25, 1], tickprefix: '₹',
-    },
-    yaxis2: {
-      gridcolor: '#1e1c35', color: '#6b7280',
-      domain: [0, 0.2], title: { text: 'Vol', font: { size: 10 } },
-    },
-  };
-
-  Plotly.newPlot('sxChart', [candlestick, volumeBar], layout, { responsive: true, displayModeBar: false });
+    yaxis:  { gridcolor: '#1e1c35', color: '#6b7280', domain: [0.25, 1], tickprefix: '₹' },
+    yaxis2: { gridcolor: '#1e1c35', color: '#6b7280', domain: [0, 0.2],
+              title: { text: 'Volume', font: { size: 10 } } },
+  }, { responsive: true, displayModeBar: false });
 }
 
 function closeChart() {
-  document.getElementById('sxChartPanel').style.display = 'none';
-  document.getElementById('sxChart').innerHTML = '';
-  document.querySelectorAll('#sxChainBody tr').forEach(r => {
-    r.classList.remove('selected-ce', 'selected-pe');
-  });
+  document.getElementById('chartCard').style.display = 'none';
+  document.getElementById('chartDiv').innerHTML = '';
+  document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadHoldings();
-setInterval(loadHoldings, 60000);
+loadLtp();
+setInterval(loadLtp, 5000);
+loadExpiries().then(() => {
+  const sel = document.getElementById('expirySelect');
+  if (sel?.value) loadChain();
+});
 </script>
 </body>
 </html>
