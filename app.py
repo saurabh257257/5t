@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred
 from modules.holdings import get_holdings_data
 from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
-from modules.market import get_ltp, get_expiry_dates, get_option_chain_data
+from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_historical_data
 
 load_dotenv()
 
@@ -114,6 +114,14 @@ def api_expiry():
     ))
 
 
+@app.route('/api/sensex-ltp')
+def api_sensex_ltp():
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+    return jsonify(get_sensex_ltp(client))
+
+
 @app.route('/api/option-chain')
 def api_option_chain():
     client = require_auth()
@@ -123,7 +131,21 @@ def api_option_chain():
         client,
         request.args.get('exch', 'N'),
         request.args.get('symbol', ''),
-        request.args.get('expiry', '')
+        request.args.get('expiry_ts', 0)
+    ))
+
+
+@app.route('/api/history')
+def api_history():
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+    return jsonify(get_historical_data(
+        client,
+        request.args.get('exch', 'B'),
+        request.args.get('exch_type', 'D'),
+        request.args.get('scripcode', 0),
+        request.args.get('interval', '1m')
     ))
 
 

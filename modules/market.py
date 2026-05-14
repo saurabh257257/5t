@@ -1,4 +1,7 @@
-from datetime import datetime
+import re
+from datetime import datetime, timezone, timedelta, date as _date
+
+_IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def get_ltp(client, scripcode, exch="N", exch_type="C"):
@@ -22,38 +25,93 @@ def get_ltp(client, scripcode, exch="N", exch_type="C"):
         return {"error": str(e)}
 
 
-def get_expiry_dates(client, exch, symbol):
+def get_sensex_ltp(client):
     try:
-        result = client.get_expiry(exch, symbol)
+        req = [{"Exch": "B", "ExchangeType": "C", "ScripCode": 999901}]
+        result = client.fetch_market_feed(req)
         if not result:
-            return {"expiries": []}
-        expiries = result if isinstance(result, list) else result.get("Expiry", [])
-        return {"expiries": expiries}
+            return {"error": "No data"}
+        item = result[0] if isinstance(result, list) else result
+        return {
+            "ltp":        float(item.get("LastRate") or item.get("LTP") or 0),
+            "change":     float(item.get("Change") or 0),
+            "change_pct": float(item.get("PercentChange") or 0),
+            "open":       float(item.get("OpenRate") or item.get("Open") or 0),
+            "high":       float(item.get("High") or item.get("HighRate") or 0),
+            "low":        float(item.get("Low") or item.get("LowRate") or 0),
+        }
     except Exception as e:
         return {"error": str(e)}
 
 
-def get_option_chain_data(client, exch, symbol, expiry_str):
+def get_expiry_dates(client, exch, symbol):
     try:
-        dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-        expiry_ts = int(dt.timestamp() * 1000)
-        result = client.get_option_chain(exch, symbol, expiry_ts)
+        result = client.get_expiry(exch, symbol)
+        if not result:
+            return {"expiries": [], "ltp": 0}
+        expiries_raw = result.get("Expiry", [])
+        last_rate    = result.get("lastrate", [{}])
+        ltp = float(last_rate[0].get("LTP", 0)) if last_rate else 0
+        expiries = []
+        for item in expiries_raw:
+            match = re.search(r'\d+', item.get("ExpiryDate", ""))
+            if match:
+                ms = int(match.group())
+                dt = datetime.fromtimestamp(ms / 1000, tz=_IST)
+                expiries.append({"label": dt.strftime("%d %b %Y (%A)"), "ts": ms})
+        return {"expiries": expiries, "ltp": ltp}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_option_chain_data(client, exch, symbol, expiry_ts):
+    try:
+        result = client.get_option_chain(exch, symbol, int(expiry_ts))
         if not result:
             return {"option_chain": []}
-        chain = result if isinstance(result, list) else result.get("Data", result.get("data", []))
+        options = result.get("Options", [])
+        ce_map, pe_map = {}, {}
+        for item in options:
+            strike = float(item.get("StrikeRate", 0))
+            entry  = {
+                "scrip":   int(item.get("ScripCode", 0)),
+                "ltp":     float(item.get("LastRate", 0)),
+                "oi":      int(item.get("OpenInterest", 0)),
+                "chg_oi":  int(item.get("ChangeInOI", 0)),
+                "vol":     int(item.get("Volume", 0)),
+            }
+            if item.get("CPType") == "CE":
+                ce_map[strike] = entry
+            elif item.get("CPType") == "PE":
+                pe_map[strike] = entry
         rows = []
-        for item in chain:
+        for s in sorted(set(ce_map) | set(pe_map)):
+            ce = ce_map.get(s, {})
+            pe = pe_map.get(s, {})
             rows.append({
-                "strike":     float(item.get("StrikeRate") or item.get("Strike") or 0),
-                "ce_ltp":     float(item.get("CE_LTP") or item.get("CallLTP") or 0),
-                "ce_oi":      int(item.get("CE_OI") or item.get("CallOI") or 0),
-                "ce_volume":  int(item.get("CE_Volume") or item.get("CallVolume") or 0),
-                "ce_change":  float(item.get("CE_Change") or 0),
-                "pe_ltp":     float(item.get("PE_LTP") or item.get("PutLTP") or 0),
-                "pe_oi":      int(item.get("PE_OI") or item.get("PutOI") or 0),
-                "pe_volume":  int(item.get("PE_Volume") or item.get("PutVolume") or 0),
-                "pe_change":  float(item.get("PE_Change") or 0),
+                "strike":    s,
+                "ce_scrip":  ce.get("scrip", 0),
+                "ce_ltp":    ce.get("ltp", 0),
+                "ce_oi":     ce.get("oi", 0),
+                "ce_chg_oi": ce.get("chg_oi", 0),
+                "ce_vol":    ce.get("vol", 0),
+                "pe_scrip":  pe.get("scrip", 0),
+                "pe_ltp":    pe.get("ltp", 0),
+                "pe_oi":     pe.get("oi", 0),
+                "pe_chg_oi": pe.get("chg_oi", 0),
+                "pe_vol":    pe.get("vol", 0),
             })
-        return {"option_chain": rows, "raw": chain[:2] if chain else []}
+        return {"option_chain": rows}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_historical_data(client, exch, exch_type, scrip_code, interval="1m"):
+    try:
+        today = _date.today().strftime('%Y-%m-%d')
+        df = client.historical_data(exch, exch_type, int(scrip_code), interval, today, today)
+        if df is None:
+            return {"error": "No data returned"}
+        return {"candles": df.to_dict(orient='records')}
     except Exception as e:
         return {"error": str(e)}
