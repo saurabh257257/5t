@@ -45,8 +45,8 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-          # Copy env file
-          cp .env.example .env
+          # Copy env file only if it doesn't exist
+          [ -f .env ] || cp .env.example .env
 
           # Install PM2
           npm install -g pm2
