@@ -145,7 +145,8 @@ def api_history():
         request.args.get('exch', 'B'),
         request.args.get('exch_type', 'D'),
         request.args.get('scripcode', 0),
-        request.args.get('interval', '1m')
+        request.args.get('interval', '15m'),
+        request.args.get('days', 2)
     ))
 
 

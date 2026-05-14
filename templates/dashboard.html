@@ -105,13 +105,35 @@ header {
 }
 @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 .chart-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
   padding: 13px 20px; border-bottom: 1px solid #2d2b4e; background: #12111f;
 }
 .chart-title { font-weight: 700; font-size: 0.92em; color: #a78bfa; }
 .chart-sub   { font-size: 0.75em; color: #6b7280; margin-top: 2px; }
 .btn-close { padding: 5px 12px; border-radius: 7px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
 .btn-close:hover { background: #2d2b4e; }
+.chart-toolbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 20px; border-bottom: 1px solid #1e1c35; background: #15131f;
+}
+.toolbar-group { display: flex; align-items: center; gap: 6px; }
+.toolbar-label { font-size: 0.72em; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 2px; }
+.tb-btn {
+  padding: 5px 12px; border-radius: 6px; font-size: 0.78em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
+  transition: all 0.15s;
+}
+.tb-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+.tb-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.tb-sep { width: 1px; height: 20px; background: #2d2b4e; margin: 0 4px; }
+.auto-refresh-btn {
+  padding: 5px 12px; border-radius: 6px; font-size: 0.78em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
+  display: flex; align-items: center; gap: 5px; transition: all 0.15s;
+}
+.auto-refresh-btn.on  { border-color: #34d399; color: #34d399; }
+.auto-refresh-btn.off { border-color: #4b5563; color: #4b5563; }
+.refresh-countdown { font-size: 0.68em; color: #6b7280; min-width: 28px; text-align: right; }
 
 /* States */
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
@@ -172,12 +194,39 @@ header {
     <div class="chart-header">
       <div>
         <div class="chart-title" id="chartTitle">—</div>
-        <div class="chart-sub">1-Min Candles &middot; Yesterday → Now</div>
+        <div class="chart-sub" id="chartSub">15-Min Candles · 2 Days</div>
       </div>
       <button class="btn-close" onclick="closeChart()">&#x2715; Close</button>
     </div>
+
+    <!-- Toolbar -->
+    <div class="chart-toolbar">
+      <div class="toolbar-group">
+        <span class="toolbar-label">Interval</span>
+        <button class="tb-btn" onclick="setInterval_('1m')"  data-iv="1m">1m</button>
+        <button class="tb-btn" onclick="setInterval_('5m')"  data-iv="5m">5m</button>
+        <button class="tb-btn active" onclick="setInterval_('15m')" data-iv="15m">15m</button>
+        <button class="tb-btn" onclick="setInterval_('30m')" data-iv="30m">30m</button>
+        <button class="tb-btn" onclick="setInterval_('60m')" data-iv="60m">1h</button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="toolbar-group">
+        <span class="toolbar-label">Period</span>
+        <button class="tb-btn" onclick="setDays(1)" data-days="1">1D</button>
+        <button class="tb-btn active" onclick="setDays(2)" data-days="2">2D</button>
+        <button class="tb-btn" onclick="setDays(5)" data-days="5">5D</button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="toolbar-group">
+        <button class="auto-refresh-btn on" id="arBtn" onclick="toggleAutoRefresh()">
+          &#x21BB; Auto
+        </button>
+        <span class="refresh-countdown" id="arCount">60s</span>
+      </div>
+    </div>
+
     <div style="padding:8px">
-      <div id="chartDiv" style="height:380px"></div>
+      <div id="chartDiv" style="height:400px"></div>
     </div>
   </div>
 
@@ -294,22 +343,70 @@ async function loadChain() {
   }, 120);
 }
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
+// ── Chart state ───────────────────────────────────────────────────────────────
+let chartScrip = null, chartName = '', chartIv = '15m', chartDays = 2;
+let arEnabled = true, arTimer = null, arCountdown = 60, arTick = null;
+
+function setInterval_(iv) {
+  chartIv = iv;
+  document.querySelectorAll('[data-iv]').forEach(b => b.classList.toggle('active', b.dataset.iv === iv));
+  if (chartScrip) refreshChart();
+}
+
+function setDays(d) {
+  chartDays = d;
+  document.querySelectorAll('[data-days]').forEach(b => b.classList.toggle('active', +b.dataset.days === d));
+  if (chartScrip) refreshChart();
+}
+
+function toggleAutoRefresh() {
+  arEnabled = !arEnabled;
+  const btn = document.getElementById('arBtn');
+  btn.className = 'auto-refresh-btn ' + (arEnabled ? 'on' : 'off');
+  btn.innerHTML = (arEnabled ? '&#x21BB;' : '&#x23F8;') + ' Auto';
+  if (arEnabled) startArCountdown(); else stopArCountdown();
+}
+
+function startArCountdown() {
+  stopArCountdown();
+  arCountdown = 60;
+  document.getElementById('arCount').textContent = arCountdown + 's';
+  arTick = setInterval(() => {
+    arCountdown--;
+    document.getElementById('arCount').textContent = arCountdown + 's';
+    if (arCountdown <= 0) { arCountdown = 60; if (chartScrip) refreshChart(); }
+  }, 1000);
+}
+
+function stopArCountdown() {
+  clearInterval(arTick);
+  document.getElementById('arCount').textContent = '—';
+}
+
 function pick(cell, side, scripCode, name) {
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
   cell.closest('tr').classList.add(side === 'ce' ? 'sel-ce' : 'sel-pe');
-  showChart(scripCode, name);
+  chartScrip = scripCode; chartName = name;
+  showChart(false);
 }
 
-async function showChart(scripCode, name) {
+async function refreshChart() { if (chartScrip) showChart(true); }
+
+async function showChart(silent = false) {
   const card = document.getElementById('chartCard');
   card.style.display = 'block';
-  document.getElementById('chartTitle').textContent = name;
-  document.getElementById('chartDiv').innerHTML =
-    '<div class="state-box"><div class="spinner"></div>Loading 1-min candles…</div>';
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('chartTitle').textContent = chartName;
 
-  const d = await get(`/api/history?exch=B&exch_type=D&scripcode=${scripCode}&interval=1m`);
+  const ivLabel = { '1m':'1-Min','5m':'5-Min','15m':'15-Min','30m':'30-Min','60m':'1-Hour' }[chartIv] || chartIv;
+  document.getElementById('chartSub').textContent = `${ivLabel} Candles · ${chartDays}D`;
+
+  if (!silent) {
+    document.getElementById('chartDiv').innerHTML =
+      '<div class="state-box"><div class="spinner"></div>Loading candles…</div>';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const d = await get(`/api/history?exch=B&exch_type=D&scripcode=${chartScrip}&interval=${chartIv}&days=${chartDays}`);
 
   if (d.error || !d.candles?.length) {
     document.getElementById('chartDiv').innerHTML =
@@ -317,44 +414,85 @@ async function showChart(scripCode, name) {
     return;
   }
 
-  const c = d.candles;
-  // Filter to only today's session if data spans multiple days — show all returned
-  const times  = c.map(x => x.Datetime || x.datetime || '');
+  const c      = d.candles;
+  const raw    = c.map(x => x.Datetime || x.datetime || '');
   const opens  = c.map(x => parseFloat(x.Open  || x.open  || 0));
   const highs  = c.map(x => parseFloat(x.High  || x.high  || 0));
   const lows   = c.map(x => parseFloat(x.Low   || x.low   || 0));
   const closes = c.map(x => parseFloat(x.Close || x.close || 0));
-  const vols   = c.map(x => parseInt(x.Volume  || x.volume || 0));
+  const vols   = c.map(x => parseInt  (x.Volume|| x.volume|| 0));
 
-  const candlestick = {
-    type: 'candlestick', x: times,
-    open: opens, high: highs, low: lows, close: closes,
-    name: name,
-    increasing: { line: { color: '#34d399' }, fillcolor: 'rgba(52,211,153,0.8)' },
-    decreasing: { line: { color: '#f87171' }, fillcolor: 'rgba(248,113,113,0.8)' },
-  };
+  // Format x labels as HH:MM, prefix with "DD Mon" on first candle of each day
+  const labels = raw.map((dt, i) => {
+    const d  = new Date(dt);
+    const hm = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    if (i === 0) return hm;
+    const prev = new Date(raw[i-1]);
+    return d.toDateString() !== prev.toDateString()
+      ? d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' + hm
+      : hm;
+  });
 
-  const volume = {
-    type: 'bar', x: times, y: vols, name: 'Volume', yaxis: 'y2',
-    marker: { color: closes.map((cl,i) => cl >= opens[i] ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)') },
-  };
+  // Thin ticks so x-axis stays readable
+  const tickStep = chartIv === '1m' ? 30 : chartIv === '5m' ? 12 : chartIv === '15m' ? 4 : 2;
+  const tickvals = [], ticktext = [];
+  labels.forEach((l, i) => { if (i % tickStep === 0) { tickvals.push(raw[i]); ticktext.push(l); } });
 
-  Plotly.newPlot('chartDiv', [candlestick, volume], {
+  const traces = [
+    {
+      type: 'candlestick', x: raw,
+      open: opens, high: highs, low: lows, close: closes,
+      name: chartName,
+      increasing: { line: { color: '#34d399' }, fillcolor: 'rgba(52,211,153,0.85)' },
+      decreasing: { line: { color: '#f87171' }, fillcolor: 'rgba(248,113,113,0.85)' },
+      hovertext: raw.map((dt, i) => {
+        const d  = new Date(dt);
+        return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' +
+               d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+      }),
+    },
+    {
+      type: 'bar', x: raw, y: vols, name: 'Volume', yaxis: 'y2',
+      marker: { color: closes.map((cl,i) => cl >= opens[i] ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)') },
+    },
+  ];
+
+  const layout = {
     paper_bgcolor: '#12111f', plot_bgcolor: '#12111f',
     font: { color: '#94a3b8', size: 11 },
-    margin: { t: 10, b: 50, l: 64, r: 20 },
+    margin: { t: 10, b: 55, l: 68, r: 20 },
     showlegend: false,
     xaxis: {
-      type: 'category', gridcolor: '#1e1c35', color: '#6b7280',
-      rangeslider: { visible: false }, tickangle: -35, tickfont: { size: 10 },
+      type: 'category',
+      tickvals, ticktext,
+      tickangle: -35,
+      tickfont: { size: 10 },
+      gridcolor: '#1e1c35',
+      color: '#6b7280',
+      rangeslider: { visible: false },
     },
     yaxis:  { gridcolor: '#1e1c35', color: '#6b7280', domain: [0.25, 1], tickprefix: '₹' },
     yaxis2: { gridcolor: '#1e1c35', color: '#6b7280', domain: [0, 0.2],
-              title: { text: 'Volume', font: { size: 10 } } },
-  }, { responsive: true, displayModeBar: false });
+              title: { text: 'Vol', font: { size: 10 } } },
+  };
+
+  const config = {
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: ['autoScale2d','lasso2d','select2d','toggleSpikelines',
+                             'hoverClosestCartesian','hoverCompareCartesian'],
+  };
+
+  Plotly.react('chartDiv', traces, layout, config);
+
+  // restart countdown after manual refresh
+  if (arEnabled) startArCountdown();
 }
 
 function closeChart() {
+  chartScrip = null;
+  stopArCountdown();
   document.getElementById('chartCard').style.display = 'none';
   document.getElementById('chartDiv').innerHTML = '';
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
