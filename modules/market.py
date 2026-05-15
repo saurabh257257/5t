@@ -46,8 +46,11 @@ def _fetch_hist_close(client, exch, scrip_code, days=10):
     return []
 
 
-def get_index_ltp(client, exch, scrip_code):
-    """Generic index LTP with proper prev-close and change calculation."""
+def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
+    """
+    Generic index LTP with proper prev-close and change calculation.
+    Falls back to expiry API LTP if market feed scrip code returns 0.
+    """
     # ── 1. Try live market feed ───────────────────────────────────────────────
     ltp = 0
     open_ = high = low = 0
@@ -65,18 +68,32 @@ def get_index_ltp(client, exch, scrip_code):
     except Exception:
         pass
 
-    # ── 2. Always get historical closes to find prev_close & fill missing ltp ─
+    # ── 2. Fallback: get LTP from expiry API (always works for any index) ─────
+    if ltp == 0 and opt_symbol:
+        try:
+            result = client.get_expiry(exch, opt_symbol)
+            if result:
+                last_rate = result.get("lastrate", [{}])
+                ltp = float(last_rate[0].get("LTP", 0)) if last_rate else 0
+                market_open = ltp > 0
+        except Exception:
+            pass
+
+    # ── 3. Always get historical closes for prev_close ────────────────────────
     closes = _fetch_hist_close(client, exch, scrip_code, days=14)
 
     if market_open:
-        # Most recent hist candle = yesterday's close
         prev_close = closes[-1] if closes else 0
     else:
-        # Market closed / holiday — last hist candle IS the last working day close
-        ltp        = closes[-1] if closes else ltp
-        prev_close = closes[-2] if len(closes) >= 2 else (closes[-1] if closes else 0)
+        # Market closed / holiday — last hist candle IS last working day close
+        if closes:
+            if ltp == 0:
+                ltp = closes[-1]
+            prev_close = closes[-2] if len(closes) >= 2 else closes[-1]
+        else:
+            prev_close = 0
 
-    # ── 3. Compute change vs prev_close ──────────────────────────────────────
+    # ── 4. Compute change vs prev_close ──────────────────────────────────────
     if prev_close > 0 and ltp > 0:
         change     = round(ltp - prev_close, 2)
         change_pct = round((change / prev_close) * 100, 2)
@@ -96,7 +113,7 @@ def get_index_ltp(client, exch, scrip_code):
 
 
 def get_sensex_ltp(client):
-    return get_index_ltp(client, 'B', 999901)
+    return get_index_ltp(client, 'B', 999901, 'SENSEX')
 
 
 def get_expiry_dates(client, exch, symbol):

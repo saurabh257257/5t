@@ -151,8 +151,8 @@ def api_index_ltp():
     idx = request.args.get('index', 'SENSEX').upper()
     if idx not in INDEX_MAP:
         return jsonify({"error": f"Unknown index: {idx}"}), 400
-    exch, scrip, _, _ = INDEX_MAP[idx]
-    return jsonify(get_index_ltp(client, exch, scrip))
+    exch, scrip, opt_exch, opt_symbol = INDEX_MAP[idx]
+    return jsonify(get_index_ltp(client, exch, scrip, opt_symbol))
 
 
 @app.route('/api/option-chain')
