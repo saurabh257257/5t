@@ -32,11 +32,26 @@ def get_sensex_ltp(client):
         if not result:
             return {"error": "No data"}
         item = result[0] if isinstance(result, list) else result
-        # When market is closed LastRate is 0 — fall back to CloseRate/PreviousClose
         ltp = (float(item.get("LastRate") or 0) or
                float(item.get("LTP") or 0) or
                float(item.get("CloseRate") or 0) or
                float(item.get("PreviousClose") or 0))
+        prev_close = float(item.get("CloseRate") or item.get("PreviousClose") or 0)
+
+        # If everything is 0 (pre-market / weekend), fetch last close from history
+        if ltp == 0:
+            try:
+                from datetime import timedelta
+                today     = _date.today().strftime('%Y-%m-%d')
+                from_date = (_date.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+                df = client.historical_data('B', 'C', 999901, '1d', from_date, today)
+                if df is not None and len(df) > 0:
+                    last_row   = df.iloc[-1]
+                    ltp        = float(last_row.get('Close', 0) or last_row.get('close', 0))
+                    prev_close = ltp
+            except Exception:
+                pass
+
         return {
             "ltp":        ltp,
             "change":     float(item.get("Change") or 0),
@@ -44,7 +59,8 @@ def get_sensex_ltp(client):
             "open":       float(item.get("OpenRate") or item.get("Open") or 0),
             "high":       float(item.get("High") or item.get("HighRate") or 0),
             "low":        float(item.get("Low") or item.get("LowRate") or 0),
-            "close":      float(item.get("CloseRate") or item.get("PreviousClose") or 0),
+            "close":      prev_close,
+            "market_open": float(item.get("LastRate") or 0) > 0,
         }
     except Exception as e:
         return {"error": str(e)}

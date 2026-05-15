@@ -269,23 +269,22 @@ async function get(url) {
 }
 
 // ── Live SENSEX ───────────────────────────────────────────────────────────────
-let lastLtp = 0;  // cache last known non-zero value
+let lastLtp = 0;
 
 async function loadLtp() {
   const d = await get('/api/sensex-ltp');
   if (d.error) return;
 
-  // Use best available value; fall back to last known if all zero
-  const ltp = d.ltp || d.close || lastLtp;
+  const ltp = d.ltp || lastLtp;
   if (ltp > 0) lastLtp = ltp;
 
+  const marketOpen = d.market_open;
   const up = d.change >= 0;
-  const marketClosed = !d.ltp;
 
   document.getElementById('sxLtp').textContent = fmt2(ltp);
-  document.getElementById('sxLtp').style.color = marketClosed ? '#94a3b8' : (up ? '#34d399' : '#f87171');
-  document.getElementById('sxChange').innerHTML = marketClosed
-    ? `<span style="color:#6b7280">Market Closed</span>`
+  document.getElementById('sxLtp').style.color = !marketOpen ? '#94a3b8' : (up ? '#34d399' : '#f87171');
+  document.getElementById('sxChange').innerHTML = !marketOpen
+    ? `<span style="color:#6b7280">Last Close</span>`
     : `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
   document.getElementById('sxOpen').textContent  = d.open  > 0 ? fmt2(d.open)  : '—';
   document.getElementById('sxHigh').textContent  = d.high  > 0 ? fmt2(d.high)  : '—';
