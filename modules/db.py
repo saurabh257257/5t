@@ -31,7 +31,7 @@ def init_db():
 
 def save_sr(index_id, ltp, supports, resistances, valid_today, verdict):
     with _conn() as c:
-        c.execute(
+        cur = c.execute(
             '''INSERT INTO sr_levels
                (index_id, saved_at, ltp, supports, resistances, valid_today, verdict)
                VALUES (?, ?, ?, ?, ?, ?, ?)''',
@@ -46,7 +46,14 @@ def save_sr(index_id, ltp, supports, resistances, valid_today, verdict):
             )
         )
         c.commit()
-        return c.lastrowid
+        return cur.lastrowid
+
+
+def delete_sr(record_id):
+    with _conn() as c:
+        c.execute('DELETE FROM sr_levels WHERE id = ?', (record_id,))
+        c.commit()
+        return c.execute('SELECT changes()').fetchone()[0]
 
 
 def get_sr_history(index_id, limit=10):

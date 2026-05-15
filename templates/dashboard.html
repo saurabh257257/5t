@@ -958,19 +958,38 @@ async function loadSRHistory() {
     return;
   }
   el.innerHTML = d.history.map(h => `
-    <div class="sr-hist-entry">
-      <div class="sr-hist-meta">
-        <strong style="color:#a78bfa">${h.index_id}</strong>
-        &nbsp;·&nbsp;LTP: <strong>${fmt2(h.ltp)}</strong>
-        &nbsp;·&nbsp;<span>${h.saved_at}</span>
+    <div class="sr-hist-entry" id="sr-entry-${h.id}">
+      <div class="sr-hist-meta" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <strong style="color:#a78bfa">${h.index_id}</strong>
+          &nbsp;·&nbsp;LTP: <strong>${fmt2(h.ltp)}</strong>
+          &nbsp;·&nbsp;<span>${h.saved_at}</span>
+        </div>
+        <button onclick="deleteSR(${h.id})" title="Delete" style="background:transparent;border:1px solid #4b5563;color:#6b7280;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:0.8em;flex-shrink:0;margin-left:10px">✕</button>
       </div>
-      <div class="sr-hist-verdict">${h.verdict || ''}</div>
+      <div class="sr-hist-verdict" style="margin-top:5px">${h.verdict || ''}</div>
       <div style="margin-top:5px;font-size:0.75em;color:#6b7280">
         <span style="color:#34d399">S:</span> ${(h.supports||[]).map(s=>s.level).join(', ')||'—'}
         &nbsp;&nbsp;
         <span style="color:#f87171">R:</span> ${(h.resistances||[]).map(r=>r.level).join(', ')||'—'}
       </div>
     </div>`).join('');
+}
+
+async function deleteSR(id) {
+  const el = document.getElementById(`sr-entry-${id}`);
+  if (!el) return;
+  el.style.opacity = '0.4';
+  const r = await fetch(`/api/sr-history/${id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.success) {
+    el.style.transition = 'all 0.3s';
+    el.style.maxHeight = '0'; el.style.overflow = 'hidden'; el.style.padding = '0';
+    setTimeout(() => el.remove(), 320);
+  } else {
+    el.style.opacity = '1';
+    alert('Delete failed: ' + (d.error || 'Unknown error'));
+  }
 }
 
 document.getElementById('chartModal').addEventListener('click', e => {

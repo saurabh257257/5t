@@ -9,7 +9,7 @@ from modules.master import search_scrips, refresh_master, get_scrip_info, browse
 from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
                             get_sensex_ltp, get_index_ltp, get_historical_data,
                             get_today_ohlc, get_chart_data, get_components_ltp)
-from modules.db import init_db, save_sr, get_sr_history
+from modules.db import init_db, save_sr, get_sr_history, delete_sr
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -584,6 +584,18 @@ def api_sr_history():
     idx   = request.args.get('index', 'SENSEX').upper()
     limit = int(request.args.get('limit', 10))
     return jsonify({'history': get_sr_history(idx, limit)})
+
+
+@app.route('/api/sr-history/<int:record_id>', methods=['DELETE'])
+def api_delete_sr(record_id):
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        deleted = delete_sr(record_id)
+        return jsonify({'success': True, 'deleted': deleted})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/components')

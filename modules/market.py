@@ -294,7 +294,8 @@ def get_components_ltp(client, components, exch, exch_type):
         enriched = []
         for i, comp in enumerate(components):
             item = items[i] if i < len(items) else {}
-            ltp        = float(item.get('LastRate')      or item.get('LTP')           or 0)
+            ltp        = float(item.get('LastRate') or item.get('LTP') or
+                               item.get('CloseRate') or item.get('PreviousClose') or 0)
             change     = float(item.get('Change')        or 0)
             chg_pct    = float(item.get('PercentChange') or 0)
             weight     = float(comp.get('weight', 0))
