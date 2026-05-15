@@ -46,6 +46,14 @@ header {
   content: ''; display: inline-block; width: 7px; height: 7px;
   background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite;
 }
+.closed-dot {
+  font-size: 0.72em; font-weight: 700; color: #6b7280;
+  display: flex; align-items: center; gap: 5px;
+}
+.closed-dot::before {
+  content: ''; display: inline-block; width: 7px; height: 7px;
+  background: #4b5563; border-radius: 50%;
+}
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 .ticker-time { font-size: 0.75em; color: #4b5563; }
 
@@ -217,7 +225,7 @@ header {
         L&nbsp;<span id="sxLow" style="color:#f87171">—</span>
       </div>
       <div class="ticker-close">Prev Close&nbsp;<span id="sxClose">—</span></div>
-      <span class="live-dot">LIVE</span>
+      <div id="mktStatus" class="live-dot">LIVE</div>
       <span class="ticker-time" id="sxTime">—</span>
     </div>
   </div>
@@ -315,17 +323,28 @@ async function loadLtp() {
 
   const marketOpen = d.market_open;
   const up = d.change >= 0;
+  const absCh  = Math.abs(d.change).toFixed(2);
+  const pctCh  = Math.abs(d.change_pct).toFixed(2);
+  const sign   = d.change >= 0 ? '+' : '−';
+  const color  = d.change >= 0 ? '#34d399' : '#f87171';
 
-  document.getElementById('sxLtp').textContent = fmt2(ltp);
-  document.getElementById('sxLtp').style.color = !marketOpen ? '#94a3b8' : (up ? '#34d399' : '#f87171');
-  document.getElementById('sxChange').innerHTML = !marketOpen
-    ? `<span style="color:#6b7280">Last Close</span>`
-    : `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
+  document.getElementById('sxLtp').textContent  = fmt2(ltp);
+  document.getElementById('sxLtp').style.color  = !marketOpen ? '#94a3b8' : color;
+
+  document.getElementById('sxChange').innerHTML = marketOpen
+    ? `<span style="color:${color}">${d.change>=0?'▲':'▼'} ${sign}${absCh} (${sign}${pctCh}%)</span>`
+    : `<span style="color:#6b7280;font-size:0.82em">vs prev close&nbsp;
+       <span style="color:${color};font-weight:700">${sign}${absCh} (${sign}${pctCh}%)</span></span>`;
+
   document.getElementById('sxOpen').textContent  = d.open  > 0 ? fmt2(d.open)  : '—';
   document.getElementById('sxHigh').textContent  = d.high  > 0 ? fmt2(d.high)  : '—';
   document.getElementById('sxLow').textContent   = d.low   > 0 ? fmt2(d.low)   : '—';
-  document.getElementById('sxClose').textContent = d.close > 0 ? fmt2(d.close) : fmt2(ltp);
+  document.getElementById('sxClose').textContent = d.prev_close > 0 ? fmt2(d.prev_close) : fmt2(ltp);
   document.getElementById('sxTime').textContent  = nowStr();
+
+  const mkt = document.getElementById('mktStatus');
+  mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
+  mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
