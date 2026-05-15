@@ -2,7 +2,7 @@ from flask import Flask, request, session, redirect, jsonify, render_template
 import os
 import anthropic as _anthropic
 from dotenv import load_dotenv
-from modules.auth import process_callback, authenticated_clients, cred
+from modules.auth import process_callback, authenticated_clients, cred, try_restore_session
 from modules.holdings import get_holdings_data
 from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
 from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_index_ltp, get_historical_data
@@ -39,15 +39,24 @@ def index():
 
 @app.route('/verify-pin', methods=['POST'])
 def verify_pin():
-    if request.form.get('pin', '').strip() == PIN:
-        session['pin_verified'] = True
-        login_url = (
-            f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index"
-            f"?VendorKey={cred['USER_KEY']}"
-            f"&ResponseURL=http://{DROPLET_IP}:3000/callback"
-        )
-        return render_template('login.html', login_url=login_url)
-    return render_template('pin.html', error="Incorrect PIN. Please try again.")
+    if request.form.get('pin', '').strip() != PIN:
+        return render_template('pin.html', error="Incorrect PIN. Please try again.")
+
+    # Try to restore previous session — skip OAuth if still valid
+    client_id = try_restore_session()
+    if client_id:
+        session['authenticated'] = True
+        session['client_id'] = client_id
+        return redirect('/dashboard')
+
+    # No valid saved session — go through OAuth
+    session['pin_verified'] = True
+    login_url = (
+        f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index"
+        f"?VendorKey={cred['USER_KEY']}"
+        f"&ResponseURL=http://{DROPLET_IP}:3000/callback"
+    )
+    return render_template('login.html', login_url=login_url)
 
 
 @app.route('/callback')
