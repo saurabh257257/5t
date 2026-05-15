@@ -205,11 +205,79 @@ header {
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
 .state-icon { font-size: 2.4em; margin-bottom: 12px; }
 
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .chain-ai-wrap { flex-direction: column; }
-  .ai-panel { width: 100%; position: static; max-height: none; }
+  .ai-panel { width: 100%; position: static; max-height: 60vh; }
   .cs-stats { flex-wrap: wrap; }
   .cs-stat { min-width: 45%; }
+}
+
+@media (max-width: 768px) {
+  .page { padding: 10px 10px; }
+
+  /* Header compact */
+  header { padding: 6px 12px; height: auto; flex-wrap: wrap; gap: 6px; }
+  .logo  { font-size: 0.9em; }
+  .sched-info { display: none; }
+  .sched-pill { padding: 4px 10px 4px 8px; gap: 7px; border-radius: 16px; }
+  .sched-toggle { padding: 3px 9px; font-size: 0.78em; }
+  .btn-danger { padding: 5px 10px; font-size: 0.78em; }
+
+  /* Ticker stacks vertically */
+  .ticker { padding: 12px 14px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .ticker-ltp { font-size: 2em; }
+  .ticker-right { width: 100%; gap: 8px; flex-wrap: wrap; }
+  .ticker-btns { width: 100%; }
+  .btn-ticker { flex: 1; text-align: center; justify-content: center; }
+  .ticker-ohlc, .ticker-close { font-size: 0.76em; }
+
+  /* Controls stack */
+  .controls { padding: 10px 12px; flex-direction: column; align-items: stretch; gap: 8px; }
+  .ctrl-sep { display: none; }
+  .sx-select, .idx-select { min-width: 0; width: 100%; }
+  .btn-load { width: 100%; padding: 10px; }
+  .controls label { font-size: 0.8em; }
+
+  /* Chain table */
+  .chain-scroll { max-height: 48vh; }
+  .sx-table     { font-size: 0.73em; }
+  .sx-table td, .sx-table th { padding: 8px 6px; }
+
+  /* Chain summary stats */
+  .cs-stats  { flex-wrap: wrap; }
+  .cs-stat   { min-width: 48%; flex: none; }
+  .cs-body   { font-size: 0.8em; }
+
+  /* AI panel */
+  .ai-panel { position: static; max-height: 55vh; }
+
+  /* Modals — full screen on mobile */
+  .modal-overlay { align-items: flex-end; }
+  .modal-box { width: 100vw; max-width: 100vw; max-height: 95dvh; border-radius: 16px 16px 0 0; margin: 0; }
+  .modal-bd  { padding: 12px 14px; }
+
+  /* Chart */
+  #chartContainer { height: 240px; }
+  .chart-toolbar  { flex-direction: column; gap: 7px; }
+  .btn-analyze-sr, .btn-save-sr { width: 100%; text-align: center; }
+  .sr-tables { flex-direction: column; }
+  .chart-tabs { flex-wrap: wrap; }
+
+  /* Components */
+  .comp-tbl    { font-size: 0.74em; }
+  .comp-tbl td, .comp-tbl th { padding: 8px 7px; }
+  .comp-summary-bar { gap: 12px; font-size: 0.78em; }
+}
+
+@media (max-width: 480px) {
+  .ticker-ltp    { font-size: 1.7em; }
+  .ticker-change { font-size: 0.88em; }
+  .ticker-ohlc, .ticker-close { font-size: 0.7em; }
+  .sx-table td, .sx-table th { padding: 7px 4px; }
+  .sx-table      { font-size: 0.67em; }
+  .cs-stat       { min-width: 100%; }
+  .comp-tbl td, .comp-tbl th { padding: 6px 5px; }
 }
 
 /* ── Ticker action buttons ──────────────────────────────────────────────────── */
@@ -528,7 +596,6 @@ async function get(url) {
 let INDICES = [];
 let currentIndex = '';
 let lastLtp = 0, lastPrevClose = 0;
-let _ohlcFetched = false;
 
 async function loadIndices() {
   INDICES = await get('/api/indices');
@@ -545,7 +612,7 @@ function switchIndex() {
   currentIndex = sel.value;
   const cfg = INDICES.find(i => i.id === currentIndex);
   document.getElementById('idxLabel').textContent = cfg ? cfg.label : currentIndex;
-  lastLtp = 0; lastPrevClose = 0; _ohlcFetched = false;
+  lastLtp = 0; lastPrevClose = 0;
   ['sxLtp','sxChange','sxOpen','sxHigh','sxLow','sxClose'].forEach(id => {
     document.getElementById(id).textContent = '—';
   });
@@ -557,6 +624,7 @@ function switchIndex() {
   document.getElementById('statusTxt').textContent = '';
   closeAiPanel();
   loadLtp();
+  loadOHLC();
   loadExpiries();
 }
 
@@ -618,26 +686,21 @@ async function loadLtp() {
   document.getElementById('sxChange').innerHTML = marketOpen
     ? `<span style="color:${color}">${d.change>=0?'▲':'▼'} ${sign}${absCh} (${sign}${pctCh}%)</span>`
     : `<span style="color:#6b7280;font-size:0.82em">vs prev&nbsp;<span style="color:${color};font-weight:700">${sign}${absCh} (${sign}${pctCh}%)</span></span>`;
-  document.getElementById('sxOpen').textContent  = d.open  > 0 ? fmt2(d.open)  : '—';
-  document.getElementById('sxHigh').textContent  = d.high  > 0 ? fmt2(d.high)  : '—';
-  document.getElementById('sxLow').textContent   = d.low   > 0 ? fmt2(d.low)   : '—';
   document.getElementById('sxClose').textContent = d.prev_close > 0 ? fmt2(d.prev_close) : fmt2(ltp);
   document.getElementById('sxTime').textContent  = nowStr();
   const mkt = document.getElementById('mktStatus');
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
   mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
+}
 
-  // Fetch intraday OHLC once if market feed didn't return it (NIFTY/BANKNIFTY)
-  if (!_ohlcFetched && d.open === 0 && currentIndex) {
-    _ohlcFetched = true;
-    get(`/api/today-ohlc?index=${currentIndex}`).then(od => {
-      if (!od.error) {
-        if (od.open > 0) document.getElementById('sxOpen').textContent = fmt2(od.open);
-        if (od.high > 0) document.getElementById('sxHigh').textContent = fmt2(od.high);
-        if (od.low  > 0) document.getElementById('sxLow').textContent  = fmt2(od.low);
-      }
-    });
-  }
+// ── Today's Open / High / Low (separate from LTP poll) ───────────────────────
+async function loadOHLC() {
+  if (!currentIndex) return;
+  const od = await get(`/api/today-ohlc?index=${currentIndex}`);
+  if (od.error) return;
+  if (od.open > 0) document.getElementById('sxOpen').textContent = fmt2(od.open);
+  if (od.high > 0) document.getElementById('sxHigh').textContent = fmt2(od.high);
+  if (od.low  > 0) document.getElementById('sxLow').textContent  = fmt2(od.low);
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
@@ -1151,12 +1214,14 @@ document.getElementById('compModal').addEventListener('click', e => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadIndices().then(() => {
   loadLtp();
+  loadOHLC();
   loadExpiries().then(() => {
     const sel = document.getElementById('expirySelect');
     if (sel?.value) loadChain();
   });
 });
-setInterval(loadLtp, 5000);
+setInterval(loadLtp,  5000);          // LTP every 5s
+setInterval(loadOHLC, 5 * 60 * 1000); // OHL every 5 min
 </script>
 </body>
 </html>

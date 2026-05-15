@@ -4,6 +4,16 @@ from datetime import datetime, timezone, timedelta, date as _date
 _IST = timezone(timedelta(hours=5, minutes=30))
 
 
+def _market_open_now():
+    """True only during NSE/BSE live trading hours (IST), Mon–Fri."""
+    from datetime import time as _t
+    now = datetime.now(_IST)
+    if now.weekday() >= 5:          # Saturday=5, Sunday=6
+        return False
+    t = now.time()
+    return _t(9, 14) <= t <= _t(15, 31)
+
+
 def get_ltp(client, scripcode, exch="N", exch_type="C"):
     try:
         req = [{"Exch": exch, "ExchangeType": exch_type, "ScripCode": int(scripcode)}]
@@ -54,7 +64,7 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
     # ── 1. Try live market feed ───────────────────────────────────────────────
     ltp = 0
     open_ = high = low = 0
-    market_open = False
+    market_open = _market_open_now()   # time-based, not feed-based
     try:
         req = [{"Exch": exch, "ExchangeType": "C", "ScripCode": int(scrip_code)}]
         result = client.fetch_market_feed(req)
@@ -64,7 +74,6 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
             open_ = float(item.get("OpenRate")  or item.get("Open") or 0)
             high  = float(item.get("High")       or item.get("HighRate") or 0)
             low   = float(item.get("Low")        or item.get("LowRate")  or 0)
-            market_open = ltp > 0
     except Exception:
         pass
 
