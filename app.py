@@ -175,9 +175,14 @@ def api_option_chain():
 @app.route('/api/debug-index')
 def api_debug_index():
     """Find correct NIFTY/BANKNIFTY scrip codes from master data."""
+    # Try authenticated client first, fall back to fresh restore
     client = require_auth()
     if not client:
-        return jsonify({"error": "Not authenticated"}), 401
+        from modules.auth import try_restore_session, authenticated_clients
+        cid = try_restore_session()
+        client = authenticated_clients.get(cid) if cid else None
+    if not client:
+        return jsonify({"error": "Not authenticated — log in first"}), 401
 
     results = {}
 
