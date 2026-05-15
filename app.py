@@ -32,7 +32,17 @@ DROPLET_IP = os.getenv("DROPLET_IP", "142.93.222.101")
 
 def require_auth():
     cid = session.get('client_id')
-    return authenticated_clients.get(cid) if cid else None
+    if not cid:
+        return None
+    client = authenticated_clients.get(cid)
+    if client:
+        return client
+    # Server may have restarted — try to restore saved session transparently
+    restored_cid = try_restore_session()
+    if restored_cid:
+        session['client_id'] = restored_cid
+        return authenticated_clients.get(restored_cid)
+    return None
 
 
 # ── Auth routes ────────────────────────────────────────────────────────────────

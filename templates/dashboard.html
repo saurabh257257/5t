@@ -288,7 +288,11 @@ const fmtChg = n => {
 };
 const nowStr = () => new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
-async function get(url) { const r = await fetch(url); return r.json(); }
+async function get(url) {
+  const r = await fetch(url);
+  if (r.status === 401) { window.location.href = '/'; return {}; }
+  return r.json();
+}
 
 // ── Index config from server ──────────────────────────────────────────────────
 let INDICES = [];
