@@ -598,6 +598,34 @@ def api_delete_sr(record_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/debug-components')
+def api_debug_components():
+    """Debug: show raw fetch_market_feed response for first 3 SENSEX components."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    cfg_comp = COMPONENTS.get(idx)
+    if not cfg_comp:
+        return jsonify({'error': f'No components for {idx}'}), 400
+
+    comps = cfg_comp['components'][:5]   # first 5 only
+    exch  = cfg_comp['exch']
+    et    = cfg_comp['exch_type']
+    req   = [{'Exch': exch, 'ExchangeType': et, 'ScripCode': int(c['scrip_code'])} for c in comps]
+
+    try:
+        raw = client.fetch_market_feed(req)
+    except Exception as e:
+        return jsonify({'error': str(e), 'request': req})
+
+    return jsonify({
+        'request':      req,
+        'raw_response': raw if isinstance(raw, list) else str(raw),
+        'type':         type(raw).__name__,
+    })
+
+
 @app.route('/api/components')
 def api_components():
     client = require_auth()
