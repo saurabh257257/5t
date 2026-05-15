@@ -600,30 +600,44 @@ def api_delete_sr(record_id):
 
 @app.route('/api/debug-components')
 def api_debug_components():
-    """Debug: show raw fetch_market_feed response for first 3 SENSEX components."""
+    """Debug: test single vs batch fetch_market_feed + verify scrip codes via search."""
     client = require_auth()
     if not client:
         return jsonify({'error': 'Not authenticated'}), 401
-    idx = request.args.get('index', 'SENSEX').upper()
+
+    results = {}
+
+    # 1. Search master for correct scrip codes
+    from modules.master import search_scrips
+    for q in ['RELIANCE', 'HDFCBANK', 'INFY']:
+        hits = search_scrips(q)
+        results[f'search_{q}'] = hits[:5]
+
+    # 2. Try single-item fetch_market_feed for first SENSEX component
+    idx      = request.args.get('index', 'SENSEX').upper()
     cfg_comp = COMPONENTS.get(idx)
-    if not cfg_comp:
-        return jsonify({'error': f'No components for {idx}'}), 400
+    if cfg_comp:
+        comp = cfg_comp['components'][0]
+        exch = cfg_comp['exch']
+        et   = cfg_comp['exch_type']
 
-    comps = cfg_comp['components'][:5]   # first 5 only
-    exch  = cfg_comp['exch']
-    et    = cfg_comp['exch_type']
-    req   = [{'Exch': exch, 'ExchangeType': et, 'ScripCode': int(c['scrip_code'])} for c in comps]
+        # Single item
+        try:
+            r1 = client.fetch_market_feed([{'Exch': exch, 'ExchangeType': et, 'ScripCode': int(comp['scrip_code'])}])
+            results['single_item'] = {'scrip': comp['scrip_code'], 'name': comp['name'],
+                                      'response': str(r1), 'type': type(r1).__name__}
+        except Exception as e:
+            results['single_item'] = {'error': str(e)}
 
-    try:
-        raw = client.fetch_market_feed(req)
-    except Exception as e:
-        return jsonify({'error': str(e), 'request': req})
+        # Two items
+        comps2 = cfg_comp['components'][:2]
+        try:
+            r2 = client.fetch_market_feed([{'Exch': exch, 'ExchangeType': et, 'ScripCode': int(c['scrip_code'])} for c in comps2])
+            results['two_items'] = {'response': str(r2), 'type': type(r2).__name__}
+        except Exception as e:
+            results['two_items'] = {'error': str(e)}
 
-    return jsonify({
-        'request':      req,
-        'raw_response': raw if isinstance(raw, list) else str(raw),
-        'type':         type(raw).__name__,
-    })
+    return jsonify(results)
 
 
 @app.route('/api/components')
