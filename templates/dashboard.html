@@ -269,19 +269,28 @@ async function get(url) {
 }
 
 // ── Live SENSEX ───────────────────────────────────────────────────────────────
+let lastLtp = 0;  // cache last known non-zero value
+
 async function loadLtp() {
   const d = await get('/api/sensex-ltp');
   if (d.error) return;
+
+  // Use best available value; fall back to last known if all zero
+  const ltp = d.ltp || d.close || lastLtp;
+  if (ltp > 0) lastLtp = ltp;
+
   const up = d.change >= 0;
-  const ltp = d.ltp || d.close;  // use close if LTP is 0 (market closed)
+  const marketClosed = !d.ltp;
+
   document.getElementById('sxLtp').textContent = fmt2(ltp);
-  document.getElementById('sxLtp').style.color = up ? '#34d399' : '#f87171';
-  document.getElementById('sxChange').innerHTML =
-    `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
-  document.getElementById('sxOpen').textContent  = fmt2(d.open);
-  document.getElementById('sxHigh').textContent  = fmt2(d.high);
-  document.getElementById('sxLow').textContent   = fmt2(d.low);
-  document.getElementById('sxClose').textContent = fmt2(d.close);
+  document.getElementById('sxLtp').style.color = marketClosed ? '#94a3b8' : (up ? '#34d399' : '#f87171');
+  document.getElementById('sxChange').innerHTML = marketClosed
+    ? `<span style="color:#6b7280">Market Closed</span>`
+    : `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
+  document.getElementById('sxOpen').textContent  = d.open  > 0 ? fmt2(d.open)  : '—';
+  document.getElementById('sxHigh').textContent  = d.high  > 0 ? fmt2(d.high)  : '—';
+  document.getElementById('sxLow').textContent   = d.low   > 0 ? fmt2(d.low)   : '—';
+  document.getElementById('sxClose').textContent = d.close > 0 ? fmt2(d.close) : fmt2(ltp);
   document.getElementById('sxTime').textContent  = nowStr();
 }
 
@@ -321,12 +330,14 @@ async function loadChain() {
 
   chainData = d.option_chain;
 
-  const ltpVal = parseFloat(document.getElementById('sxLtp').textContent.replace(/,/g,'')) || 0;
+  const ltpVal = lastLtp || parseFloat(document.getElementById('sxLtp').textContent.replace(/,/g,'')) || 0;
   const strikes = d.option_chain.map(r => r.strike);
-  const atm = strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]);
+  const atm = ltpVal > 0
+    ? strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0])
+    : null;
 
   const rows = d.option_chain.map(r => {
-    const isAtm = r.strike === atm;
+    const isAtm = atm !== null && r.strike === atm;
     const cs = r.ce_scrip || 0, ps = r.pe_scrip || 0;
     const ce = cs ? `onclick="pick(this,'ce',${r.strike},${cs},${ps})"` : '';
     const pe = ps ? `onclick="pick(this,'pe',${r.strike},${cs},${ps})"` : '';
