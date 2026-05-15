@@ -1,5 +1,6 @@
 from flask import Flask, request, session, redirect, jsonify, render_template
 import os
+import json
 import anthropic as _anthropic
 from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred, try_restore_session
@@ -7,12 +8,18 @@ from modules.holdings import get_holdings_data
 from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
 from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_index_ltp, get_historical_data
 
-# Index config: name → (ltp_exch, ltp_scrip, opt_exch, opt_symbol)
-INDEX_MAP = {
-    'SENSEX':    ('B', 999901, 'B', 'SENSEX'),
-    'NIFTY':     ('N', 999920, 'N', 'NIFTY'),
-    'BANKNIFTY': ('N', 999921, 'N', 'BANKNIFTY'),
-}
+# ── Load index config from indices.json ────────────────────────────────────────
+_INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
+
+def _load_indices():
+    try:
+        with open(_INDICES_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return [{"id":"SENSEX","label":"SENSEX","feed_exch":"B","feed_scrip":999901,"opt_exch":"B","opt_symbol":"SENSEX"}]
+
+INDICES = _load_indices()
+INDEX_MAP = {i['id']: i for i in INDICES}
 
 load_dotenv()
 
@@ -126,13 +133,18 @@ def api_expiry():
         return jsonify({"error": "Not authenticated"}), 401
     idx = request.args.get('index', '').upper()
     if idx and idx in INDEX_MAP:
-        _, _, opt_exch, opt_symbol = INDEX_MAP[idx]
-        return jsonify(get_expiry_dates(client, opt_exch, opt_symbol))
+        cfg = INDEX_MAP[idx]
+        return jsonify(get_expiry_dates(client, cfg['opt_exch'], cfg['opt_symbol']))
     return jsonify(get_expiry_dates(
         client,
         request.args.get('exch', 'N'),
         request.args.get('symbol', '')
     ))
+
+
+@app.route('/api/indices')
+def api_indices():
+    return jsonify(INDICES)
 
 
 @app.route('/api/sensex-ltp')
@@ -151,8 +163,8 @@ def api_index_ltp():
     idx = request.args.get('index', 'SENSEX').upper()
     if idx not in INDEX_MAP:
         return jsonify({"error": f"Unknown index: {idx}"}), 400
-    exch, scrip, opt_exch, opt_symbol = INDEX_MAP[idx]
-    return jsonify(get_index_ltp(client, exch, scrip, opt_symbol))
+    cfg = INDEX_MAP[idx]
+    return jsonify(get_index_ltp(client, cfg['feed_exch'], cfg['feed_scrip'], cfg['opt_symbol']))
 
 
 @app.route('/api/option-chain')
@@ -162,8 +174,8 @@ def api_option_chain():
         return jsonify({"error": "Not authenticated"}), 401
     idx = request.args.get('index', '').upper()
     if idx and idx in INDEX_MAP:
-        _, _, opt_exch, opt_symbol = INDEX_MAP[idx]
-        return jsonify(get_option_chain_data(client, opt_exch, opt_symbol, request.args.get('expiry_ts', 0)))
+        cfg = INDEX_MAP[idx]
+        return jsonify(get_option_chain_data(client, cfg['opt_exch'], cfg['opt_symbol'], request.args.get('expiry_ts', 0)))
     return jsonify(get_option_chain_data(
         client,
         request.args.get('exch', 'N'),
@@ -254,6 +266,92 @@ def api_master_refresh():
     try:
         df = refresh_master()
         return jsonify({"success": True, "rows": len(df)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analyze-chain')
+def api_analyze_chain():
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    idx        = request.args.get('index', 'SENSEX').upper()
+    expiry_ts  = request.args.get('expiry_ts', 0)
+    ltp        = float(request.args.get('ltp', 0))
+    prev_close = float(request.args.get('prev_close', 0))
+    expiry_lbl = request.args.get('expiry_label', '')
+
+    cfg = INDEX_MAP.get(idx)
+    if not cfg:
+        return jsonify({"error": f"Unknown index: {idx}"}), 400
+
+    chain = get_option_chain_data(client, cfg['opt_exch'], cfg['opt_symbol'], expiry_ts)
+    if 'error' in chain:
+        return jsonify(chain)
+
+    rows = chain.get('option_chain', [])
+    if not rows:
+        return jsonify({"error": "No option chain data"})
+
+    # ── Stats ─────────────────────────────────────────────────────────────────
+    total_ce_oi = sum(r['ce_oi'] for r in rows)
+    total_pe_oi = sum(r['pe_oi'] for r in rows)
+    pcr         = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
+
+    # Max pain — strike with highest total OI
+    max_pain = max(rows, key=lambda r: r['ce_oi'] + r['pe_oi'], default={}).get('strike', 0)
+
+    # Highest CE & PE OI strikes (resistance / support)
+    top_ce = sorted(rows, key=lambda r: r['ce_oi'], reverse=True)[:3]
+    top_pe = sorted(rows, key=lambda r: r['pe_oi'], reverse=True)[:3]
+
+    # 15 strikes nearest to LTP for detailed analysis
+    near_rows = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:15]
+    chain_txt = "Strike | CE_LTP | CE_OI | CE_ChgOI | CE_Vol | PE_LTP | PE_OI | PE_ChgOI | PE_Vol\n"
+    for r in near_rows:
+        chain_txt += (f"{int(r['strike'])} | {r['ce_ltp']} | {r['ce_oi']} | {r['ce_chg_oi']} | "
+                      f"{r['ce_vol']} | {r['pe_ltp']} | {r['pe_oi']} | {r['pe_chg_oi']} | {r['pe_vol']}\n")
+
+    chg_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0
+    chg_abs = round(ltp - prev_close, 2)
+
+    prompt = f"""You are an expert options trader. Analyze this {idx} option chain and provide a market summary.
+
+Index: {idx}  |  Expiry: {expiry_lbl}
+Current Price: {ltp}  |  Prev Close: {prev_close}  |  Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
+PCR (PE OI / CE OI): {pcr}  |  Max Pain: {int(max_pain)}
+Top CE OI (resistance): {', '.join(str(int(r['strike'])) for r in top_ce)}
+Top PE OI (support): {', '.join(str(int(r['strike'])) for r in top_pe)}
+
+Option Chain (15 strikes near current price):
+{chain_txt}
+Provide analysis in exactly these sections:
+1. **Market Bias** — bullish/bearish/neutral, one clear reason
+2. **Key Support** — top 2 PE OI levels protecting downside
+3. **Key Resistance** — top 2 CE OI levels capping upside
+4. **PCR Signal** — what {pcr} PCR means for market sentiment
+5. **Max Pain** — implication of {int(max_pain)} max pain vs current {ltp}
+6. **Watch Out** — any unusual OI buildup, unwinding, or red flags
+
+Max 220 words. Be specific with levels."""
+
+    try:
+        ac = _anthropic.Anthropic()
+        resp = ac.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=700,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return jsonify({
+            "summary":      resp.content[0].text,
+            "pcr":          pcr,
+            "max_pain":     max_pain,
+            "total_ce_oi":  total_ce_oi,
+            "total_pe_oi":  total_pe_oi,
+            "change":       chg_abs,
+            "change_pct":   chg_pct,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

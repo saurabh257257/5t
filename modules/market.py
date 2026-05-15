@@ -80,15 +80,17 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
             pass
 
     # ── 3. Always get historical closes for prev_close ────────────────────────
-    closes = _fetch_hist_close(client, exch, scrip_code, days=14)
+    # Fetch enough days to always find the last two working days
+    closes = _fetch_hist_close(client, exch, scrip_code, days=20)
 
     if market_open:
+        # Market is open today — last hist candle = yesterday (last working day close)
         prev_close = closes[-1] if closes else 0
     else:
-        # Market closed / holiday — last hist candle IS last working day close
+        # Market closed / holiday — last hist candle = last working day close
         if closes:
             if ltp == 0:
-                ltp = closes[-1]
+                ltp = closes[-1]          # show last working day close as price
             prev_close = closes[-2] if len(closes) >= 2 else closes[-1]
         else:
             prev_close = 0

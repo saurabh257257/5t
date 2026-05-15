@@ -1,0 +1,34 @@
+[
+  {
+    "id": "SENSEX",
+    "label": "SENSEX",
+    "feed_exch": "B",
+    "feed_scrip": 999901,
+    "opt_exch": "B",
+    "opt_symbol": "SENSEX"
+  },
+  {
+    "id": "NIFTY",
+    "label": "NIFTY 50",
+    "feed_exch": "N",
+    "feed_scrip": 999920,
+    "opt_exch": "N",
+    "opt_symbol": "NIFTY"
+  },
+  {
+    "id": "BANKNIFTY",
+    "label": "BANK NIFTY",
+    "feed_exch": "N",
+    "feed_scrip": 999921,
+    "opt_exch": "N",
+    "opt_symbol": "BANKNIFTY"
+  },
+  {
+    "id": "FINNIFTY",
+    "label": "FIN NIFTY",
+    "feed_exch": "N",
+    "feed_scrip": 999922,
+    "opt_exch": "N",
+    "opt_symbol": "FINNIFTY"
+  }
+]

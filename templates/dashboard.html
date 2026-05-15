@@ -3,12 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SENSEX Options</title>
+<title>Options Dashboard</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
 
-/* Header */
 header {
   background: #1a1830; border-bottom: 1px solid #2d2b4e;
   padding: 0 24px; display: flex; align-items: center;
@@ -19,10 +18,9 @@ header {
 .btn-danger { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: 1px solid #7f1d1d; background: #450a0a; color: #fca5a5; }
 .btn-danger:hover { background: #7f1d1d; }
 
-/* Page */
 .page { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
 
-/* Live Ticker */
+/* Ticker */
 .ticker {
   background: linear-gradient(135deg, #1a1830 0%, #1e1c45 100%);
   border: 1px solid #2d2b4e; border-radius: 14px;
@@ -38,22 +36,10 @@ header {
 .ticker-ohlc span { color: #94a3b8; font-weight: 600; }
 .ticker-close { font-size: 0.8em; color: #6b7280; }
 .ticker-close span { color: #a78bfa; font-weight: 700; }
-.live-dot {
-  font-size: 0.72em; font-weight: 700; color: #34d399;
-  display: flex; align-items: center; gap: 5px;
-}
-.live-dot::before {
-  content: ''; display: inline-block; width: 7px; height: 7px;
-  background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite;
-}
-.closed-dot {
-  font-size: 0.72em; font-weight: 700; color: #6b7280;
-  display: flex; align-items: center; gap: 5px;
-}
-.closed-dot::before {
-  content: ''; display: inline-block; width: 7px; height: 7px;
-  background: #4b5563; border-radius: 50%;
-}
+.live-dot   { font-size: 0.72em; font-weight: 700; color: #34d399; display: flex; align-items: center; gap: 5px; }
+.live-dot::before   { content:''; display:inline-block; width:7px; height:7px; background:#34d399; border-radius:50%; animation:pulse 1.5s infinite; }
+.closed-dot { font-size: 0.72em; font-weight: 700; color: #6b7280; display: flex; align-items: center; gap: 5px; }
+.closed-dot::before { content:''; display:inline-block; width:7px; height:7px; background:#4b5563; border-radius:50%; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 .ticker-time { font-size: 0.75em; color: #4b5563; }
 
@@ -80,21 +66,51 @@ header {
 .btn-load:hover { background: #6d28d9; }
 .status-txt { font-size: 0.78em; color: #6b7280; }
 
-/* Chain + AI two-column layout */
+/* Chain Summary Box */
+.chain-summary {
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
+  overflow: hidden; margin-bottom: 14px; animation: slideUp 0.2s ease;
+}
+@keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.cs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; background: #12111f; border-bottom: 1px solid #2d2b4e;
+}
+.cs-header-left { display: flex; align-items: center; gap: 8px; }
+.cs-title { font-weight: 700; font-size: 0.88em; color: #e2e8f0; }
+.cs-badge { font-size: 0.6em; padding: 2px 7px; border-radius: 10px; background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a; font-weight: 700; text-transform: uppercase; }
+.cs-refresh { padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8; transition: all 0.15s; }
+.cs-refresh:hover { border-color: #7c3aed; color: #a78bfa; }
+
+.cs-stats {
+  display: flex; gap: 0; border-bottom: 1px solid #2d2b4e;
+}
+.cs-stat {
+  flex: 1; padding: 10px 16px; border-right: 1px solid #2d2b4e; text-align: center;
+}
+.cs-stat:last-child { border-right: none; }
+.cs-stat-label { font-size: 0.68em; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.cs-stat-val { font-size: 1em; font-weight: 800; color: #e2e8f0; }
+.cs-stat-val.bull { color: #34d399; }
+.cs-stat-val.bear { color: #f87171; }
+.cs-stat-val.neu  { color: #fbbf24; }
+
+.cs-body { padding: 14px 18px; font-size: 0.82em; line-height: 1.65; color: #cbd5e1; }
+.cs-loading { padding: 28px; text-align: center; }
+.cs-loading .spinner { width: 22px; height: 22px; border: 2px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 8px; }
+.cs-loading-txt { font-size: 0.78em; color: #6b7280; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Chain + AI side by side */
 .chain-ai-wrap { display: flex; gap: 14px; align-items: flex-start; }
-.chain-ai-wrap .chain-card { flex: 1; min-width: 0; margin-bottom: 0; }
+.chain-ai-wrap .chain-card { flex: 1; min-width: 0; }
 
 /* Option Chain */
-.chain-card {
-  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden;
-}
-.chain-scroll { overflow-x: auto; max-height: calc(100vh - 220px); overflow-y: auto; }
+.chain-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
+.chain-scroll { overflow-x: auto; max-height: calc(100vh - 320px); overflow-y: auto; }
 .sx-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
 .sx-table thead { position: sticky; top: 0; z-index: 10; }
-.sx-table th {
-  padding: 10px 14px; font-size: 0.7em; text-transform: uppercase;
-  letter-spacing: 0.5px; background: #12111f; border-bottom: 1px solid #2d2b4e; white-space: nowrap;
-}
+.sx-table th { padding: 10px 14px; font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.5px; background: #12111f; border-bottom: 1px solid #2d2b4e; white-space: nowrap; }
 .sx-table th.ce-hd  { text-align: right; color: #34d399; }
 .sx-table th.pe-hd  { text-align: left;  color: #f87171; }
 .sx-table th.str-hd { text-align: center; color: #a78bfa; background: #1e1c35; min-width: 100px; }
@@ -104,8 +120,8 @@ header {
 .sx-table td.str-td { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
 .sx-table tr.atm td         { background: rgba(124,58,237,0.08) !important; }
 .sx-table tr.atm td.str-td  { background: rgba(124,58,237,0.22) !important; }
-.sx-table tr:hover td       { background: #1e1c35; cursor: default; }
-.sx-table tr:hover td.str-td{ background: #2d2b4e; }
+.sx-table tr:hover td        { background: #1e1c35; cursor: default; }
+.sx-table tr:hover td.str-td { background: #2d2b4e; }
 .ce-cell { cursor: pointer; }
 .pe-cell { cursor: pointer; }
 .ce-cell:hover { background: rgba(52,211,153,0.1) !important; }
@@ -122,99 +138,67 @@ header {
   width: 360px; flex-shrink: 0;
   background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
   overflow: hidden; position: sticky; top: 70px;
-  max-height: calc(100vh - 90px);
-  display: flex; flex-direction: column;
+  max-height: calc(100vh - 90px); display: flex; flex-direction: column;
   animation: slideIn 0.2s ease;
 }
 @keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
-
-.ai-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f; flex-shrink: 0;
-}
+.ai-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f; flex-shrink: 0; }
 .ai-header-left { display: flex; align-items: center; gap: 8px; }
 .ai-title { font-weight: 700; font-size: 0.9em; color: #e2e8f0; }
-.ai-badge {
-  font-size: 0.6em; padding: 2px 7px; border-radius: 10px;
-  background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a;
-  font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
-}
+.ai-badge { font-size: 0.6em; padding: 2px 7px; border-radius: 10px; background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a; font-weight: 700; text-transform: uppercase; }
 .ai-header-right { display: flex; align-items: center; gap: 6px; }
-.ai-refresh {
-  padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600;
-  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8; transition: all 0.15s;
-}
+.ai-refresh { padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8; transition: all 0.15s; }
 .ai-refresh:hover { border-color: #7c3aed; color: #a78bfa; }
-.btn-close {
-  padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600;
-  cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa;
-}
+.btn-close { padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
 .btn-close:hover { background: #2d2b4e; }
-
-.ai-body { padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; color: #cbd5e1; }
+.ai-body { padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; }
 .ai-loading { padding: 40px; text-align: center; }
-.ai-loading .spinner {
-  width: 26px; height: 26px; border: 2px solid #2d2b4e; border-top-color: #7c3aed;
-  border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px;
-}
+.ai-loading .spinner { width: 26px; height: 26px; border: 2px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
 .ai-loading-text { font-size: 0.82em; color: #6b7280; }
 .ai-loading-sub  { font-size: 0.72em; color: #4b5563; margin-top: 4px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.ai-strike-bar {
-  padding: 10px 16px; background: rgba(124,58,237,0.08);
-  border-bottom: 1px solid #2d2b4e; display: flex; gap: 14px; flex-wrap: wrap;
-}
+.ai-strike-bar { padding: 10px 16px; background: rgba(124,58,237,0.08); border-bottom: 1px solid #2d2b4e; display: flex; gap: 14px; flex-wrap: wrap; }
 .ai-strike-info .lbl { font-size: 0.72em; color: #6b7280; }
 .ai-strike-info .val { font-weight: 700; font-size: 0.85em; }
 .ai-strike-info .val.ce  { color: #34d399; }
 .ai-strike-info .val.pe  { color: #f87171; }
 .ai-strike-info .val.str { color: #a78bfa; }
-
 .ai-content { padding: 14px 16px; }
 .ai-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #1e1c35; }
 .ai-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.ai-section-title {
-  font-size: 0.7em; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.8px; color: #7c3aed; margin-bottom: 5px;
-}
+.ai-section-title { font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c3aed; margin-bottom: 5px; }
 .ai-section-body { color: #cbd5e1; font-size: 0.88em; line-height: 1.65; }
 .ai-section-body strong { color: #e2e8f0; }
 .ai-section-body .bull { color: #34d399; font-weight: 600; }
 .ai-section-body .bear { color: #f87171; font-weight: 600; }
 .ai-section-body .neu  { color: #fbbf24; font-weight: 600; }
-.ai-trade-box {
-  background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a;
-  border-radius: 8px; padding: 10px 12px; margin-top: 6px;
-  font-size: 0.88em; color: #c4b5fd; line-height: 1.6;
-}
-.ai-trade-box strong { color: #a78bfa; }
+.ai-trade-box { background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a; border-radius: 8px; padding: 10px 12px; margin-top: 6px; font-size: 0.88em; color: #c4b5fd; line-height: 1.6; }
 .ai-error { padding: 20px 16px; color: #f87171; font-size: 0.82em; }
 
 /* States */
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
 .state-icon { font-size: 2.4em; margin-bottom: 12px; }
-.spinner { width: 30px; height: 30px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
 
 @media (max-width: 900px) {
   .chain-ai-wrap { flex-direction: column; }
   .ai-panel { width: 100%; position: static; max-height: none; }
+  .cs-stats { flex-wrap: wrap; }
+  .cs-stat { min-width: 45%; }
 }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">&#x1F4CA; SENSEX Options Dashboard</div>
+  <div class="logo">&#x1F4CA; Options Dashboard</div>
   <a href="/logout"><button class="btn-danger">Logout</button></a>
 </header>
 
 <div class="page">
 
-  <!-- Live Ticker -->
+  <!-- Ticker -->
   <div class="ticker">
     <div class="ticker-left">
-      <span class="ticker-label" id="idxLabel">SENSEX</span>
+      <span class="ticker-label" id="idxLabel">—</span>
       <span class="ticker-ltp" id="sxLtp">—</span>
       <span class="ticker-change" id="sxChange">—</span>
     </div>
@@ -225,7 +209,7 @@ header {
         L&nbsp;<span id="sxLow" style="color:#f87171">—</span>
       </div>
       <div class="ticker-close">Prev Close&nbsp;<span id="sxClose">—</span></div>
-      <div id="mktStatus" class="live-dot">LIVE</div>
+      <div id="mktStatus" class="closed-dot">—</div>
       <span class="ticker-time" id="sxTime">—</span>
     </div>
   </div>
@@ -234,9 +218,7 @@ header {
   <div class="controls">
     <label>Index</label>
     <select class="idx-select" id="indexSelect" onchange="switchIndex()">
-      <option value="SENSEX">SENSEX</option>
-      <option value="NIFTY">NIFTY 50</option>
-      <option value="BANKNIFTY">BANK NIFTY</option>
+      <option value="">Loading…</option>
     </select>
     <div class="ctrl-sep"></div>
     <label>Expiry</label>
@@ -247,9 +229,29 @@ header {
     <span class="status-txt" id="statusTxt"></span>
   </div>
 
-  <!-- Option Chain + AI Panel -->
-  <div class="chain-ai-wrap">
+  <!-- Chain Summary Box (shown after chain loads) -->
+  <div class="chain-summary" id="chainSummaryCard" style="display:none">
+    <div class="cs-header">
+      <div class="cs-header-left">
+        <span class="cs-title" id="csSummaryTitle">Market Summary</span>
+        <span class="cs-badge">Claude AI</span>
+      </div>
+      <button class="cs-refresh" onclick="loadChainSummary()">&#x21BB; Refresh</button>
+    </div>
+    <div class="cs-stats" id="csStats">
+      <div class="cs-stat"><div class="cs-stat-label">PCR</div><div class="cs-stat-val" id="csPcr">—</div></div>
+      <div class="cs-stat"><div class="cs-stat-label">Max Pain</div><div class="cs-stat-val" id="csMaxPain">—</div></div>
+      <div class="cs-stat"><div class="cs-stat-label">Total CE OI</div><div class="cs-stat-val" id="csCeOi">—</div></div>
+      <div class="cs-stat"><div class="cs-stat-label">Total PE OI</div><div class="cs-stat-val" id="csPeOi">—</div></div>
+      <div class="cs-stat"><div class="cs-stat-label">Price Change</div><div class="cs-stat-val" id="csPriceChg">—</div></div>
+    </div>
+    <div class="cs-body" id="csBody">
+      <div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Analyzing option chain…</div></div>
+    </div>
+  </div>
 
+  <!-- Option Chain + AI Strike Panel -->
+  <div class="chain-ai-wrap">
     <div class="chain-card">
       <div id="chainBody">
         <div class="state-box">
@@ -262,7 +264,7 @@ header {
     <div class="ai-panel" id="aiPanel" style="display:none">
       <div class="ai-header">
         <div class="ai-header-left">
-          <span class="ai-title" id="aiTitle">Analysis</span>
+          <span class="ai-title" id="aiTitle">Strike Analysis</span>
           <span class="ai-badge">Claude AI</span>
         </div>
         <div class="ai-header-right">
@@ -272,76 +274,84 @@ header {
       </div>
       <div class="ai-body" id="aiBody"></div>
     </div>
-
   </div>
+
 </div>
 
 <script>
 const fmt2  = n => parseFloat(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtN  = n => parseInt(n||0).toLocaleString('en-IN');
+const fmtCr = n => { const v = Math.abs(parseInt(n||0)); return v >= 10000000 ? (v/10000000).toFixed(2)+'Cr' : v >= 100000 ? (v/100000).toFixed(1)+'L' : v.toLocaleString('en-IN'); };
 const fmtChg = n => {
   const v = parseInt(n||0);
   return `<span class="${v>=0?'chg-pos':'chg-neg'}">${v>=0?'+':''}${v.toLocaleString('en-IN')}</span>`;
 };
 const nowStr = () => new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
-async function get(url) {
-  const r = await fetch(url);
-  return r.json();
+async function get(url) { const r = await fetch(url); return r.json(); }
+
+// ── Index config from server ──────────────────────────────────────────────────
+let INDICES = [];
+let currentIndex = '';
+let lastLtp = 0, lastPrevClose = 0;
+
+async function loadIndices() {
+  INDICES = await get('/api/indices');
+  const sel = document.getElementById('indexSelect');
+  sel.innerHTML = INDICES.map(i => `<option value="${i.id}">${i.label}</option>`).join('');
+  if (INDICES.length) {
+    currentIndex = INDICES[0].id;
+    document.getElementById('idxLabel').textContent = INDICES[0].label;
+  }
 }
 
-// ── Index config ──────────────────────────────────────────────────────────────
-const INDEX_LABELS = { SENSEX: 'SENSEX', NIFTY: 'NIFTY 50', BANKNIFTY: 'BANK NIFTY' };
-let currentIndex = 'SENSEX';
-let lastLtp = 0;
-
 function switchIndex() {
-  currentIndex = document.getElementById('indexSelect').value;
-  document.getElementById('idxLabel').textContent = INDEX_LABELS[currentIndex] || currentIndex;
-  lastLtp = 0;
-  document.getElementById('sxLtp').textContent   = '—';
-  document.getElementById('sxChange').innerHTML  = '—';
-  document.getElementById('sxOpen').textContent  = '—';
-  document.getElementById('sxHigh').textContent  = '—';
-  document.getElementById('sxLow').textContent   = '—';
-  document.getElementById('sxClose').textContent = '—';
-  closeAiPanel();
+  const sel = document.getElementById('indexSelect');
+  currentIndex = sel.value;
+  const cfg = INDICES.find(i => i.id === currentIndex);
+  document.getElementById('idxLabel').textContent = cfg ? cfg.label : currentIndex;
+  lastLtp = 0; lastPrevClose = 0;
+  ['sxLtp','sxChange','sxOpen','sxHigh','sxLow','sxClose'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+  document.getElementById('mktStatus').className = 'closed-dot';
+  document.getElementById('mktStatus').textContent = '—';
+  document.getElementById('chainSummaryCard').style.display = 'none';
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="state-icon">&#x1F4CA;</div>Select an expiry and click Load Chain</div>';
   document.getElementById('statusTxt').textContent = '';
+  closeAiPanel();
   loadLtp();
   loadExpiries();
 }
 
 // ── Live Index Price ──────────────────────────────────────────────────────────
 async function loadLtp() {
+  if (!currentIndex) return;
   const d = await get(`/api/index-ltp?index=${currentIndex}`);
   if (d.error) return;
 
   const ltp = d.ltp || lastLtp;
   if (ltp > 0) lastLtp = ltp;
+  if (d.prev_close > 0) lastPrevClose = d.prev_close;
 
   const marketOpen = d.market_open;
   const up = d.change >= 0;
-  const absCh  = Math.abs(d.change).toFixed(2);
-  const pctCh  = Math.abs(d.change_pct).toFixed(2);
-  const sign   = d.change >= 0 ? '+' : '−';
-  const color  = d.change >= 0 ? '#34d399' : '#f87171';
+  const sign  = d.change >= 0 ? '+' : '−';
+  const color = d.change >= 0 ? '#34d399' : '#f87171';
+  const absCh = Math.abs(d.change).toFixed(2);
+  const pctCh = Math.abs(d.change_pct).toFixed(2);
 
   document.getElementById('sxLtp').textContent  = fmt2(ltp);
   document.getElementById('sxLtp').style.color  = !marketOpen ? '#94a3b8' : color;
-
   document.getElementById('sxChange').innerHTML = marketOpen
     ? `<span style="color:${color}">${d.change>=0?'▲':'▼'} ${sign}${absCh} (${sign}${pctCh}%)</span>`
-    : `<span style="color:#6b7280;font-size:0.82em">vs prev close&nbsp;
-       <span style="color:${color};font-weight:700">${sign}${absCh} (${sign}${pctCh}%)</span></span>`;
-
+    : `<span style="color:#6b7280;font-size:0.82em">vs prev&nbsp;<span style="color:${color};font-weight:700">${sign}${absCh} (${sign}${pctCh}%)</span></span>`;
   document.getElementById('sxOpen').textContent  = d.open  > 0 ? fmt2(d.open)  : '—';
   document.getElementById('sxHigh').textContent  = d.high  > 0 ? fmt2(d.high)  : '—';
   document.getElementById('sxLow').textContent   = d.low   > 0 ? fmt2(d.low)   : '—';
   document.getElementById('sxClose').textContent = d.prev_close > 0 ? fmt2(d.prev_close) : fmt2(ltp);
   document.getElementById('sxTime').textContent  = nowStr();
-
   const mkt = document.getElementById('mktStatus');
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
   mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
@@ -349,6 +359,7 @@ async function loadLtp() {
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
 async function loadExpiries() {
+  if (!currentIndex) return;
   const d   = await get(`/api/expiry?index=${currentIndex}`);
   const sel = document.getElementById('expirySelect');
   if (d.error || !d.expiries?.length) {
@@ -359,7 +370,7 @@ async function loadExpiries() {
 }
 
 // ── Option Chain ──────────────────────────────────────────────────────────────
-let chainData = [];
+let chainData = [], currentExpiryTs = 0, currentExpiryLabel = '';
 
 async function loadChain() {
   const sel   = document.getElementById('expirySelect');
@@ -367,9 +378,13 @@ async function loadChain() {
   const label = sel.options[sel.selectedIndex]?.text || '';
   if (!ts) return;
 
+  currentExpiryTs    = ts;
+  currentExpiryLabel = label;
+
   document.getElementById('statusTxt').textContent = 'Loading…';
   document.getElementById('chainBody').innerHTML =
-    '<div class="state-box"><div class="spinner"></div>Loading option chain…</div>';
+    '<div class="state-box"><div class="spinner" style="width:30px;height:30px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px"></div>Loading option chain…</div>';
+  document.getElementById('chainSummaryCard').style.display = 'none';
   closeAiPanel();
 
   const d = await get(`/api/option-chain?index=${currentIndex}&expiry_ts=${ts}`);
@@ -382,12 +397,9 @@ async function loadChain() {
   }
 
   chainData = d.option_chain;
-
   const ltpVal = lastLtp || 0;
   const strikes = d.option_chain.map(r => r.strike);
-  const atm = ltpVal > 0
-    ? strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0])
-    : null;
+  const atm = ltpVal > 0 ? strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]) : null;
 
   const rows = d.option_chain.map(r => {
     const isAtm = atm !== null && r.strike === atm;
@@ -427,14 +439,62 @@ async function loadChain() {
     </div>`;
 
   document.getElementById('statusTxt').textContent =
-    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell for AI analysis`;
+    `${d.option_chain.length} strikes · ${label} · Click CE/PE for strike analysis`;
 
   setTimeout(() => {
     document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior:'smooth', block:'center' });
   }, 120);
+
+  // Auto-trigger chain summary analysis
+  loadChainSummary();
 }
 
-// ── AI Panel ──────────────────────────────────────────────────────────────────
+// ── Chain Summary (above option chain) ───────────────────────────────────────
+async function loadChainSummary() {
+  if (!currentExpiryTs || !currentIndex) return;
+
+  const card = document.getElementById('chainSummaryCard');
+  const body = document.getElementById('csBody');
+  const cfg  = INDICES.find(i => i.id === currentIndex);
+
+  card.style.display = 'block';
+  document.getElementById('csSummaryTitle').textContent =
+    `${cfg?.label || currentIndex} · ${currentExpiryLabel} · Market Summary`;
+
+  // Reset stats
+  ['csPcr','csMaxPain','csCeOi','csPeOi','csPriceChg'].forEach(id =>
+    document.getElementById(id).textContent = '—');
+  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude is analyzing option chain…</div></div>';
+
+  const d = await get(
+    `/api/analyze-chain?index=${currentIndex}&expiry_ts=${currentExpiryTs}` +
+    `&ltp=${lastLtp}&prev_close=${lastPrevClose}&expiry_label=${encodeURIComponent(currentExpiryLabel)}`
+  );
+
+  if (d.error) {
+    body.innerHTML = `<div style="color:#f87171;padding:14px">&#x26A0; ${d.error}</div>`;
+    return;
+  }
+
+  // Update stats bar
+  const pcr = d.pcr || 0;
+  const pcrEl = document.getElementById('csPcr');
+  pcrEl.textContent = pcr.toFixed(2);
+  pcrEl.className = 'cs-stat-val ' + (pcr > 1.2 ? 'bull' : pcr < 0.8 ? 'bear' : 'neu');
+
+  document.getElementById('csMaxPain').textContent  = fmtN(d.max_pain);
+  document.getElementById('csCeOi').textContent     = fmtCr(d.total_ce_oi);
+  document.getElementById('csPeOi').textContent     = fmtCr(d.total_pe_oi);
+
+  const chgEl = document.getElementById('csPriceChg');
+  const chg   = d.change_pct || 0;
+  chgEl.textContent  = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+  chgEl.className    = 'cs-stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
+
+  body.innerHTML = renderAnalysis(d.summary);
+}
+
+// ── Strike AI Panel ───────────────────────────────────────────────────────────
 let currentStrike = null, currentCeScrip = null, currentPeScrip = null;
 
 function pick(cell, side, strike, ceScrip, peScrip) {
@@ -462,7 +522,7 @@ async function showAnalysis(strike, ceScrip, peScrip, row) {
   const panel = document.getElementById('aiPanel');
   const body  = document.getElementById('aiBody');
   panel.style.display = 'flex';
-  document.getElementById('aiTitle').textContent = `SENSEX ${strike}`;
+  document.getElementById('aiTitle').textContent = `${currentIndex} ${strike}`;
 
   const ceLtp = row ? fmt2(row.ce_ltp) : '—';
   const peLtp = row ? fmt2(row.pe_ltp) : '—';
@@ -480,15 +540,12 @@ async function showAnalysis(strike, ceScrip, peScrip, row) {
     </div>`;
 
   const d = await get(`/api/analyze?ce_scrip=${ceScrip}&pe_scrip=${peScrip}&strike=${strike}&interval=15m&days=2`);
-
   const bar = body.querySelector('.ai-strike-bar')?.outerHTML || '';
-  if (d.error) {
-    body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`;
-    return;
-  }
+  if (d.error) { body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`; return; }
   body.innerHTML = bar + renderAnalysis(d.summary);
 }
 
+// ── Markdown renderer ─────────────────────────────────────────────────────────
 function inlineMd(text) {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -497,22 +554,19 @@ function inlineMd(text) {
     .replace(/bearish/gi, '<span class="bear">Bearish</span>')
     .replace(/neutral/gi, '<span class="neu">Neutral</span>');
 }
-
-const ICONS = { trend:'📈', 'key level':'🎯', volume:'📊', bias:'⚖️', 'market bias':'⚖️', trade:'💡', 'trade idea':'💡' };
+const ICONS = { trend:'📈', 'key support':'🛡️', 'key resistance':'🚧', support:'🛡️', resistance:'🚧', volume:'📊', bias:'⚖️', 'market bias':'⚖️', trade:'💡', 'trade idea':'💡', 'pcr':'📉', 'max pain':'🎯', 'watch':'⚠️', 'watch out':'⚠️', 'smart money':'🧠' };
 
 function renderAnalysis(text) {
   if (!text) return '<div class="ai-error">No response.</div>';
   const re = /^\d+\.\s+\*\*(.+?)\*\*\s*[—–-]?\s*([\s\S]*?)(?=^\d+\.\s+\*\*|\s*$)/gm;
   const sections = [];
   let m;
-  while ((m = re.exec(text + '\n')) !== null) {
-    sections.push({ title: m[1].trim(), body: m[2].trim() });
-  }
+  while ((m = re.exec(text + '\n')) !== null) sections.push({ title: m[1].trim(), body: m[2].trim() });
   if (sections.length > 0) {
     return '<div class="ai-content">' + sections.map(s => {
       const key  = Object.keys(ICONS).find(k => s.title.toLowerCase().includes(k));
       const icon = key ? ICONS[key] : '•';
-      const isTradeIdea = s.title.toLowerCase().includes('trade');
+      const isTradeIdea = s.title.toLowerCase().includes('trade') || s.title.toLowerCase().includes('watch');
       const bodyHtml = inlineMd(s.body.replace(/\n/g, ' '));
       return `<div class="ai-section">
         <div class="ai-section-title">${icon} ${s.title}</div>
@@ -522,17 +576,19 @@ function renderAnalysis(text) {
       </div>`;
     }).join('') + '</div>';
   }
-  const lines = text.split('\n').filter(l => l.trim());
-  return '<div class="ai-content">' + lines.map(l => `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('') + '</div>';
+  return '<div class="ai-content">' + text.split('\n').filter(l=>l.trim()).map(l =>
+    `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('') + '</div>';
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadLtp();
-setInterval(loadLtp, 5000);
-loadExpiries().then(() => {
-  const sel = document.getElementById('expirySelect');
-  if (sel?.value) loadChain();
+loadIndices().then(() => {
+  loadLtp();
+  loadExpiries().then(() => {
+    const sel = document.getElementById('expirySelect');
+    if (sel?.value) loadChain();
+  });
 });
+setInterval(loadLtp, 5000);
 </script>
 </body>
 </html>
