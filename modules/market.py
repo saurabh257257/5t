@@ -195,34 +195,48 @@ def get_historical_data(client, exch, exch_type, scrip_code, interval="15m", day
 
 def get_today_ohlc(client, exch, scrip_code):
     """
-    Fetch today's intraday 15m candles and derive Open / High / Low.
-    Returns {open, high, low, candle_count} or {error}.
+    Fetch Open/High/Low for the current (or most recent) trading day.
+    1. Tries today's 15m intraday candles (works when market is open).
+    2. Falls back to most recent daily candle (works when market is closed/holiday).
+    Returns {open, high, low} or {error}.
     """
-    try:
-        today = _date.today().strftime('%Y-%m-%d')
-        for et in ('C', 'D'):
-            try:
-                df = client.historical_data(exch, et, int(scrip_code), '15m', today, today)
-                if df is None or len(df) == 0:
-                    continue
-                opens  = [float(r.get('Open')  or r.get('open')  or 0) for _, r in df.iterrows()]
-                highs  = [float(r.get('High')  or r.get('high')  or 0) for _, r in df.iterrows()]
-                lows   = [float(r.get('Low')   or r.get('low')   or 0) for _, r in df.iterrows()]
-                opens  = [v for v in opens if v > 0]
-                highs  = [v for v in highs if v > 0]
-                lows   = [v for v in lows  if v > 0]
-                if opens and highs and lows:
-                    return {
-                        'open':         opens[0],
-                        'high':         max(highs),
-                        'low':          min(lows),
-                        'candle_count': len(opens),
-                    }
-            except Exception:
+    from datetime import timedelta as _td2
+    today     = _date.today().strftime('%Y-%m-%d')
+    past_week = (_date.today() - _td2(days=7)).strftime('%Y-%m-%d')
+
+    # ── 1. Try intraday 15m (market open) ────────────────────────────────────
+    for et in ('C', 'D'):
+        try:
+            df = client.historical_data(exch, et, int(scrip_code), '15m', today, today)
+            if df is None or len(df) == 0:
                 continue
-        return {'error': 'No intraday data available'}
-    except Exception as e:
-        return {'error': str(e)}
+            opens = [float(r.get('Open') or r.get('open') or 0) for _, r in df.iterrows()]
+            highs = [float(r.get('High') or r.get('high') or 0) for _, r in df.iterrows()]
+            lows  = [float(r.get('Low')  or r.get('low')  or 0) for _, r in df.iterrows()]
+            opens = [v for v in opens if v > 0]
+            highs = [v for v in highs if v > 0]
+            lows  = [v for v in lows  if v > 0]
+            if opens and highs and lows:
+                return {'open': opens[0], 'high': max(highs), 'low': min(lows)}
+        except Exception:
+            continue
+
+    # ── 2. Fallback: most recent daily candle (market closed / holiday) ───────
+    for et in ('C', 'D'):
+        try:
+            df = client.historical_data(exch, et, int(scrip_code), '1d', past_week, today)
+            if df is None or len(df) == 0:
+                continue
+            row = df.iloc[-1]
+            o = float(row.get('Open') or row.get('open') or 0)
+            h = float(row.get('High') or row.get('high') or 0)
+            l = float(row.get('Low')  or row.get('low')  or 0)
+            if o > 0:
+                return {'open': o, 'high': h, 'low': l}
+        except Exception:
+            continue
+
+    return {'error': 'No OHLC data available'}
 
 
 def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
@@ -271,49 +285,67 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
     return {'error': 'No chart data available for any interval', 'candles': []}
 
 
+def _extract_ltp(item):
+    """Extract best available price from a market feed item."""
+    for field in ('LastRate', 'LTP', 'Last', 'CloseRate', 'PreviousClose', 'Close'):
+        v = item.get(field)
+        if v:
+            try:
+                f = float(v)
+                if f > 0:
+                    return f
+            except Exception:
+                pass
+    return 0.0
+
+
 def get_components_ltp(client, components, exch, exch_type):
     """
-    Batch-fetch LTPs for a list of component dicts.
-    Each component: {rank, name, sector, scrip_code, weight}.
-    Returns {components: [...]} enriched with ltp, change, change_pct, contribution.
+    Batch-fetch LTPs for component stocks.
+    Splits into batches of 25 (API safe limit).
+    Returns {components: [...]} or {error}.
     """
     if not components:
         return {'error': 'No components provided'}
-    try:
+
+    BATCH = 25
+    all_items = []
+
+    for start in range(0, len(components), BATCH):
+        batch = components[start:start + BATCH]
         req = [
             {'Exch': exch, 'ExchangeType': exch_type, 'ScripCode': int(c['scrip_code'])}
-            for c in components
+            for c in batch
         ]
-        feed = client.fetch_market_feed(req)
-        if not feed:
-            return {'error': 'No market feed response'}
+        try:
+            feed = client.fetch_market_feed(req)
+            items = feed if isinstance(feed, list) else ([feed] if feed else [])
+            # Pad with empty dicts if response is shorter than request
+            while len(items) < len(batch):
+                items.append({})
+            all_items.extend(items[:len(batch)])
+        except Exception:
+            all_items.extend([{}] * len(batch))
 
-        # Use positional matching — response order matches request order
-        items = feed if isinstance(feed, list) else [feed]
+    enriched = []
+    for i, comp in enumerate(components):
+        item    = all_items[i] if i < len(all_items) else {}
+        ltp     = _extract_ltp(item)
+        change  = float(item.get('Change')        or 0)
+        chg_pct = float(item.get('PercentChange') or 0)
+        weight  = float(comp.get('weight', 0))
+        contrib = round(weight * chg_pct / 100, 4)
+        enriched.append({
+            'rank':         comp['rank'],
+            'name':         comp['name'],
+            'sector':       comp['sector'],
+            'scrip_code':   comp['scrip_code'],
+            'weight':       weight,
+            'ltp':          ltp,
+            'change':       round(change, 2),
+            'change_pct':   round(chg_pct, 2),
+            'contribution': contrib,
+        })
 
-        enriched = []
-        for i, comp in enumerate(components):
-            item = items[i] if i < len(items) else {}
-            ltp        = float(item.get('LastRate') or item.get('LTP') or
-                               item.get('CloseRate') or item.get('PreviousClose') or 0)
-            change     = float(item.get('Change')        or 0)
-            chg_pct    = float(item.get('PercentChange') or 0)
-            weight     = float(comp.get('weight', 0))
-            contrib    = round(weight * chg_pct / 100, 4)
-            enriched.append({
-                'rank':         comp['rank'],
-                'name':         comp['name'],
-                'sector':       comp['sector'],
-                'scrip_code':   comp['scrip_code'],
-                'weight':       weight,
-                'ltp':          ltp,
-                'change':       round(change, 2),
-                'change_pct':   round(chg_pct, 2),
-                'contribution': contrib,
-            })
-
-        enriched.sort(key=lambda x: abs(x['contribution']), reverse=True)
-        return {'components': enriched}
-
-    except Exception as e:
-        return {'error': str(e)}
+    enriched.sort(key=lambda x: abs(x['contribution']), reverse=True)
+    return {'components': enriched}

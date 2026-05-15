@@ -1,7 +1,9 @@
 import sqlite3
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+_IST = timezone(timedelta(hours=5, minutes=30))
 
 _DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'dashboard.db')
 
@@ -37,7 +39,7 @@ def save_sr(index_id, ltp, supports, resistances, valid_today, verdict):
                VALUES (?, ?, ?, ?, ?, ?, ?)''',
             (
                 index_id,
-                datetime.now().strftime('%Y-%m-%d %H:%M'),
+                datetime.now(_IST).strftime('%Y-%m-%d %H:%M'),
                 ltp,
                 json.dumps(supports),
                 json.dumps(resistances),
