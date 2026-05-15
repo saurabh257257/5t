@@ -251,9 +251,8 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
                         # Handle pandas Timestamp or string
                         s = str(dt_val)[:19].replace('T', ' ')
                         dt = _dt.strptime(s, '%Y-%m-%d %H:%M:%S')
-                        # Convert IST (UTC+5:30) to UTC unix seconds
-                        unix_ts = int((_dt(1970, 1, 1) + (dt - _dt(1970, 1, 1)) -
-                                       __import__('datetime').timedelta(hours=5, minutes=30)).total_seconds())
+                        # Convert IST naive datetime to UTC unix seconds
+                        unix_ts = int((dt - _dt(1970, 1, 1) - _td(hours=5, minutes=30)).total_seconds())
                     except Exception:
                         continue
                     o = float(row.get('Open')   or row.get('open')   or 0)
@@ -289,18 +288,12 @@ def get_components_ltp(client, components, exch, exch_type):
         if not feed:
             return {'error': 'No market feed response'}
 
-        # Build scrip-code → item lookup
-        feed_map = {}
+        # Use positional matching — response order matches request order
         items = feed if isinstance(feed, list) else [feed]
-        for item in items:
-            sc = int(item.get('ScripCode') or item.get('Scripcode') or 0)
-            if sc:
-                feed_map[sc] = item
 
         enriched = []
-        for comp in components:
-            sc   = int(comp['scrip_code'])
-            item = feed_map.get(sc, {})
+        for i, comp in enumerate(components):
+            item = items[i] if i < len(items) else {}
             ltp        = float(item.get('LastRate')      or item.get('LTP')           or 0)
             change     = float(item.get('Change')        or 0)
             chg_pct    = float(item.get('PercentChange') or 0)
@@ -310,7 +303,7 @@ def get_components_ltp(client, components, exch, exch_type):
                 'rank':         comp['rank'],
                 'name':         comp['name'],
                 'sector':       comp['sector'],
-                'scrip_code':   sc,
+                'scrip_code':   comp['scrip_code'],
                 'weight':       weight,
                 'ltp':          ltp,
                 'change':       round(change, 2),
