@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SENSEX Options</title>
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
@@ -17,7 +16,7 @@ header {
   position: sticky; top: 0; z-index: 100;
 }
 .logo { font-size: 1em; font-weight: 700; color: #a78bfa; }
-.btn-danger { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: none; background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
+.btn-danger { padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; cursor: pointer; border: 1px solid #7f1d1d; background: #450a0a; color: #fca5a5; }
 .btn-danger:hover { background: #7f1d1d; }
 
 /* Page */
@@ -35,8 +34,10 @@ header {
 .ticker-ltp   { font-size: 2.4em; font-weight: 800; color: #e2e8f0; line-height: 1; }
 .ticker-change { font-size: 1em; font-weight: 700; }
 .ticker-right { display: flex; align-items: center; gap: 20px; }
-.ticker-ohlc  { font-size: 0.8em; color: #6b7280; line-height: 1.6; }
+.ticker-ohlc  { font-size: 0.8em; color: #6b7280; line-height: 1.8; }
 .ticker-ohlc span { color: #94a3b8; font-weight: 600; }
+.ticker-close { font-size: 0.8em; color: #6b7280; }
+.ticker-close span { color: #a78bfa; font-weight: 700; }
 .live-dot {
   font-size: 0.72em; font-weight: 700; color: #34d399;
   display: flex; align-items: center; gap: 5px;
@@ -65,34 +66,31 @@ header {
 .status-txt { font-size: 0.78em; color: #6b7280; }
 
 /* Chain + AI two-column layout */
-.chain-ai-wrap {
-  display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px;
-}
+.chain-ai-wrap { display: flex; gap: 14px; align-items: flex-start; }
 .chain-ai-wrap .chain-card { flex: 1; min-width: 0; margin-bottom: 0; }
 
-/* Option Chain card */
+/* Option Chain */
 .chain-card {
-  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden;
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden;
 }
-.chain-scroll { overflow-x: auto; max-height: 560px; overflow-y: auto; }
+.chain-scroll { overflow-x: auto; max-height: calc(100vh - 220px); overflow-y: auto; }
 .sx-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
 .sx-table thead { position: sticky; top: 0; z-index: 10; }
 .sx-table th {
   padding: 10px 14px; font-size: 0.7em; text-transform: uppercase;
   letter-spacing: 0.5px; background: #12111f; border-bottom: 1px solid #2d2b4e; white-space: nowrap;
 }
-.sx-table th.ce-hd    { text-align: right; color: #34d399; }
-.sx-table th.pe-hd    { text-align: left;  color: #f87171; }
-.sx-table th.str-hd   { text-align: center; color: #a78bfa; background: #1e1c35; min-width: 100px; }
-.sx-table td          { padding: 9px 14px; border-bottom: 1px solid #1e1c35; white-space: nowrap; color: #cbd5e1; }
-.sx-table td.ce-td    { text-align: right; }
-.sx-table td.pe-td    { text-align: left;  }
-.sx-table td.str-td   { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
-.sx-table tr.atm td   { background: rgba(124,58,237,0.08) !important; }
-.sx-table tr.atm td.str-td { background: rgba(124,58,237,0.22) !important; }
-.sx-table tr:hover td { background: #1e1c35; cursor: default; }
-.sx-table tr:hover td.str-td { background: #2d2b4e; }
+.sx-table th.ce-hd  { text-align: right; color: #34d399; }
+.sx-table th.pe-hd  { text-align: left;  color: #f87171; }
+.sx-table th.str-hd { text-align: center; color: #a78bfa; background: #1e1c35; min-width: 100px; }
+.sx-table td        { padding: 9px 14px; border-bottom: 1px solid #1e1c35; white-space: nowrap; color: #cbd5e1; }
+.sx-table td.ce-td  { text-align: right; }
+.sx-table td.pe-td  { text-align: left; }
+.sx-table td.str-td { text-align: center; font-weight: 800; color: #a78bfa; background: #1e1c35; }
+.sx-table tr.atm td         { background: rgba(124,58,237,0.08) !important; }
+.sx-table tr.atm td.str-td  { background: rgba(124,58,237,0.22) !important; }
+.sx-table tr:hover td       { background: #1e1c35; cursor: default; }
+.sx-table tr:hover td.str-td{ background: #2d2b4e; }
 .ce-cell { cursor: pointer; }
 .pe-cell { cursor: pointer; }
 .ce-cell:hover { background: rgba(52,211,153,0.1) !important; }
@@ -117,8 +115,7 @@ header {
 
 .ai-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f;
-  flex-shrink: 0;
+  padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f; flex-shrink: 0;
 }
 .ai-header-left { display: flex; align-items: center; gap: 8px; }
 .ai-title { font-weight: 700; font-size: 0.9em; color: #e2e8f0; }
@@ -130,8 +127,7 @@ header {
 .ai-header-right { display: flex; align-items: center; gap: 6px; }
 .ai-refresh {
   padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600;
-  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
-  transition: all 0.15s;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8; transition: all 0.15s;
 }
 .ai-refresh:hover { border-color: #7c3aed; color: #a78bfa; }
 .btn-close {
@@ -140,10 +136,8 @@ header {
 }
 .btn-close:hover { background: #2d2b4e; }
 
-.ai-body {
-  padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; color: #cbd5e1;
-}
-.ai-loading { padding: 40px; text-align: center; color: #4b5563; }
+.ai-body { padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; color: #cbd5e1; }
+.ai-loading { padding: 40px; text-align: center; }
 .ai-loading .spinner {
   width: 26px; height: 26px; border: 2px solid #2d2b4e; border-top-color: #7c3aed;
   border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px;
@@ -152,17 +146,14 @@ header {
 .ai-loading-sub  { font-size: 0.72em; color: #4b5563; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* AI Content sections */
 .ai-strike-bar {
   padding: 10px 16px; background: rgba(124,58,237,0.08);
-  border-bottom: 1px solid #2d2b4e;
-  display: flex; gap: 14px; flex-wrap: wrap;
+  border-bottom: 1px solid #2d2b4e; display: flex; gap: 14px; flex-wrap: wrap;
 }
-.ai-strike-info { font-size: 0.78em; }
-.ai-strike-info .lbl { color: #6b7280; font-size: 0.85em; }
-.ai-strike-info .val { font-weight: 700; }
-.ai-strike-info .val.ce { color: #34d399; }
-.ai-strike-info .val.pe { color: #f87171; }
+.ai-strike-info .lbl { font-size: 0.72em; color: #6b7280; }
+.ai-strike-info .val { font-weight: 700; font-size: 0.85em; }
+.ai-strike-info .val.ce  { color: #34d399; }
+.ai-strike-info .val.pe  { color: #f87171; }
 .ai-strike-info .val.str { color: #a78bfa; }
 
 .ai-content { padding: 14px 16px; }
@@ -171,64 +162,25 @@ header {
 .ai-section-title {
   font-size: 0.7em; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.8px; color: #7c3aed; margin-bottom: 5px;
-  display: flex; align-items: center; gap: 5px;
 }
 .ai-section-body { color: #cbd5e1; font-size: 0.88em; line-height: 1.65; }
 .ai-section-body strong { color: #e2e8f0; }
 .ai-section-body .bull { color: #34d399; font-weight: 600; }
 .ai-section-body .bear { color: #f87171; font-weight: 600; }
 .ai-section-body .neu  { color: #fbbf24; font-weight: 600; }
-.ai-error { padding: 20px 16px; color: #f87171; font-size: 0.82em; }
 .ai-trade-box {
   background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a;
   border-radius: 8px; padding: 10px 12px; margin-top: 6px;
   font-size: 0.88em; color: #c4b5fd; line-height: 1.6;
 }
 .ai-trade-box strong { color: #a78bfa; }
-
-/* Chart */
-.chart-card {
-  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; animation: slideUp 0.2s ease;
-}
-@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-.chart-header {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
-  padding: 13px 20px; border-bottom: 1px solid #2d2b4e; background: #12111f;
-}
-.chart-title { font-weight: 700; font-size: 0.92em; color: #a78bfa; }
-.chart-sub   { font-size: 0.75em; color: #6b7280; margin-top: 2px; }
-.chart-close { padding: 5px 12px; border-radius: 7px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
-.chart-close:hover { background: #2d2b4e; }
-.chart-toolbar {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding: 10px 20px; border-bottom: 1px solid #1e1c35; background: #15131f;
-}
-.toolbar-group { display: flex; align-items: center; gap: 6px; }
-.toolbar-label { font-size: 0.72em; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 2px; }
-.tb-btn {
-  padding: 5px 12px; border-radius: 6px; font-size: 0.78em; font-weight: 600;
-  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
-  transition: all 0.15s;
-}
-.tb-btn:hover { border-color: #7c3aed; color: #a78bfa; }
-.tb-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
-.tb-sep { width: 1px; height: 20px; background: #2d2b4e; margin: 0 4px; }
-.auto-refresh-btn {
-  padding: 5px 12px; border-radius: 6px; font-size: 0.78em; font-weight: 600;
-  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
-  display: flex; align-items: center; gap: 5px; transition: all 0.15s;
-}
-.auto-refresh-btn.on  { border-color: #34d399; color: #34d399; }
-.auto-refresh-btn.off { border-color: #4b5563; color: #4b5563; }
-.refresh-countdown { font-size: 0.68em; color: #6b7280; min-width: 28px; text-align: right; }
+.ai-error { padding: 20px 16px; color: #f87171; font-size: 0.82em; }
 
 /* States */
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
 .state-icon { font-size: 2.4em; margin-bottom: 12px; }
 .spinner { width: 30px; height: 30px; border: 3px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
 
-/* Responsive */
 @media (max-width: 900px) {
   .chain-ai-wrap { flex-direction: column; }
   .ai-panel { width: 100%; position: static; max-height: none; }
@@ -257,6 +209,7 @@ header {
         H&nbsp;<span id="sxHigh" style="color:#34d399">—</span>&nbsp;&nbsp;
         L&nbsp;<span id="sxLow" style="color:#f87171">—</span>
       </div>
+      <div class="ticker-close">Prev Close&nbsp;<span id="sxClose">—</span></div>
       <span class="live-dot">LIVE</span>
       <span class="ticker-time" id="sxTime">—</span>
     </div>
@@ -272,10 +225,9 @@ header {
     <span class="status-txt" id="statusTxt"></span>
   </div>
 
-  <!-- Option Chain + AI Panel (side by side) -->
+  <!-- Option Chain + AI Panel -->
   <div class="chain-ai-wrap">
 
-    <!-- Option Chain -->
     <div class="chain-card">
       <div id="chainBody">
         <div class="state-box">
@@ -285,7 +237,6 @@ header {
       </div>
     </div>
 
-    <!-- AI Analysis Side Panel -->
     <div class="ai-panel" id="aiPanel" style="display:none">
       <div class="ai-header">
         <div class="ai-header-left">
@@ -293,65 +244,17 @@ header {
           <span class="ai-badge">Claude AI</span>
         </div>
         <div class="ai-header-right">
-          <button class="ai-refresh" onclick="reanalyze()" title="Re-analyze">&#x21BB; Refresh</button>
+          <button class="ai-refresh" onclick="reanalyze()">&#x21BB; Refresh</button>
           <button class="btn-close" onclick="closeAiPanel()">&#x2715;</button>
         </div>
       </div>
-      <div class="ai-body" id="aiBody">
-        <div class="ai-loading">
-          <div class="spinner"></div>
-          <div class="ai-loading-text">Analyzing…</div>
-        </div>
-      </div>
+      <div class="ai-body" id="aiBody"></div>
     </div>
 
   </div>
-
-  <!-- Chart (hidden until row clicked) -->
-  <div class="chart-card" id="chartCard" style="display:none">
-    <div class="chart-header">
-      <div>
-        <div class="chart-title" id="chartTitle">—</div>
-        <div class="chart-sub" id="chartSub">15-Min Candles · 2 Days</div>
-      </div>
-      <button class="chart-close" onclick="closeChart()">&#x2715; Close</button>
-    </div>
-
-    <!-- Toolbar -->
-    <div class="chart-toolbar">
-      <div class="toolbar-group">
-        <span class="toolbar-label">Interval</span>
-        <button class="tb-btn" onclick="setInterval_('1m')"  data-iv="1m">1m</button>
-        <button class="tb-btn" onclick="setInterval_('5m')"  data-iv="5m">5m</button>
-        <button class="tb-btn active" onclick="setInterval_('15m')" data-iv="15m">15m</button>
-        <button class="tb-btn" onclick="setInterval_('30m')" data-iv="30m">30m</button>
-        <button class="tb-btn" onclick="setInterval_('60m')" data-iv="60m">1h</button>
-      </div>
-      <div class="tb-sep"></div>
-      <div class="toolbar-group">
-        <span class="toolbar-label">Period</span>
-        <button class="tb-btn" onclick="setDays(1)" data-days="1">1D</button>
-        <button class="tb-btn active" onclick="setDays(2)" data-days="2">2D</button>
-        <button class="tb-btn" onclick="setDays(5)" data-days="5">5D</button>
-      </div>
-      <div class="tb-sep"></div>
-      <div class="toolbar-group">
-        <button class="auto-refresh-btn on" id="arBtn" onclick="toggleAutoRefresh()">
-          &#x21BB; Auto
-        </button>
-        <span class="refresh-countdown" id="arCount">60s</span>
-      </div>
-    </div>
-
-    <div style="padding:8px">
-      <div id="chartDiv" style="height:400px"></div>
-    </div>
-  </div>
-
 </div>
 
 <script>
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt2  = n => parseFloat(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtN  = n => parseInt(n||0).toLocaleString('en-IN');
 const fmtChg = n => {
@@ -365,19 +268,21 @@ async function get(url) {
   return r.json();
 }
 
-// ── Live SENSEX Price ─────────────────────────────────────────────────────────
+// ── Live SENSEX ───────────────────────────────────────────────────────────────
 async function loadLtp() {
   const d = await get('/api/sensex-ltp');
   if (d.error) return;
   const up = d.change >= 0;
-  document.getElementById('sxLtp').textContent  = fmt2(d.ltp);
-  document.getElementById('sxLtp').style.color  = up ? '#34d399' : '#f87171';
+  const ltp = d.ltp || d.close;  // use close if LTP is 0 (market closed)
+  document.getElementById('sxLtp').textContent = fmt2(ltp);
+  document.getElementById('sxLtp').style.color = up ? '#34d399' : '#f87171';
   document.getElementById('sxChange').innerHTML =
     `<span style="color:${up?'#34d399':'#f87171'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)} (${up?'+':''}${d.change_pct.toFixed(2)}%)</span>`;
-  document.getElementById('sxOpen').textContent = fmt2(d.open);
-  document.getElementById('sxHigh').textContent = fmt2(d.high);
-  document.getElementById('sxLow').textContent  = fmt2(d.low);
-  document.getElementById('sxTime').textContent = nowStr();
+  document.getElementById('sxOpen').textContent  = fmt2(d.open);
+  document.getElementById('sxHigh').textContent  = fmt2(d.high);
+  document.getElementById('sxLow').textContent   = fmt2(d.low);
+  document.getElementById('sxClose').textContent = fmt2(d.close);
+  document.getElementById('sxTime').textContent  = nowStr();
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
@@ -392,7 +297,6 @@ async function loadExpiries() {
 }
 
 // ── Option Chain ──────────────────────────────────────────────────────────────
-// Store chain data for AI panel access
 let chainData = [];
 
 async function loadChain() {
@@ -404,7 +308,6 @@ async function loadChain() {
   document.getElementById('statusTxt').textContent = 'Loading…';
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="spinner"></div>Loading option chain…</div>';
-  closeChart();
   closeAiPanel();
 
   const d = await get(`/api/option-chain?exch=B&symbol=SENSEX&expiry_ts=${ts}`);
@@ -418,17 +321,16 @@ async function loadChain() {
 
   chainData = d.option_chain;
 
-  // Find ATM
   const ltpVal = parseFloat(document.getElementById('sxLtp').textContent.replace(/,/g,'')) || 0;
   const strikes = d.option_chain.map(r => r.strike);
-  const atm     = strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]);
+  const atm = strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]);
 
   const rows = d.option_chain.map(r => {
     const isAtm = r.strike === atm;
     const cs = r.ce_scrip || 0, ps = r.pe_scrip || 0;
-    const ce = cs ? `onclick="pick(this,'ce',${cs},'SENSEX ${r.strike} CE',${r.strike},${cs},${ps})"` : '';
-    const pe = ps ? `onclick="pick(this,'pe',${ps},'SENSEX ${r.strike} PE',${r.strike},${cs},${ps})"` : '';
-    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}" data-ce="${cs}" data-pe="${ps}">
+    const ce = cs ? `onclick="pick(this,'ce',${r.strike},${cs},${ps})"` : '';
+    const pe = ps ? `onclick="pick(this,'pe',${r.strike},${cs},${ps})"` : '';
+    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}">
       <td class="ce-td ce-cell" ${ce}>${fmtChg(r.ce_chg_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_vol)}</td>
@@ -451,9 +353,9 @@ async function loadChain() {
             <th class="pe-hd" colspan="4">── PUTS (PE) ──</th>
           </tr>
           <tr>
-            <th class="ce-hd">ChgOI</th><th class="ce-hd">OI</th><th class="ce-hd">Volume</th><th class="ce-hd">LTP</th>
+            <th class="ce-hd">ChgOI</th><th class="ce-hd">OI</th><th class="ce-hd">Vol</th><th class="ce-hd">LTP</th>
             <th class="str-hd">&#9733;</th>
-            <th class="pe-hd">LTP</th><th class="pe-hd">Volume</th><th class="pe-hd">OI</th><th class="pe-hd">ChgOI</th>
+            <th class="pe-hd">LTP</th><th class="pe-hd">Vol</th><th class="pe-hd">OI</th><th class="pe-hd">ChgOI</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -461,199 +363,91 @@ async function loadChain() {
     </div>`;
 
   document.getElementById('statusTxt').textContent =
-    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell`;
+    `${d.option_chain.length} strikes · ${label} · Click any CE/PE cell for AI analysis`;
 
   setTimeout(() => {
-    document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior:'smooth', block:'center' });
   }, 120);
 }
 
-// ── Chart state ───────────────────────────────────────────────────────────────
-let chartScrip = null, chartName = '', chartIv = '15m', chartDays = 2;
-let arEnabled = true, arTimer = null, arCountdown = 60, arTick = null;
+// ── AI Panel ──────────────────────────────────────────────────────────────────
+let currentStrike = null, currentCeScrip = null, currentPeScrip = null;
 
-// AI state
-let currentStrike = null, currentCeScrip = null, currentPeScrip = null, currentName = '';
-
-function setInterval_(iv) {
-  chartIv = iv;
-  document.querySelectorAll('[data-iv]').forEach(b => b.classList.toggle('active', b.dataset.iv === iv));
-  if (chartScrip) refreshChart();
-}
-
-function setDays(d) {
-  chartDays = d;
-  document.querySelectorAll('[data-days]').forEach(b => b.classList.toggle('active', +b.dataset.days === d));
-  if (chartScrip) refreshChart();
-}
-
-function toggleAutoRefresh() {
-  arEnabled = !arEnabled;
-  const btn = document.getElementById('arBtn');
-  btn.className = 'auto-refresh-btn ' + (arEnabled ? 'on' : 'off');
-  btn.innerHTML = (arEnabled ? '&#x21BB;' : '&#x23F8;') + ' Auto';
-  if (arEnabled) startArCountdown(); else stopArCountdown();
-}
-
-function startArCountdown() {
-  stopArCountdown();
-  arCountdown = 60;
-  document.getElementById('arCount').textContent = arCountdown + 's';
-  arTick = setInterval(() => {
-    arCountdown--;
-    document.getElementById('arCount').textContent = arCountdown + 's';
-    if (arCountdown <= 0) { arCountdown = 60; if (chartScrip) refreshChart(); }
-  }, 1000);
-}
-
-function stopArCountdown() {
-  clearInterval(arTick);
-  document.getElementById('arCount').textContent = '—';
-}
-
-function pick(cell, side, scripCode, name, strike, ceScrip, peScrip) {
+function pick(cell, side, strike, ceScrip, peScrip) {
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
   cell.closest('tr').classList.add(side === 'ce' ? 'sel-ce' : 'sel-pe');
-
-  chartScrip = scripCode; chartName = name;
-  currentStrike = strike; currentCeScrip = ceScrip; currentPeScrip = peScrip; currentName = name;
-
-  // Find chain row for LTP display
+  currentStrike = strike; currentCeScrip = ceScrip; currentPeScrip = peScrip;
   const row = chainData.find(r => r.strike === strike);
-
-  showChart(false);
-  showAnalysis(strike, ceScrip, peScrip, name, row);
+  showAnalysis(strike, ceScrip, peScrip, row);
 }
 
-async function refreshChart() { if (chartScrip) showChart(true); }
-
-async function showChart(silent = false) {
-  const card = document.getElementById('chartCard');
-  card.style.display = 'block';
-  document.getElementById('chartTitle').textContent = chartName;
-
-  const ivLabel = { '1m':'1-Min','5m':'5-Min','15m':'15-Min','30m':'30-Min','60m':'1-Hour' }[chartIv] || chartIv;
-  document.getElementById('chartSub').textContent = `${ivLabel} Candles · ${chartDays}D`;
-
-  if (!silent) {
-    document.getElementById('chartDiv').innerHTML =
-      '<div class="state-box"><div class="spinner"></div>Loading candles…</div>';
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function reanalyze() {
+  if (currentStrike) {
+    const row = chainData.find(r => r.strike === currentStrike);
+    showAnalysis(currentStrike, currentCeScrip, currentPeScrip, row);
   }
-
-  const d = await get(`/api/history?exch=B&exch_type=D&scripcode=${chartScrip}&interval=${chartIv}&days=${chartDays}`);
-
-  if (d.error || !d.candles?.length) {
-    document.getElementById('chartDiv').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${d.error || 'No candle data'}</div>`;
-    return;
-  }
-
-  const c      = d.candles;
-  const raw    = c.map(x => x.Datetime || x.datetime || '');
-  const opens  = c.map(x => parseFloat(x.Open  || x.open  || 0));
-  const highs  = c.map(x => parseFloat(x.High  || x.high  || 0));
-  const lows   = c.map(x => parseFloat(x.Low   || x.low   || 0));
-  const closes = c.map(x => parseFloat(x.Close || x.close || 0));
-  const vols   = c.map(x => parseInt  (x.Volume|| x.volume|| 0));
-
-  const labels = raw.map((dt, i) => {
-    const d  = new Date(dt);
-    const hm = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-    if (i === 0) return hm;
-    const prev = new Date(raw[i-1]);
-    return d.toDateString() !== prev.toDateString()
-      ? d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' + hm
-      : hm;
-  });
-
-  const tickStep = chartIv === '1m' ? 30 : chartIv === '5m' ? 12 : chartIv === '15m' ? 4 : 2;
-  const tickvals = [], ticktext = [];
-  labels.forEach((l, i) => { if (i % tickStep === 0) { tickvals.push(raw[i]); ticktext.push(l); } });
-
-  const traces = [
-    {
-      type: 'candlestick', x: raw,
-      open: opens, high: highs, low: lows, close: closes,
-      name: chartName,
-      increasing: { line: { color: '#34d399' }, fillcolor: 'rgba(52,211,153,0.85)' },
-      decreasing: { line: { color: '#f87171' }, fillcolor: 'rgba(248,113,113,0.85)' },
-      hovertext: raw.map(dt => {
-        const d = new Date(dt);
-        return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' +
-               d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-      }),
-    },
-    {
-      type: 'bar', x: raw, y: vols, name: 'Volume', yaxis: 'y2',
-      marker: { color: closes.map((cl,i) => cl >= opens[i] ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)') },
-    },
-  ];
-
-  const layout = {
-    paper_bgcolor: '#12111f', plot_bgcolor: '#12111f',
-    font: { color: '#94a3b8', size: 11 },
-    margin: { t: 10, b: 55, l: 68, r: 20 },
-    showlegend: false,
-    xaxis: {
-      type: 'category', tickvals, ticktext, tickangle: -35, tickfont: { size: 10 },
-      gridcolor: '#1e1c35', color: '#6b7280', rangeslider: { visible: false },
-    },
-    yaxis:  { gridcolor: '#1e1c35', color: '#6b7280', domain: [0.25, 1], tickprefix: '₹' },
-    yaxis2: { gridcolor: '#1e1c35', color: '#6b7280', domain: [0, 0.2],
-              title: { text: 'Vol', font: { size: 10 } } },
-  };
-
-  const config = {
-    responsive: true, displayModeBar: true, displaylogo: false,
-    modeBarButtonsToRemove: ['autoScale2d','lasso2d','select2d','toggleSpikelines',
-                             'hoverClosestCartesian','hoverCompareCartesian'],
-  };
-
-  Plotly.react('chartDiv', traces, layout, config);
-  if (arEnabled) startArCountdown();
 }
 
-function closeChart() {
-  chartScrip = null;
-  stopArCountdown();
-  document.getElementById('chartCard').style.display = 'none';
-  document.getElementById('chartDiv').innerHTML = '';
+function closeAiPanel() {
+  document.getElementById('aiPanel').style.display = 'none';
+  currentStrike = null;
   document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
 }
 
-// ── AI Analysis Panel ─────────────────────────────────────────────────────────
+async function showAnalysis(strike, ceScrip, peScrip, row) {
+  const panel = document.getElementById('aiPanel');
+  const body  = document.getElementById('aiBody');
+  panel.style.display = 'flex';
+  document.getElementById('aiTitle').textContent = `SENSEX ${strike}`;
+
+  const ceLtp = row ? fmt2(row.ce_ltp) : '—';
+  const peLtp = row ? fmt2(row.pe_ltp) : '—';
+
+  body.innerHTML = `
+    <div class="ai-strike-bar">
+      <div class="ai-strike-info"><div class="lbl">Strike</div><div class="val str">${strike}</div></div>
+      <div class="ai-strike-info"><div class="lbl">CE LTP</div><div class="val ce">₹${ceLtp}</div></div>
+      <div class="ai-strike-info"><div class="lbl">PE LTP</div><div class="val pe">₹${peLtp}</div></div>
+    </div>
+    <div class="ai-loading">
+      <div class="spinner"></div>
+      <div class="ai-loading-text">Claude is analyzing…</div>
+      <div class="ai-loading-sub">Fetching CE &amp; PE history</div>
+    </div>`;
+
+  const d = await get(`/api/analyze?ce_scrip=${ceScrip}&pe_scrip=${peScrip}&strike=${strike}&interval=15m&days=2`);
+
+  const bar = body.querySelector('.ai-strike-bar')?.outerHTML || '';
+  if (d.error) {
+    body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`;
+    return;
+  }
+  body.innerHTML = bar + renderAnalysis(d.summary);
+}
+
 function inlineMd(text) {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em style="color:#94a3b8">$1</em>')
-    .replace(/`(.+?)`/g, '<code style="background:#1e1c35;padding:1px 4px;border-radius:3px;color:#a78bfa">$1</code>')
     .replace(/bullish/gi, '<span class="bull">Bullish</span>')
     .replace(/bearish/gi, '<span class="bear">Bearish</span>')
     .replace(/neutral/gi, '<span class="neu">Neutral</span>');
 }
 
-const SECTION_ICONS = {
-  'trend': '📈', 'key level': '🎯', 'volume': '📊',
-  'bias': '⚖️', 'market bias': '⚖️', 'trade': '💡', 'trade idea': '💡'
-};
+const ICONS = { trend:'📈', 'key level':'🎯', volume:'📊', bias:'⚖️', 'market bias':'⚖️', trade:'💡', 'trade idea':'💡' };
 
 function renderAnalysis(text) {
-  if (!text) return '<div class="ai-error">No response received.</div>';
-
-  // Split into numbered sections like "1. **Trend** — ..."
-  const sectionRe = /^\d+\.\s+\*\*(.+?)\*\*\s*[—–-]?\s*([\s\S]*?)(?=^\d+\.\s+\*\*|\s*$)/gm;
+  if (!text) return '<div class="ai-error">No response.</div>';
+  const re = /^\d+\.\s+\*\*(.+?)\*\*\s*[—–-]?\s*([\s\S]*?)(?=^\d+\.\s+\*\*|\s*$)/gm;
   const sections = [];
-  let match;
-  while ((match = sectionRe.exec(text + '\n')) !== null) {
-    sections.push({ title: match[1].trim(), body: match[2].trim() });
+  let m;
+  while ((m = re.exec(text + '\n')) !== null) {
+    sections.push({ title: m[1].trim(), body: m[2].trim() });
   }
-
-  // If structured sections found, render them nicely
   if (sections.length > 0) {
-    const html = sections.map(s => {
-      const iconKey = Object.keys(SECTION_ICONS).find(k => s.title.toLowerCase().includes(k));
-      const icon = iconKey ? SECTION_ICONS[iconKey] : '•';
+    return '<div class="ai-content">' + sections.map(s => {
+      const key  = Object.keys(ICONS).find(k => s.title.toLowerCase().includes(k));
+      const icon = key ? ICONS[key] : '•';
       const isTradeIdea = s.title.toLowerCase().includes('trade');
       const bodyHtml = inlineMd(s.body.replace(/\n/g, ' '));
       return `<div class="ai-section">
@@ -662,76 +456,10 @@ function renderAnalysis(text) {
           ? `<div class="ai-trade-box">${bodyHtml}</div>`
           : `<div class="ai-section-body">${bodyHtml}</div>`}
       </div>`;
-    }).join('');
-    return `<div class="ai-content">${html}</div>`;
+    }).join('') + '</div>';
   }
-
-  // Fallback: render as simple paragraphs
   const lines = text.split('\n').filter(l => l.trim());
-  const html = lines.map(l => `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('');
-  return `<div class="ai-content">${html}</div>`;
-}
-
-async function showAnalysis(strike, ceScrip, peScrip, name, row) {
-  const panel = document.getElementById('aiPanel');
-  const body  = document.getElementById('aiBody');
-
-  panel.style.display = 'flex';
-  document.getElementById('aiTitle').textContent = `SENSEX ${strike}`;
-
-  // Show strike metadata bar + spinner
-  const ceLtp = row ? fmt2(row.ce_ltp) : '—';
-  const peLtp = row ? fmt2(row.pe_ltp) : '—';
-  body.innerHTML = `
-    <div class="ai-strike-bar">
-      <div class="ai-strike-info">
-        <div class="lbl">Strike</div>
-        <div class="val str">${strike}</div>
-      </div>
-      <div class="ai-strike-info">
-        <div class="lbl">CE LTP</div>
-        <div class="val ce">₹${ceLtp}</div>
-      </div>
-      <div class="ai-strike-info">
-        <div class="lbl">PE LTP</div>
-        <div class="val pe">₹${peLtp}</div>
-      </div>
-      <div class="ai-strike-info">
-        <div class="lbl">Interval</div>
-        <div class="val">${chartIv} · ${chartDays}D</div>
-      </div>
-    </div>
-    <div class="ai-loading">
-      <div class="spinner"></div>
-      <div class="ai-loading-text">Claude is analyzing…</div>
-      <div class="ai-loading-sub">Fetching CE &amp; PE history and running analysis</div>
-    </div>`;
-
-  const d = await get(
-    `/api/analyze?ce_scrip=${ceScrip}&pe_scrip=${peScrip}&strike=${strike}&interval=${chartIv}&days=${chartDays}`
-  );
-
-  // Preserve the metadata bar, replace only the loading area
-  const bar = body.querySelector('.ai-strike-bar')?.outerHTML || '';
-
-  if (d.error) {
-    body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`;
-    return;
-  }
-
-  body.innerHTML = bar + renderAnalysis(d.summary);
-}
-
-function closeAiPanel() {
-  document.getElementById('aiPanel').style.display = 'none';
-  currentStrike = null; currentCeScrip = null; currentPeScrip = null;
-}
-
-function reanalyze() {
-  if (currentStrike) {
-    const row = chainData.find(r => r.strike === currentStrike);
-    showAnalysis(currentStrike, currentCeScrip, currentPeScrip, currentName, row);
-  }
+  return '<div class="ai-content">' + lines.map(l => `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('') + '</div>';
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

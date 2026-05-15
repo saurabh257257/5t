@@ -32,13 +32,19 @@ def get_sensex_ltp(client):
         if not result:
             return {"error": "No data"}
         item = result[0] if isinstance(result, list) else result
+        # When market is closed LastRate is 0 — fall back to CloseRate/PreviousClose
+        ltp = (float(item.get("LastRate") or 0) or
+               float(item.get("LTP") or 0) or
+               float(item.get("CloseRate") or 0) or
+               float(item.get("PreviousClose") or 0))
         return {
-            "ltp":        float(item.get("LastRate") or item.get("LTP") or 0),
+            "ltp":        ltp,
             "change":     float(item.get("Change") or 0),
             "change_pct": float(item.get("PercentChange") or 0),
             "open":       float(item.get("OpenRate") or item.get("Open") or 0),
             "high":       float(item.get("High") or item.get("HighRate") or 0),
             "low":        float(item.get("Low") or item.get("LowRate") or 0),
+            "close":      float(item.get("CloseRate") or item.get("PreviousClose") or 0),
         }
     except Exception as e:
         return {"error": str(e)}
