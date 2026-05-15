@@ -25,9 +25,10 @@ def get_ltp(client, scripcode, exch="N", exch_type="C"):
         return {"error": str(e)}
 
 
-def get_sensex_ltp(client):
+def get_index_ltp(client, exch, scrip_code):
+    """Generic index LTP — works for SENSEX (B/999901), NIFTY (N/999920), BANKNIFTY (N/999921)."""
     try:
-        req = [{"Exch": "B", "ExchangeType": "C", "ScripCode": 999901}]
+        req = [{"Exch": exch, "ExchangeType": "C", "ScripCode": int(scrip_code)}]
         result = client.fetch_market_feed(req)
         if not result:
             return {"error": "No data"}
@@ -38,13 +39,13 @@ def get_sensex_ltp(client):
                float(item.get("PreviousClose") or 0))
         prev_close = float(item.get("CloseRate") or item.get("PreviousClose") or 0)
 
-        # If everything is 0 (pre-market / weekend), fetch last close from history
+        # If everything is 0 (pre-market / weekend) fetch last close from history
         if ltp == 0:
             try:
                 from datetime import timedelta
                 today     = _date.today().strftime('%Y-%m-%d')
                 from_date = (_date.today() - timedelta(days=7)).strftime('%Y-%m-%d')
-                df = client.historical_data('B', 'C', 999901, '1d', from_date, today)
+                df = client.historical_data(exch, 'C', int(scrip_code), '1d', from_date, today)
                 if df is not None and len(df) > 0:
                     last_row   = df.iloc[-1]
                     ltp        = float(last_row.get('Close', 0) or last_row.get('close', 0))
@@ -53,17 +54,21 @@ def get_sensex_ltp(client):
                 pass
 
         return {
-            "ltp":        ltp,
-            "change":     float(item.get("Change") or 0),
-            "change_pct": float(item.get("PercentChange") or 0),
-            "open":       float(item.get("OpenRate") or item.get("Open") or 0),
-            "high":       float(item.get("High") or item.get("HighRate") or 0),
-            "low":        float(item.get("Low") or item.get("LowRate") or 0),
-            "close":      prev_close,
+            "ltp":         ltp,
+            "change":      float(item.get("Change") or 0),
+            "change_pct":  float(item.get("PercentChange") or 0),
+            "open":        float(item.get("OpenRate") or item.get("Open") or 0),
+            "high":        float(item.get("High") or item.get("HighRate") or 0),
+            "low":         float(item.get("Low") or item.get("LowRate") or 0),
+            "close":       prev_close,
             "market_open": float(item.get("LastRate") or 0) > 0,
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+def get_sensex_ltp(client):
+    return get_index_ltp(client, 'B', 999901)
 
 
 def get_expiry_dates(client, exch, symbol):

@@ -5,7 +5,14 @@ from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred
 from modules.holdings import get_holdings_data
 from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
-from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_historical_data
+from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_index_ltp, get_historical_data
+
+# Index config: name → (ltp_exch, ltp_scrip, opt_exch, opt_symbol)
+INDEX_MAP = {
+    'SENSEX':    ('B', 999901, 'B', 'SENSEX'),
+    'NIFTY':     ('N', 999920, 'N', 'NIFTY'),
+    'BANKNIFTY': ('N', 999921, 'N', 'BANKNIFTY'),
+}
 
 load_dotenv()
 
@@ -108,6 +115,10 @@ def api_expiry():
     client = require_auth()
     if not client:
         return jsonify({"error": "Not authenticated"}), 401
+    idx = request.args.get('index', '').upper()
+    if idx and idx in INDEX_MAP:
+        _, _, opt_exch, opt_symbol = INDEX_MAP[idx]
+        return jsonify(get_expiry_dates(client, opt_exch, opt_symbol))
     return jsonify(get_expiry_dates(
         client,
         request.args.get('exch', 'N'),
@@ -123,11 +134,27 @@ def api_sensex_ltp():
     return jsonify(get_sensex_ltp(client))
 
 
+@app.route('/api/index-ltp')
+def api_index_ltp():
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    if idx not in INDEX_MAP:
+        return jsonify({"error": f"Unknown index: {idx}"}), 400
+    exch, scrip, _, _ = INDEX_MAP[idx]
+    return jsonify(get_index_ltp(client, exch, scrip))
+
+
 @app.route('/api/option-chain')
 def api_option_chain():
     client = require_auth()
     if not client:
         return jsonify({"error": "Not authenticated"}), 401
+    idx = request.args.get('index', '').upper()
+    if idx and idx in INDEX_MAP:
+        _, _, opt_exch, opt_symbol = INDEX_MAP[idx]
+        return jsonify(get_option_chain_data(client, opt_exch, opt_symbol, request.args.get('expiry_ts', 0)))
     return jsonify(get_option_chain_data(
         client,
         request.args.get('exch', 'N'),
