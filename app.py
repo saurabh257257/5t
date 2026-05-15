@@ -46,23 +46,28 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "5paisa-flask-secret")
+app.config['PERMANENT_SESSION_LIFETIME'] = __import__('datetime').timedelta(days=30)
 
 PIN = os.getenv("APP_PIN", "7592")
 DROPLET_IP = os.getenv("DROPLET_IP", "142.93.222.101")
 
 
 def require_auth():
+    # 1. Fast path — client already in memory
     cid = session.get('client_id')
-    if not cid:
-        return None
-    client = authenticated_clients.get(cid)
-    if client:
-        return client
-    # Server may have restarted — try to restore saved session transparently
+    if cid:
+        client = authenticated_clients.get(cid)
+        if client:
+            return client
+
+    # 2. Slow path — server restarted OR browser cookie gone
+    #    Try to restore from the saved JWT file on disk
     restored_cid = try_restore_session()
     if restored_cid:
+        session.permanent = True          # cookie survives browser close
         session['client_id'] = restored_cid
         return authenticated_clients.get(restored_cid)
+
     return None
 
 
@@ -83,6 +88,7 @@ def verify_pin():
     # Try to restore previous session — skip OAuth if still valid
     client_id = try_restore_session()
     if client_id:
+        session.permanent = True
         session['authenticated'] = True
         session['client_id'] = client_id
         return redirect('/dashboard')
@@ -101,6 +107,7 @@ def verify_pin():
 def callback():
     result = process_callback(request.args)
     if result['success']:
+        session.permanent = True
         session['authenticated'] = True
         session['client_id'] = result['client_id']
         session.pop('pin_verified', None)
@@ -604,6 +611,14 @@ def api_debug_components():
     client = require_auth()
     if not client:
         return jsonify({'error': 'Not authenticated'}), 401
+
+    # Auto-restore from saved session file if cookie missing
+    if not client:
+        from modules.auth import try_restore_session as _trs, authenticated_clients as _ac
+        _cid = _trs()
+        client = _ac.get(_cid) if _cid else None
+    if not client:
+        return jsonify({'error': 'No saved session on server — log in once via the dashboard first'}), 401
 
     results = {}
 
