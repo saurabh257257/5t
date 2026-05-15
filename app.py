@@ -172,6 +172,45 @@ def api_option_chain():
     ))
 
 
+@app.route('/api/debug-index')
+def api_debug_index():
+    """Temporary: find working scrip codes for NIFTY/BANKNIFTY."""
+    client = require_auth()
+    if not client:
+        return jsonify({"error": "Not authenticated"}), 401
+    from datetime import date, timedelta
+    today     = date.today().strftime('%Y-%m-%d')
+    from_date = (date.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+    results = {}
+    # Market feed tests
+    for exch, et, sc, label in [
+        ('N','C',999920,'NIFTY-C-999920'), ('N','D',999920,'NIFTY-D-999920'),
+        ('N','C',26000, 'NIFTY-C-26000'),  ('N','D',26000, 'NIFTY-D-26000'),
+        ('N','C',999921,'BNFTY-C-999921'), ('N','D',999921,'BNFTY-D-999921'),
+        ('N','C',26009, 'BNFTY-C-26009'),  ('N','D',26009, 'BNFTY-D-26009'),
+    ]:
+        try:
+            r = client.fetch_market_feed([{"Exch": exch, "ExchangeType": et, "ScripCode": sc}])
+            if r:
+                item = r[0] if isinstance(r, list) else r
+                ltp = item.get('LastRate') or item.get('LTP') or 0
+                results[f"feed_{label}"] = f"LTP={ltp}"
+            else:
+                results[f"feed_{label}"] = "empty"
+        except Exception as e:
+            results[f"feed_{label}"] = f"ERR:{e}"
+        # Historical tests
+        try:
+            df = client.historical_data(exch, et, sc, '1d', from_date, today)
+            if df is not None and len(df) > 0:
+                results[f"hist_{label}"] = f"OK rows={len(df)} close={df.iloc[-1].get('Close','?')}"
+            else:
+                results[f"hist_{label}"] = "empty"
+        except Exception as e:
+            results[f"hist_{label}"] = f"ERR:{e}"
+    return jsonify(results)
+
+
 @app.route('/api/history')
 def api_history():
     client = require_auth()
