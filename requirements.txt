@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 pandas==2.2.3
 requests==2.32.3
 anthropic
+APScheduler==3.10.4

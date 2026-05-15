@@ -28,6 +28,24 @@ def init_db():
                 verdict     TEXT
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chain_snapshots (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id     TEXT    NOT NULL,
+                expiry_label TEXT,
+                expiry_ts    INTEGER,
+                ltp          REAL,
+                prev_close   REAL,
+                change_abs   REAL,
+                change_pct   REAL,
+                pcr          REAL,
+                max_pain     REAL,
+                ce_oi        INTEGER,
+                pe_oi        INTEGER,
+                summary      TEXT,
+                saved_at     TEXT NOT NULL
+            )
+        ''')
         c.commit()
 
 
@@ -77,3 +95,36 @@ def get_sr_history(index_id, limit=10):
                 'verdict':     r['verdict'],
             })
         return result
+
+
+# ── Auto chain snapshots ───────────────────────────────────────────────────────
+
+def save_snapshot(index_id, expiry_label, expiry_ts, ltp, prev_close,
+                  change_abs, change_pct, pcr, max_pain, ce_oi, pe_oi, summary):
+    with _conn() as c:
+        c.execute('''
+            INSERT INTO chain_snapshots
+            (index_id, expiry_label, expiry_ts, ltp, prev_close,
+             change_abs, change_pct, pcr, max_pain, ce_oi, pe_oi, summary, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (index_id, expiry_label, int(expiry_ts), ltp, prev_close,
+              change_abs, change_pct, pcr, max_pain, ce_oi, pe_oi, summary,
+              datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')))
+        c.commit()
+
+
+def get_snapshots(index_id, limit=60):
+    with _conn() as c:
+        rows = c.execute(
+            'SELECT * FROM chain_snapshots WHERE index_id=? ORDER BY saved_at DESC LIMIT ?',
+            (index_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def cleanup_old_snapshots(days=7):
+    """Delete snapshots older than N days to prevent DB bloat."""
+    with _conn() as c:
+        cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('DELETE FROM chain_snapshots WHERE saved_at < ?', (cutoff,))
+        c.commit()

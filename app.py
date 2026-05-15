@@ -9,7 +9,7 @@ from modules.master import search_scrips, refresh_master, get_scrip_info, browse
 from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
                             get_sensex_ltp, get_index_ltp, get_historical_data,
                             get_today_ohlc, get_chart_data, get_components_ltp)
-from modules.db import init_db, save_sr, get_sr_history, delete_sr
+from modules.db import init_db, save_sr, get_sr_history, delete_sr, get_snapshots
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -41,6 +41,18 @@ try:
     init_db()
 except Exception as _e:
     print(f'[DB] init failed: {_e}')
+
+# ── Background scheduler ────────────────────────────────────────────────────────
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from modules.scheduler import run_sensex_snapshot
+    _scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
+    _scheduler.add_job(run_sensex_snapshot, 'interval', minutes=1, id='sensex_snapshot',
+                       max_instances=1, misfire_grace_time=30)
+    _scheduler.start()
+    print('[SCHEDULER] Started — SENSEX snapshots every 1 min during market hours')
+except Exception as _e:
+    print(f'[SCHEDULER] Failed to start: {_e}')
 
 load_dotenv()
 
@@ -670,6 +682,16 @@ def api_components():
         cfg_comp['exch'],
         cfg_comp['exch_type'],
     ))
+
+
+@app.route('/api/snapshots')
+def api_snapshots():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx   = request.args.get('index', 'SENSEX').upper()
+    limit = int(request.args.get('limit', 60))
+    return jsonify({'snapshots': get_snapshots(idx, limit)})
 
 
 if __name__ == '__main__':
