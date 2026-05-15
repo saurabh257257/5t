@@ -719,6 +719,88 @@ def api_scheduler_status():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/scheduler/run-now')
+def api_scheduler_run_now():
+    """Force an immediate snapshot (ignores market hours) — for testing."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    import traceback
+    try:
+        from modules.auth import _restore_client
+        from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp
+        from modules.db import save_snapshot, cleanup_old_snapshots
+        import anthropic as _ac
+        from datetime import datetime, timezone, timedelta
+        _IST = timezone(timedelta(hours=5, minutes=30))
+
+        # Step 1: restore client
+        rc = _restore_client()
+        if not rc:
+            return jsonify({'step': 'restore_client', 'error': 'No saved session — .5paisa_session.json missing or JWT expired'})
+
+        # Step 2: expiries
+        expiry_data = get_expiry_dates(rc, 'B', 'SENSEX')
+        if 'error' in expiry_data or not expiry_data.get('expiries'):
+            return jsonify({'step': 'expiries', 'error': str(expiry_data)})
+
+        expiry     = expiry_data['expiries'][0]
+        expiry_ts  = expiry['ts']
+        expiry_lbl = expiry['label']
+
+        # Step 3: LTP
+        ltp_data   = get_index_ltp(rc, 'B', 999901, 'SENSEX')
+        ltp        = ltp_data.get('ltp', 0)
+        prev_close = ltp_data.get('prev_close', 0)
+        change_abs = ltp_data.get('change', 0)
+        change_pct = ltp_data.get('change_pct', 0)
+
+        if ltp == 0:
+            return jsonify({'step': 'ltp', 'error': 'LTP is 0', 'ltp_data': ltp_data})
+
+        # Step 4: option chain
+        chain = get_option_chain_data(rc, 'B', 'SENSEX', expiry_ts)
+        if 'error' in chain or not chain.get('option_chain'):
+            return jsonify({'step': 'chain', 'error': str(chain)})
+
+        rows        = chain['option_chain']
+        total_ce_oi = sum(r['ce_oi'] for r in rows)
+        total_pe_oi = sum(r['pe_oi'] for r in rows)
+        pcr         = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
+        max_pain    = max(rows, key=lambda r: r['ce_oi'] + r['pe_oi'], default={'strike':0})['strike']
+        top_ce      = sorted(rows, key=lambda r: r['ce_oi'],  reverse=True)[:3]
+        top_pe      = sorted(rows, key=lambda r: r['pe_oi'],  reverse=True)[:3]
+        near_rows   = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:12]
+
+        chain_txt = 'Strike|CE_OI|CE_ChgOI|PE_OI|PE_ChgOI\n'
+        for r in near_rows:
+            chain_txt += f"{int(r['strike'])}|{r['ce_oi']}|{r['ce_chg_oi']}|{r['pe_oi']}|{r['pe_chg_oi']}\n"
+
+        # Step 5: AI summary
+        prompt = f"""SENSEX option chain snapshot. Be brief and direct.
+Price: {ltp} | Change: {change_abs:+.0f} ({change_pct:+.2f}%) | Expiry: {expiry_lbl}
+PCR: {pcr} | Max Pain: {int(max_pain)}
+Top CE resistance: {', '.join(str(int(r['strike'])) for r in top_ce)}
+Top PE support: {', '.join(str(int(r['strike'])) for r in top_pe)}
+{chain_txt}
+In 80 words max: (1) Bias bullish/bearish/neutral + reason, (2) Key support, (3) Key resistance, (4) Watch out for."""
+
+        ac  = _ac.Anthropic()
+        rsp = ac.messages.create(model='claude-haiku-4-5', max_tokens=250,
+                                 messages=[{'role':'user','content':prompt}])
+        summary = rsp.content[0].text.strip()
+
+        save_snapshot(index_id='SENSEX', expiry_label=expiry_lbl, expiry_ts=expiry_ts,
+                      ltp=ltp, prev_close=prev_close, change_abs=change_abs,
+                      change_pct=change_pct, pcr=pcr, max_pain=max_pain,
+                      ce_oi=total_ce_oi, pe_oi=total_pe_oi, summary=summary)
+
+        return jsonify({'ok': True, 'ltp': ltp, 'pcr': pcr, 'max_pain': max_pain,
+                        'expiry': expiry_lbl, 'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
 @app.route('/api/scheduler/toggle', methods=['POST'])
 def api_scheduler_toggle():
     client = require_auth()
