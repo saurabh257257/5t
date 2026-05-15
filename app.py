@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 from modules.auth import process_callback, authenticated_clients, cred, try_restore_session
 from modules.holdings import get_holdings_data
 from modules.master import search_scrips, refresh_master, get_scrip_info, browse_scrips, get_status
-from modules.market import get_ltp, get_expiry_dates, get_option_chain_data, get_sensex_ltp, get_index_ltp, get_historical_data
+from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
+                            get_sensex_ltp, get_index_ltp, get_historical_data,
+                            get_today_ohlc, get_chart_data, get_components_ltp)
+from modules.db import init_db, save_sr, get_sr_history
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -20,6 +23,24 @@ def _load_indices():
 
 INDICES = _load_indices()
 INDEX_MAP = {i['id']: i for i in INDICES}
+
+# ── Load components config ──────────────────────────────────────────────────────
+_COMP_FILE = os.path.join(os.path.dirname(__file__), 'components.json')
+
+def _load_components():
+    try:
+        with open(_COMP_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+COMPONENTS = _load_components()
+
+# ── Init SQLite DB ──────────────────────────────────────────────────────────────
+try:
+    init_db()
+except Exception as _e:
+    print(f'[DB] init failed: {_e}')
 
 load_dotenv()
 
@@ -429,6 +450,157 @@ Max 250 words. Use ₹ for prices. Be direct and specific."""
         return jsonify({"summary": resp.content[0].text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/today-ohlc')
+def api_today_ohlc():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    if idx not in INDEX_MAP:
+        return jsonify({'error': f'Unknown index: {idx}'}), 400
+    cfg = INDEX_MAP[idx]
+    return jsonify(get_today_ohlc(client, cfg['feed_exch'], cfg['feed_scrip']))
+
+
+@app.route('/api/chart-data')
+def api_chart_data():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx      = request.args.get('index', 'SENSEX').upper()
+    interval = request.args.get('interval', '4h')
+    days     = int(request.args.get('days', 365))
+    if idx not in INDEX_MAP:
+        return jsonify({'error': f'Unknown index: {idx}'}), 400
+    cfg = INDEX_MAP[idx]
+    return jsonify(get_chart_data(client, cfg['feed_exch'], cfg['feed_scrip'], interval, days))
+
+
+@app.route('/api/analyze-sr')
+def api_analyze_sr():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    if idx not in INDEX_MAP:
+        return jsonify({'error': f'Unknown index: {idx}'}), 400
+    cfg = INDEX_MAP[idx]
+
+    # Fetch 1-year daily candles
+    chart = get_chart_data(client, cfg['feed_exch'], cfg['feed_scrip'], interval='1d', days=380)
+    if 'error' in chart or not chart.get('candles'):
+        return jsonify({'error': 'Could not fetch historical data for S/R analysis'})
+
+    candles = chart['candles']
+    ltp     = candles[-1]['close'] if candles else 0
+
+    # Build last 60 days OHLC text for the prompt
+    recent  = candles[-60:]
+    from datetime import datetime as _dt
+    def fmt_ts(ts):
+        try:    return _dt.utcfromtimestamp(ts).strftime('%d-%b-%y')
+        except: return str(ts)
+
+    ohlc_txt = 'Date | O | H | L | C\n'
+    for c in recent:
+        ohlc_txt += f"{fmt_ts(c['time'])} | {c['open']:.0f} | {c['high']:.0f} | {c['low']:.0f} | {c['close']:.0f}\n"
+
+    yr_high = max(c['high']  for c in candles if c['high'] > 0)
+    yr_low  = min(c['low']   for c in candles if c['low']  > 0)
+
+    prompt = f"""You are an expert technical analyst for Indian markets.
+
+Index: {idx}  |  Current Price: {ltp:.0f}
+52-Week High: {yr_high:.0f}  |  52-Week Low: {yr_low:.0f}
+
+Daily OHLC — last 60 trading days (use 1-year context for patterns):
+{ohlc_txt}
+
+Identify 3-5 key SUPPORT and 3-5 key RESISTANCE levels based on:
+- Major swing highs/lows with multiple touches
+- Round numbers that acted as S/R
+- 52-week high/low
+- Consolidation zones and breakout/breakdown levels
+
+valid_today = levels within 2% of current price {ltp:.0f}.
+
+Respond ONLY in valid JSON (no markdown, no explanation outside JSON):
+{{
+  "supports": [{{"level": 0, "strength": "strong", "reason": "..."}}],
+  "resistances": [{{"level": 0, "strength": "strong", "reason": "..."}}],
+  "valid_today": [{{"level": 0, "type": "support", "note": "..."}}],
+  "verdict": "2-3 sentence technical outlook for today."
+}}
+
+strength values: "strong" (3+ tests), "moderate" (2 tests), "weak" (1 test/confluence)"""
+
+    try:
+        ac  = _anthropic.Anthropic()
+        rsp = ac.messages.create(
+            model='claude-haiku-4-5', max_tokens=1200,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        raw = rsp.content[0].text.strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1]
+            if raw.startswith('json'): raw = raw[4:]
+        data = json.loads(raw.strip())
+        data['ltp']   = ltp
+        data['index'] = idx
+        return jsonify(data)
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Claude returned invalid JSON: {e}', 'raw': raw}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/save-sr', methods=['POST'])
+def api_save_sr():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    body = request.get_json() or {}
+    try:
+        rid = save_sr(
+            index_id    = body.get('index', ''),
+            ltp         = float(body.get('ltp', 0)),
+            supports    = body.get('supports', []),
+            resistances = body.get('resistances', []),
+            valid_today = body.get('valid_today', []),
+            verdict     = body.get('verdict', ''),
+        )
+        return jsonify({'success': True, 'id': rid})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sr-history')
+def api_sr_history():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx   = request.args.get('index', 'SENSEX').upper()
+    limit = int(request.args.get('limit', 10))
+    return jsonify({'history': get_sr_history(idx, limit)})
+
+
+@app.route('/api/components')
+def api_components():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx      = request.args.get('index', 'SENSEX').upper()
+    cfg_comp = COMPONENTS.get(idx)
+    if not cfg_comp:
+        return jsonify({'error': f'No components configured for {idx}'}), 400
+    return jsonify(get_components_ltp(
+        client,
+        cfg_comp['components'],
+        cfg_comp['exch'],
+        cfg_comp['exch_type'],
+    ))
 
 
 if __name__ == '__main__':

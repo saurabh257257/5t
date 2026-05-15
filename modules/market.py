@@ -191,3 +191,135 @@ def get_historical_data(client, exch, exch_type, scrip_code, interval="15m", day
         return {"candles": df.to_dict(orient='records')}
     except Exception as e:
         return {"error": str(e)}
+
+
+def get_today_ohlc(client, exch, scrip_code):
+    """
+    Fetch today's intraday 15m candles and derive Open / High / Low.
+    Returns {open, high, low, candle_count} or {error}.
+    """
+    try:
+        today = _date.today().strftime('%Y-%m-%d')
+        for et in ('C', 'D'):
+            try:
+                df = client.historical_data(exch, et, int(scrip_code), '15m', today, today)
+                if df is None or len(df) == 0:
+                    continue
+                opens  = [float(r.get('Open')  or r.get('open')  or 0) for _, r in df.iterrows()]
+                highs  = [float(r.get('High')  or r.get('high')  or 0) for _, r in df.iterrows()]
+                lows   = [float(r.get('Low')   or r.get('low')   or 0) for _, r in df.iterrows()]
+                opens  = [v for v in opens if v > 0]
+                highs  = [v for v in highs if v > 0]
+                lows   = [v for v in lows  if v > 0]
+                if opens and highs and lows:
+                    return {
+                        'open':         opens[0],
+                        'high':         max(highs),
+                        'low':          min(lows),
+                        'candle_count': len(opens),
+                    }
+            except Exception:
+                continue
+        return {'error': 'No intraday data available'}
+    except Exception as e:
+        return {'error': str(e)}
+
+
+def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
+    """
+    Fetch OHLCV candles for charting (TradingView lightweight-charts format).
+    Falls back: 4h → 1h → 1d.
+    Returns {candles:[{time(unix_sec), open, high, low, close, volume}], interval_used, count}
+    """
+    from datetime import timedelta as _td, datetime as _dt
+    today     = _date.today().strftime('%Y-%m-%d')
+    from_date = (_date.today() - _td(days=days)).strftime('%Y-%m-%d')
+
+    fallbacks = {'4h': ['4h', '1h', '1d'], '1h': ['1h', '1d'], '1d': ['1d']}
+    ivl_list  = fallbacks.get(interval, ['4h', '1h', '1d'])
+
+    for ivl in ivl_list:
+        for et in ('C', 'D'):
+            try:
+                df = client.historical_data(exch, et, int(scrip_code), ivl, from_date, today)
+                if df is None or len(df) < 5:
+                    continue
+                candles = []
+                for _, row in df.iterrows():
+                    dt_val = row.get('Datetime') or row.get('datetime') or ''
+                    try:
+                        # Handle pandas Timestamp or string
+                        s = str(dt_val)[:19].replace('T', ' ')
+                        dt = _dt.strptime(s, '%Y-%m-%d %H:%M:%S')
+                        # Convert IST (UTC+5:30) to UTC unix seconds
+                        unix_ts = int((_dt(1970, 1, 1) + (dt - _dt(1970, 1, 1)) -
+                                       __import__('datetime').timedelta(hours=5, minutes=30)).total_seconds())
+                    except Exception:
+                        continue
+                    o = float(row.get('Open')   or row.get('open')   or 0)
+                    h = float(row.get('High')   or row.get('high')   or 0)
+                    l = float(row.get('Low')    or row.get('low')    or 0)
+                    c = float(row.get('Close')  or row.get('close')  or 0)
+                    v = int(  row.get('Volume') or row.get('volume') or 0)
+                    if o > 0 and c > 0:
+                        candles.append({'time': unix_ts, 'open': o, 'high': h,
+                                        'low': l, 'close': c, 'volume': v})
+                if len(candles) >= 5:
+                    return {'candles': candles, 'interval_used': ivl, 'count': len(candles)}
+            except Exception:
+                continue
+
+    return {'error': 'No chart data available for any interval', 'candles': []}
+
+
+def get_components_ltp(client, components, exch, exch_type):
+    """
+    Batch-fetch LTPs for a list of component dicts.
+    Each component: {rank, name, sector, scrip_code, weight}.
+    Returns {components: [...]} enriched with ltp, change, change_pct, contribution.
+    """
+    if not components:
+        return {'error': 'No components provided'}
+    try:
+        req = [
+            {'Exch': exch, 'ExchangeType': exch_type, 'ScripCode': int(c['scrip_code'])}
+            for c in components
+        ]
+        feed = client.fetch_market_feed(req)
+        if not feed:
+            return {'error': 'No market feed response'}
+
+        # Build scrip-code → item lookup
+        feed_map = {}
+        items = feed if isinstance(feed, list) else [feed]
+        for item in items:
+            sc = int(item.get('ScripCode') or item.get('Scripcode') or 0)
+            if sc:
+                feed_map[sc] = item
+
+        enriched = []
+        for comp in components:
+            sc   = int(comp['scrip_code'])
+            item = feed_map.get(sc, {})
+            ltp        = float(item.get('LastRate')      or item.get('LTP')           or 0)
+            change     = float(item.get('Change')        or 0)
+            chg_pct    = float(item.get('PercentChange') or 0)
+            weight     = float(comp.get('weight', 0))
+            contrib    = round(weight * chg_pct / 100, 4)
+            enriched.append({
+                'rank':         comp['rank'],
+                'name':         comp['name'],
+                'sector':       comp['sector'],
+                'scrip_code':   sc,
+                'weight':       weight,
+                'ltp':          ltp,
+                'change':       round(change, 2),
+                'change_pct':   round(chg_pct, 2),
+                'contribution': contrib,
+            })
+
+        enriched.sort(key=lambda x: abs(x['contribution']), reverse=True)
+        return {'components': enriched}
+
+    except Exception as e:
+        return {'error': str(e)}

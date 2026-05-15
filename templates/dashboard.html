@@ -184,6 +184,116 @@ header {
   .cs-stats { flex-wrap: wrap; }
   .cs-stat { min-width: 45%; }
 }
+
+/* ── Ticker action buttons ──────────────────────────────────────────────────── */
+.ticker-btns { display: flex; gap: 8px; align-items: center; }
+.btn-ticker {
+  padding: 5px 12px; border-radius: 7px; font-size: 0.78em; font-weight: 700;
+  cursor: pointer; border: 1px solid #4c3f8a; background: #1e1c45; color: #a78bfa;
+  transition: all 0.15s; white-space: nowrap;
+}
+.btn-ticker:hover { background: #2d2b4e; border-color: #7c3aed; }
+
+/* ── Generic modal ──────────────────────────────────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 1000; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 16px;
+  width: 94vw; max-width: 1180px; max-height: 91vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: modalIn 0.18s ease;
+}
+@keyframes modalIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+.modal-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 20px; background: #12111f; border-bottom: 1px solid #2d2b4e; flex-shrink: 0;
+}
+.modal-title { font-size: 0.98em; font-weight: 700; color: #e2e8f0; }
+.modal-close {
+  padding: 4px 12px; border-radius: 6px; font-size: 0.82em; font-weight: 700;
+  cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa;
+}
+.modal-close:hover { background: #2d2b4e; }
+.modal-bd { flex: 1; overflow-y: auto; padding: 18px 20px; }
+
+/* ── Chart modal ────────────────────────────────────────────────────────────── */
+.chart-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.btn-analyze-sr {
+  padding: 8px 18px; border-radius: 8px; font-size: 0.82em; font-weight: 700;
+  cursor: pointer; border: none; background: linear-gradient(135deg,#7c3aed,#6d28d9);
+  color: white; transition: opacity 0.15s;
+}
+.btn-analyze-sr:hover { opacity: 0.85; }
+.btn-analyze-sr:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn-save-sr {
+  padding: 8px 15px; border-radius: 8px; font-size: 0.82em; font-weight: 700;
+  cursor: pointer; border: 1px solid #059669; background: rgba(5,150,105,0.12);
+  color: #34d399; transition: all 0.15s;
+}
+.btn-save-sr:hover { background: rgba(5,150,105,0.28); }
+#chartContainer {
+  width: 100%; height: 400px; background: #12111f;
+  border-radius: 10px; overflow: hidden; margin-bottom: 14px;
+}
+.verdict-box {
+  background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a;
+  border-radius: 10px; padding: 12px 16px; font-size: 0.84em;
+  color: #c4b5fd; line-height: 1.6; margin-bottom: 14px;
+}
+.valid-today-section { margin-bottom: 14px; }
+.valid-today-title { font-size: 0.78em; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.valid-level-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 700;
+  margin: 3px; border: 1px solid;
+}
+.valid-level-tag.support    { background: rgba(52,211,153,0.1);  border-color: #34d399; color: #34d399; }
+.valid-level-tag.resistance { background: rgba(248,113,113,0.1); border-color: #f87171; color: #f87171; }
+.sr-tables { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.sr-table-wrap { flex: 1; min-width: 260px; }
+.sr-tbl-title { font-size: 0.78em; font-weight: 700; margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.5px; }
+.sr-tbl-title.sup { color: #34d399; } .sr-tbl-title.res { color: #f87171; }
+.sr-tbl { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+.sr-tbl th { padding: 7px 10px; background: #12111f; color: #6b7280; text-align: left; font-size: 0.7em; text-transform: uppercase; border-bottom: 1px solid #2d2b4e; }
+.sr-tbl td { padding: 7px 10px; border-bottom: 1px solid #1e1c35; color: #cbd5e1; vertical-align: top; }
+.str-strong  { color: #34d399; font-weight: 700; } .str-moderate { color: #fbbf24; font-weight: 700; } .str-weak { color: #94a3b8; }
+.chart-tabs { display: flex; gap: 7px; margin-bottom: 12px; }
+.chart-tab {
+  padding: 5px 14px; border-radius: 7px; font-size: 0.78em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8;
+}
+.chart-tab.active { background: #2d2b4e; color: #e2e8f0; border-color: #4c3f8a; }
+.sr-hist-entry {
+  background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px;
+  padding: 11px 14px; margin-bottom: 8px; font-size: 0.8em;
+}
+.sr-hist-meta { color: #6b7280; margin-bottom: 5px; }
+.sr-hist-verdict { color: #c4b5fd; line-height: 1.5; }
+
+/* ── Components modal ───────────────────────────────────────────────────────── */
+.comp-summary-bar {
+  display: flex; gap: 20px; flex-wrap: wrap; padding-bottom: 12px;
+  margin-bottom: 14px; border-bottom: 1px solid #2d2b4e; font-size: 0.82em;
+}
+.comp-sum-lbl { color: #6b7280; }
+.comp-sum-val { font-weight: 700; margin-left: 4px; }
+.comp-tbl { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+.comp-tbl th {
+  padding: 9px 11px; background: #12111f; color: #6b7280; font-size: 0.7em;
+  text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #2d2b4e;
+  text-align: right; position: sticky; top: 0; z-index: 1;
+}
+.comp-tbl th.al { text-align: left; }
+.comp-tbl td { padding: 9px 11px; border-bottom: 1px solid #1e1c35; text-align: right; }
+.comp-tbl td.al { text-align: left; }
+.comp-name { font-weight: 600; color: #e2e8f0; font-size: 0.9em; }
+.comp-sector { font-size: 0.7em; color: #6b7280; }
+.comp-pos { color: #34d399; font-weight: 600; }
+.comp-neg { color: #f87171; font-weight: 600; }
+.contrib-bar { display:inline-block; height:7px; border-radius:4px; vertical-align:middle; margin-right:4px; min-width:2px; }
 </style>
 </head>
 <body>
@@ -211,6 +321,10 @@ header {
       <div class="ticker-close">Prev Close&nbsp;<span id="sxClose">—</span></div>
       <div id="mktStatus" class="closed-dot">—</div>
       <span class="ticker-time" id="sxTime">—</span>
+      <div class="ticker-btns">
+        <button class="btn-ticker" onclick="openChartModal()">📈 Chart</button>
+        <button class="btn-ticker" onclick="openCompModal()">🏢 Components</button>
+      </div>
     </div>
   </div>
 
@@ -276,6 +390,84 @@ header {
     </div>
   </div>
 
+</div><!-- /.page -->
+
+<!-- ═══════════════════ CHART MODAL ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="chartModal">
+  <div class="modal-box" style="max-width:1200px">
+    <div class="modal-hd">
+      <span class="modal-title" id="chartModalTitle">📈 Chart</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span id="chartBadge" style="font-size:0.72em;color:#6b7280"></span>
+        <button class="modal-close" onclick="closeChartModal()">✕ Close</button>
+      </div>
+    </div>
+    <div class="modal-bd">
+      <div class="chart-tabs">
+        <button class="chart-tab active" id="tabChart"   onclick="switchChartTab('chart')">📊 Chart</button>
+        <button class="chart-tab"        id="tabHistory" onclick="switchChartTab('history')">🕐 Saved S/R</button>
+      </div>
+
+      <!-- Chart Panel -->
+      <div id="chartPanel">
+        <div class="chart-toolbar">
+          <button class="btn-analyze-sr" id="btnAnalyzeSr" onclick="analyzeSR()">🤖 Analyze S/R with Claude AI</button>
+          <button class="btn-save-sr"    id="btnSaveSr"    onclick="saveSR()" style="display:none">💾 Save Analysis</button>
+        </div>
+        <div id="chartContainer">
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4b5563;font-size:0.85em">
+            <div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>
+            Loading chart data…
+          </div>
+        </div>
+        <div class="verdict-box" id="srVerdictBox" style="display:none"></div>
+        <div class="valid-today-section" id="validTodaySection" style="display:none">
+          <div class="valid-today-title">⚡ Valid Today — within 2% of current price</div>
+          <div id="validTodayTags"></div>
+        </div>
+        <div class="sr-tables" id="srTables" style="display:none">
+          <div class="sr-table-wrap">
+            <div class="sr-tbl-title sup">🛡️ Support Levels</div>
+            <table class="sr-tbl">
+              <thead><tr><th>Level</th><th>Strength</th><th>Reason</th></tr></thead>
+              <tbody id="supBody"></tbody>
+            </table>
+          </div>
+          <div class="sr-table-wrap">
+            <div class="sr-tbl-title res">🚧 Resistance Levels</div>
+            <table class="sr-tbl">
+              <thead><tr><th>Level</th><th>Strength</th><th>Reason</th></tr></thead>
+              <tbody id="resBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Panel -->
+      <div id="historyPanel" style="display:none">
+        <div id="srHistContent"><div style="color:#6b7280;font-size:0.85em;padding:20px 0">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ COMPONENTS MODAL ══════════════════════════════════════ -->
+<div class="modal-overlay" id="compModal">
+  <div class="modal-box" style="max-width:1100px">
+    <div class="modal-hd">
+      <span class="modal-title" id="compModalTitle">🏢 Components</span>
+      <button class="modal-close" onclick="closeCompModal()">✕ Close</button>
+    </div>
+    <div class="modal-bd">
+      <div class="comp-summary-bar" id="compSummaryBar" style="display:none"></div>
+      <div id="compTableWrap">
+        <div style="display:flex;align-items:center;justify-content:center;padding:60px;color:#4b5563;font-size:0.85em">
+          <div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>
+          Loading components…
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -298,6 +490,7 @@ async function get(url) {
 let INDICES = [];
 let currentIndex = '';
 let lastLtp = 0, lastPrevClose = 0;
+let _ohlcFetched = false;
 
 async function loadIndices() {
   INDICES = await get('/api/indices');
@@ -314,7 +507,7 @@ function switchIndex() {
   currentIndex = sel.value;
   const cfg = INDICES.find(i => i.id === currentIndex);
   document.getElementById('idxLabel').textContent = cfg ? cfg.label : currentIndex;
-  lastLtp = 0; lastPrevClose = 0;
+  lastLtp = 0; lastPrevClose = 0; _ohlcFetched = false;
   ['sxLtp','sxChange','sxOpen','sxHigh','sxLow','sxClose'].forEach(id => {
     document.getElementById(id).textContent = '—';
   });
@@ -359,6 +552,18 @@ async function loadLtp() {
   const mkt = document.getElementById('mktStatus');
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
   mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
+
+  // Fetch intraday OHLC once if market feed didn't return it (NIFTY/BANKNIFTY)
+  if (!_ohlcFetched && d.open === 0 && currentIndex) {
+    _ohlcFetched = true;
+    get(`/api/today-ohlc?index=${currentIndex}`).then(od => {
+      if (!od.error) {
+        if (od.open > 0) document.getElementById('sxOpen').textContent = fmt2(od.open);
+        if (od.high > 0) document.getElementById('sxHigh').textContent = fmt2(od.high);
+        if (od.low  > 0) document.getElementById('sxLow').textContent  = fmt2(od.low);
+      }
+    });
+  }
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
@@ -583,6 +788,272 @@ function renderAnalysis(text) {
   return '<div class="ai-content">' + text.split('\n').filter(l=>l.trim()).map(l =>
     `<p style="margin:5px 0">${inlineMd(l)}</p>`).join('') + '</div>';
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CHART MODAL
+// ═════════════════════════════════════════════════════════════════════════════
+let lwcLoaded = false, chartInstance = null, srData = null, _chartIndex = '';
+
+function loadLWC(cb) {
+  if (lwcLoaded) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+  s.onload = () => { lwcLoaded = true; cb(); };
+  s.onerror = () => { document.getElementById('chartContainer').innerHTML = '<div style="color:#f87171;padding:24px;text-align:center">⚠ Failed to load chart library. Check internet connection.</div>'; };
+  document.head.appendChild(s);
+}
+
+function openChartModal() {
+  if (!currentIndex) return;
+  _chartIndex = currentIndex;
+  const cfg = INDICES.find(i => i.id === currentIndex);
+  document.getElementById('chartModalTitle').textContent = `📈 Chart — ${cfg?.label || currentIndex}`;
+  document.getElementById('chartModal').classList.add('open');
+  document.getElementById('srVerdictBox').style.display = 'none';
+  document.getElementById('srTables').style.display = 'none';
+  document.getElementById('validTodaySection').style.display = 'none';
+  document.getElementById('btnSaveSr').style.display = 'none';
+  document.getElementById('btnAnalyzeSr').disabled = false;
+  document.getElementById('btnAnalyzeSr').textContent = '🤖 Analyze S/R with Claude AI';
+  srData = null;
+  switchChartTab('chart');
+  loadLWC(() => loadChartData());
+}
+
+function closeChartModal() {
+  document.getElementById('chartModal').classList.remove('open');
+  if (chartInstance) { try { chartInstance.remove(); } catch(e){} chartInstance = null; }
+}
+
+function switchChartTab(tab) {
+  ['chart','history'].forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+  });
+  document.getElementById('chartPanel').style.display   = tab === 'chart'   ? 'block' : 'none';
+  document.getElementById('historyPanel').style.display = tab === 'history' ? 'block' : 'none';
+  if (tab === 'history') loadSRHistory();
+}
+
+async function loadChartData() {
+  const container = document.getElementById('chartContainer');
+  container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4b5563;font-size:0.85em"><div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>Fetching 1 year of data…</div>';
+
+  const d = await get(`/api/chart-data?index=${_chartIndex}&interval=4h&days=365`);
+  if (d.error || !d.candles?.length) {
+    container.innerHTML = `<div style="color:#f87171;padding:28px;text-align:center">⚠ ${d.error || 'No data'}</div>`;
+    return;
+  }
+  document.getElementById('chartBadge').textContent = `${(d.interval_used||'').toUpperCase()} · ${d.count} candles · 1 year`;
+  container.innerHTML = '';
+
+  chartInstance = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 400,
+    layout: { background: { color: '#12111f' }, textColor: '#94a3b8' },
+    grid:   { vertLines: { color: '#1e1c35' }, horzLines: { color: '#1e1c35' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2d2b4e' },
+    timeScale:       { borderColor: '#2d2b4e', timeVisible: true },
+  });
+  window._candleSeries = chartInstance.addCandlestickSeries({
+    upColor: '#34d399', downColor: '#f87171',
+    borderUpColor: '#34d399', borderDownColor: '#f87171',
+    wickUpColor:   '#34d399', wickDownColor:   '#f87171',
+  });
+  window._candleSeries.setData(d.candles);
+  chartInstance.timeScale().fitContent();
+  window.addEventListener('resize', () => {
+    if (chartInstance) chartInstance.applyOptions({ width: container.clientWidth });
+  });
+  if (srData) drawSRLines(srData);
+}
+
+function drawSRLines(data) {
+  if (!window._candleSeries) return;
+  (window._srLineHandles || []).forEach(h => { try { window._candleSeries.removePriceLine(h); } catch(e){} });
+  window._srLineHandles = [];
+  (data.supports || []).forEach(s => {
+    window._srLineHandles.push(window._candleSeries.createPriceLine({
+      price: s.level, color: '#34d399', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true, title: `S ${s.level}`,
+    }));
+  });
+  (data.resistances || []).forEach(r => {
+    window._srLineHandles.push(window._candleSeries.createPriceLine({
+      price: r.level, color: '#f87171', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true, title: `R ${r.level}`,
+    }));
+  });
+}
+
+async function analyzeSR() {
+  const btn = document.getElementById('btnAnalyzeSr');
+  btn.disabled = true; btn.textContent = '⏳ Analyzing…';
+  document.getElementById('srVerdictBox').style.display = 'none';
+  document.getElementById('srTables').style.display = 'none';
+  document.getElementById('validTodaySection').style.display = 'none';
+  document.getElementById('btnSaveSr').style.display = 'none';
+
+  const d = await get(`/api/analyze-sr?index=${_chartIndex}`);
+  btn.disabled = false; btn.textContent = '🤖 Analyze S/R with Claude AI';
+
+  if (d.error) {
+    document.getElementById('srVerdictBox').style.display = 'block';
+    document.getElementById('srVerdictBox').innerHTML = `<span style="color:#f87171">⚠ ${d.error}</span>`;
+    return;
+  }
+  srData = d;
+
+  // Verdict
+  document.getElementById('srVerdictBox').style.display = 'block';
+  document.getElementById('srVerdictBox').innerHTML = `<strong style="color:#fbbf24">📝 Verdict:</strong> ${d.verdict || ''}`;
+
+  // Valid Today
+  if (d.valid_today?.length) {
+    document.getElementById('validTodaySection').style.display = 'block';
+    document.getElementById('validTodayTags').innerHTML = d.valid_today.map(v =>
+      `<span class="valid-level-tag ${v.type}">${v.type === 'support' ? '🛡️' : '🚧'} ${fmt2(v.level)} — ${v.note}</span>`
+    ).join('');
+  }
+
+  // S/R Tables
+  document.getElementById('srTables').style.display = 'flex';
+  document.getElementById('supBody').innerHTML = (d.supports || []).map(s =>
+    `<tr><td style="color:#34d399;font-weight:700">${fmt2(s.level)}</td><td><span class="str-${s.strength}">${s.strength}</span></td><td style="color:#94a3b8;font-size:0.88em">${s.reason}</td></tr>`
+  ).join('');
+  document.getElementById('resBody').innerHTML = (d.resistances || []).map(r =>
+    `<tr><td style="color:#f87171;font-weight:700">${fmt2(r.level)}</td><td><span class="str-${r.strength}">${r.strength}</span></td><td style="color:#94a3b8;font-size:0.88em">${r.reason}</td></tr>`
+  ).join('');
+
+  drawSRLines(d);
+  document.getElementById('btnSaveSr').style.display = 'inline-flex';
+}
+
+async function saveSR() {
+  if (!srData) return;
+  const btn = document.getElementById('btnSaveSr');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  const r = await fetch('/api/save-sr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...srData, index: _chartIndex }),
+  });
+  const d = await r.json();
+  if (d.success) {
+    btn.textContent = '✅ Saved!';
+    setTimeout(() => { btn.textContent = '💾 Save Analysis'; btn.disabled = false; }, 2200);
+  } else {
+    btn.textContent = '❌ Error'; btn.disabled = false;
+  }
+}
+
+async function loadSRHistory() {
+  const el = document.getElementById('srHistContent');
+  el.innerHTML = '<div style="color:#6b7280;padding:16px 0;font-size:0.85em">Loading…</div>';
+  const d = await get(`/api/sr-history?index=${_chartIndex}&limit=10`);
+  if (!d.history?.length) {
+    el.innerHTML = '<div style="color:#6b7280;padding:16px 0;font-size:0.85em">No saved analyses yet.</div>';
+    return;
+  }
+  el.innerHTML = d.history.map(h => `
+    <div class="sr-hist-entry">
+      <div class="sr-hist-meta">
+        <strong style="color:#a78bfa">${h.index_id}</strong>
+        &nbsp;·&nbsp;LTP: <strong>${fmt2(h.ltp)}</strong>
+        &nbsp;·&nbsp;<span>${h.saved_at}</span>
+      </div>
+      <div class="sr-hist-verdict">${h.verdict || ''}</div>
+      <div style="margin-top:5px;font-size:0.75em;color:#6b7280">
+        <span style="color:#34d399">S:</span> ${(h.supports||[]).map(s=>s.level).join(', ')||'—'}
+        &nbsp;&nbsp;
+        <span style="color:#f87171">R:</span> ${(h.resistances||[]).map(r=>r.level).join(', ')||'—'}
+      </div>
+    </div>`).join('');
+}
+
+document.getElementById('chartModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('chartModal')) closeChartModal();
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// COMPONENTS MODAL
+// ═════════════════════════════════════════════════════════════════════════════
+function openCompModal() {
+  if (!currentIndex) return;
+  const cfg = INDICES.find(i => i.id === currentIndex);
+  document.getElementById('compModalTitle').textContent = `🏢 Components — ${cfg?.label || currentIndex}`;
+  document.getElementById('compModal').classList.add('open');
+  document.getElementById('compSummaryBar').style.display = 'none';
+  document.getElementById('compTableWrap').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:#4b5563;font-size:0.85em"><div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>Loading components…</div>';
+  loadComponents();
+}
+
+function closeCompModal() {
+  document.getElementById('compModal').classList.remove('open');
+}
+
+async function loadComponents() {
+  const d = await get(`/api/components?index=${currentIndex}`);
+  if (d.error) {
+    document.getElementById('compTableWrap').innerHTML = `<div style="color:#f87171;padding:24px">⚠ ${d.error}</div>`;
+    return;
+  }
+  const comps = d.components || [];
+  const adv = comps.filter(c => c.change_pct > 0).length;
+  const dec = comps.filter(c => c.change_pct < 0).length;
+  const totalContrib = comps.reduce((s, c) => s + (c.contribution || 0), 0);
+  const maxAbs = Math.max(...comps.map(c => Math.abs(c.contribution || 0)), 0.0001);
+
+  const sb = document.getElementById('compSummaryBar');
+  sb.style.display = 'flex';
+  sb.innerHTML = `
+    <div><span class="comp-sum-lbl">Total:</span><span class="comp-sum-val">${comps.length}</span></div>
+    <div><span class="comp-sum-lbl">▲ Up:</span><span class="comp-sum-val comp-pos">${adv}</span></div>
+    <div><span class="comp-sum-lbl">▼ Down:</span><span class="comp-sum-val comp-neg">${dec}</span></div>
+    <div><span class="comp-sum-lbl">Est. Index Impact:</span><span class="comp-sum-val ${totalContrib>=0?'comp-pos':'comp-neg'}">${totalContrib>=0?'+':''}${(totalContrib*100).toFixed(2)} pts</span></div>`;
+
+  const rows = comps.map(c => {
+    const pos = c.change_pct >= 0;
+    const barW = Math.max(3, Math.round((Math.abs(c.contribution||0) / maxAbs) * 65));
+    const barClr = pos ? '#34d399' : '#f87171';
+    const ltp = c.ltp > 0 ? fmt2(c.ltp) : '—';
+    const chg = c.change !== 0 ? `${c.change>=0?'+':''}${fmt2(c.change)}` : '—';
+    const pct = c.change_pct !== 0 ? `${c.change_pct>=0?'+':''}${c.change_pct.toFixed(2)}%` : '—';
+    const contribPts = c.contribution !== 0
+      ? `<span class="contrib-bar" style="width:${barW}px;background:${barClr}"></span><span class="${pos?'comp-pos':'comp-neg'}">${c.contribution>=0?'+':''}${(c.contribution*100).toFixed(3)}</span>`
+      : '—';
+    return `<tr>
+      <td class="al" style="color:#6b7280">${c.rank}</td>
+      <td class="al"><div class="comp-name">${c.name}</div><div class="comp-sector">${c.sector}</div></td>
+      <td>${ltp}</td>
+      <td class="${pos?'comp-pos':'comp-neg'}">${chg}</td>
+      <td class="${pos?'comp-pos':'comp-neg'}">${pct}</td>
+      <td>${contribPts}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('compTableWrap').innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="comp-tbl">
+        <thead><tr>
+          <th class="al">#</th>
+          <th class="al">Stock</th>
+          <th>LTP</th>
+          <th>Change ₹</th>
+          <th>Change %</th>
+          <th>Est. Contribution</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+document.getElementById('compModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('compModal')) closeCompModal();
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadIndices().then(() => {
