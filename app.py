@@ -231,7 +231,7 @@ Max 250 words. Use ₹ for prices. Be direct and specific."""
     try:
         ac = _anthropic.Anthropic()
         resp = ac.messages.create(
-            model="claude-opus-4-7",
+            model="claude-haiku-4-5",
             max_tokens=700,
             messages=[{"role": "user", "content": prompt}]
         )
