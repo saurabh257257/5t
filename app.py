@@ -694,6 +694,49 @@ def api_snapshots():
     return jsonify({'snapshots': get_snapshots(idx, limit)})
 
 
+@app.route('/api/scheduler/status')
+def api_scheduler_status():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        job = _scheduler.get_job('sensex_snapshot')
+        if not job:
+            return jsonify({'running': False, 'next_run': None})
+        paused   = job.next_run_time is None
+        next_run = job.next_run_time.strftime('%H:%M:%S') if job.next_run_time else None
+        # Last snapshot info
+        snaps = get_snapshots('SENSEX', 1)
+        last  = snaps[0] if snaps else {}
+        return jsonify({
+            'running':    not paused,
+            'next_run':   next_run,
+            'last_saved': last.get('saved_at', '—'),
+            'last_ltp':   last.get('ltp', 0),
+            'last_pcr':   last.get('pcr', 0),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/toggle', methods=['POST'])
+def api_scheduler_toggle():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        job    = _scheduler.get_job('sensex_snapshot')
+        paused = job.next_run_time is None
+        if paused:
+            _scheduler.resume_job('sensex_snapshot')
+            return jsonify({'running': True})
+        else:
+            _scheduler.pause_job('sensex_snapshot')
+            return jsonify({'running': False})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     import threading
     def _preload():
