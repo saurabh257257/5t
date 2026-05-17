@@ -46,8 +46,50 @@ def init_db():
                 saved_at     TEXT NOT NULL
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chain_analysis (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id     TEXT    NOT NULL,
+                expiry_label TEXT,
+                expiry_ts    INTEGER,
+                date         TEXT    NOT NULL,
+                time         TEXT    NOT NULL,
+                ltp          REAL,
+                pcr          REAL,
+                max_pain     REAL,
+                analysis     TEXT    NOT NULL,
+                saved_at     TEXT    NOT NULL
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS sr_alerts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id     TEXT    NOT NULL,
+                level        REAL    NOT NULL,
+                level_type   TEXT    NOT NULL,
+                ltp          REAL    NOT NULL,
+                distance_pct REAL    NOT NULL,
+                alerted_at   TEXT    NOT NULL
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        ''')
+        # Seed default settings
+        defaults = [
+            ('sr_monitor_enabled',  'true'),
+            ('sr_monitor_freq_min', '5'),
+            ('sr_threshold_pct',    '0.3'),
+        ]
+        for key, val in defaults:
+            c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, val))
         c.commit()
 
+
+# ── S/R Levels ─────────────────────────────────────────────────────────────────
 
 def save_sr(index_id, ltp, supports, resistances, valid_today, verdict):
     with _conn() as c:
@@ -97,6 +139,95 @@ def get_sr_history(index_id, limit=10):
         return result
 
 
+# ── Chain Analysis (user-triggered) ───────────────────────────────────────────
+
+def save_chain_analysis(index_id, expiry_label, expiry_ts, ltp, pcr, max_pain, analysis):
+    now = datetime.now(_IST)
+    with _conn() as c:
+        cur = c.execute('''
+            INSERT INTO chain_analysis
+            (index_id, expiry_label, expiry_ts, date, time, ltp, pcr, max_pain, analysis, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            index_id, expiry_label, int(expiry_ts) if expiry_ts else 0,
+            now.strftime('%Y-%m-%d'), now.strftime('%H:%M'),
+            ltp, pcr, max_pain, analysis,
+            now.strftime('%Y-%m-%d %H:%M:%S'),
+        ))
+        c.commit()
+        return cur.lastrowid
+
+
+def get_chain_analysis_history(index_id, limit=20):
+    with _conn() as c:
+        rows = c.execute(
+            'SELECT * FROM chain_analysis WHERE index_id=? ORDER BY saved_at DESC LIMIT ?',
+            (index_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_chain_analysis(record_id):
+    with _conn() as c:
+        c.execute('DELETE FROM chain_analysis WHERE id = ?', (record_id,))
+        c.commit()
+        return c.execute('SELECT changes()').fetchone()[0]
+
+
+# ── SR Alerts ─────────────────────────────────────────────────────────────────
+
+def save_sr_alert(index_id, level, level_type, ltp, distance_pct):
+    with _conn() as c:
+        cur = c.execute('''
+            INSERT INTO sr_alerts (index_id, level, level_type, ltp, distance_pct, alerted_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (index_id, level, level_type, ltp, distance_pct,
+              datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')))
+        c.commit()
+        return cur.lastrowid
+
+
+def get_sr_alerts(limit=20):
+    with _conn() as c:
+        rows = c.execute(
+            'SELECT * FROM sr_alerts ORDER BY alerted_at DESC LIMIT ?', (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def was_recently_alerted(index_id, level, minutes=30):
+    """True if an alert for this index+level was already saved within `minutes`."""
+    with _conn() as c:
+        cutoff = (datetime.now(_IST) - timedelta(minutes=minutes)).strftime('%Y-%m-%d %H:%M:%S')
+        row = c.execute(
+            '''SELECT id FROM sr_alerts
+               WHERE index_id=? AND ABS(level - ?) < 1 AND alerted_at > ?''',
+            (index_id, level, cutoff)
+        ).fetchone()
+        return row is not None
+
+
+def cleanup_old_alerts(days=30):
+    with _conn() as c:
+        cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('DELETE FROM sr_alerts WHERE alerted_at < ?', (cutoff,))
+        c.commit()
+
+
+# ── Settings ──────────────────────────────────────────────────────────────────
+
+def get_setting(key, default=''):
+    with _conn() as c:
+        row = c.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+        return row['value'] if row else default
+
+
+def set_setting(key, value):
+    with _conn() as c:
+        c.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
+        c.commit()
+
+
 # ── Auto chain snapshots ───────────────────────────────────────────────────────
 
 def save_snapshot(index_id, expiry_label, expiry_ts, ltp, prev_close,
@@ -123,7 +254,6 @@ def get_snapshots(index_id, limit=60):
 
 
 def cleanup_old_snapshots(days=7):
-    """Delete snapshots older than N days to prevent DB bloat."""
     with _conn() as c:
         cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
         c.execute('DELETE FROM chain_snapshots WHERE saved_at < ?', (cutoff,))

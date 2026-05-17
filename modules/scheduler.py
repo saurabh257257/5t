@@ -1,13 +1,19 @@
 """
 Background scheduler — auto-snapshots SENSEX option chain every 1 minute
 during market hours, stores AI summary to SQLite. No login required.
+Also runs S/R proximity monitor at configurable intervals.
 """
+import json
+import os
 import anthropic as _anthropic
 from datetime import datetime, timezone, timedelta
 
 from modules.auth import _restore_client
 from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp
-from modules.db import save_snapshot, cleanup_old_snapshots
+from modules.db import (save_snapshot, cleanup_old_snapshots,
+                        get_sr_history, save_sr_alert, was_recently_alerted,
+                        get_setting, cleanup_old_alerts)
+from modules.telegram import send_sr_alert
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -115,3 +121,74 @@ In 80 words max: (1) Bias bullish/bearish/neutral + reason, (2) Key support leve
 
     except Exception as e:
         print(f'[SCHEDULER] Error in run_sensex_snapshot: {e}')
+
+
+# ── S/R Proximity Monitor ──────────────────────────────────────────────────────
+
+def run_sr_monitor():
+    """
+    Check SENSEX + NIFTY LTP against stored S/R levels.
+    Fires Telegram alert when within threshold%. Runs at configurable interval.
+    """
+    if not _is_market_hours():
+        return
+
+    if get_setting('sr_monitor_enabled', 'true') != 'true':
+        return
+
+    threshold_pct = float(get_setting('sr_threshold_pct', '0.3'))
+
+    client = _restore_client()
+    if not client:
+        return
+
+    # Load all configured indices from indices.json
+    try:
+        _idx_file = os.path.join(os.path.dirname(__file__), '..', 'indices.json')
+        with open(_idx_file) as f:
+            all_indices = json.load(f)
+    except Exception:
+        all_indices = [
+            {'id': 'SENSEX', 'feed_exch': 'B', 'feed_scrip': 999901},
+            {'id': 'NIFTY',  'feed_exch': 'N', 'feed_scrip': 999920},
+        ]
+
+    for idx in all_indices:
+        try:
+            _check_sr_proximity(client, idx['id'], idx['feed_exch'],
+                                idx['feed_scrip'], threshold_pct)
+        except Exception as e:
+            print(f'[SR_MONITOR] Error for {idx["id"]}: {e}')
+
+    cleanup_old_alerts(days=30)
+
+
+def _check_sr_proximity(client, index_id, exch, scrip, threshold_pct):
+    """For one index: fetch LTP, compare to stored S/R levels, alert if close."""
+    ltp_data = get_index_ltp(client, exch, scrip, index_id)
+    ltp      = ltp_data.get('ltp', 0)
+    if ltp == 0:
+        return
+
+    history = get_sr_history(index_id, limit=1)
+    if not history:
+        return
+
+    latest = history[0]
+    levels = (
+        [{'level': float(s['level']), 'type': 'support'}
+         for s in latest.get('supports', [])] +
+        [{'level': float(r['level']), 'type': 'resistance'}
+         for r in latest.get('resistances', [])]
+    )
+
+    for entry in levels:
+        level    = entry['level']
+        dist_pct = abs(ltp - level) / level * 100
+        if dist_pct <= threshold_pct:
+            if not was_recently_alerted(index_id, level, minutes=30):
+                save_sr_alert(index_id, level, entry['type'], ltp, dist_pct)
+                send_sr_alert(index_id, level, entry['type'], ltp, dist_pct)
+                now_s = datetime.now(_IST).strftime('%H:%M:%S')
+                print(f'[SR_MONITOR] {index_id} @ {ltp} near {entry["type"]} '
+                      f'{level} ({dist_pct:.3f}%) @ {now_s}')

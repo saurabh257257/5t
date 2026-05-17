@@ -9,7 +9,9 @@ from modules.master import search_scrips, refresh_master, get_scrip_info, browse
 from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
                             get_sensex_ltp, get_index_ltp, get_historical_data,
                             get_today_ohlc, get_chart_data, get_components_ltp)
-from modules.db import init_db, save_sr, get_sr_history, delete_sr, get_snapshots
+from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapshots,
+                        save_chain_analysis, get_chain_analysis_history, delete_chain_analysis,
+                        save_sr_alert, get_sr_alerts, get_setting, set_setting)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -49,6 +51,13 @@ try:
     _scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
     _scheduler.add_job(run_sensex_snapshot, 'interval', minutes=1, id='sensex_snapshot',
                        max_instances=1, misfire_grace_time=30)
+    # SR proximity monitor
+    from modules.scheduler import run_sr_monitor
+    _sr_freq = int(get_setting('sr_monitor_freq_min', '5'))
+    if get_setting('sr_monitor_enabled', 'true') == 'true':
+        _scheduler.add_job(run_sr_monitor, 'interval', minutes=_sr_freq,
+                           id='sr_monitor', max_instances=1, misfire_grace_time=60)
+        print(f'[SCHEDULER] SR Monitor started — every {_sr_freq} min')
     _scheduler.start()
     print('[SCHEDULER] Started — SENSEX snapshots every 1 min during market hours')
 except Exception as _e:
@@ -393,8 +402,20 @@ Max 220 words. Be specific with levels."""
             max_tokens=700,
             messages=[{"role": "user", "content": prompt}]
         )
+        analysis_text = resp.content[0].text
+
+        # Auto-save every analysis to DB
+        try:
+            save_chain_analysis(
+                index_id=idx, expiry_label=expiry_lbl,
+                expiry_ts=int(expiry_ts), ltp=ltp,
+                pcr=pcr, max_pain=max_pain, analysis=analysis_text,
+            )
+        except Exception as _se:
+            print(f'[DB] chain analysis save error: {_se}')
+
         return jsonify({
-            "summary":      resp.content[0].text,
+            "summary":      analysis_text,
             "pcr":          pcr,
             "max_pain":     max_pain,
             "total_ce_oi":  total_ce_oi,
@@ -682,6 +703,75 @@ def api_components():
         cfg_comp['exch'],
         cfg_comp['exch_type'],
     ))
+
+
+@app.route('/api/chain-analysis-history')
+def api_chain_analysis_history():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx   = request.args.get('index', 'SENSEX').upper()
+    limit = int(request.args.get('limit', 20))
+    return jsonify({'history': get_chain_analysis_history(idx, limit)})
+
+
+@app.route('/api/chain-analysis-history/<int:record_id>', methods=['DELETE'])
+def api_delete_chain_analysis(record_id):
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    deleted = delete_chain_analysis(record_id)
+    return jsonify({'success': True, 'deleted': deleted})
+
+
+@app.route('/api/sr-alerts')
+def api_sr_alerts():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    limit = int(request.args.get('limit', 30))
+    return jsonify({'alerts': get_sr_alerts(limit)})
+
+
+@app.route('/api/monitor/config', methods=['GET'])
+def api_monitor_config_get():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    return jsonify({
+        'enabled':       get_setting('sr_monitor_enabled', 'true') == 'true',
+        'freq_min':      int(get_setting('sr_monitor_freq_min', '5')),
+        'threshold_pct': float(get_setting('sr_threshold_pct', '0.3')),
+    })
+
+
+@app.route('/api/monitor/config', methods=['POST'])
+def api_monitor_config_set():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    body          = request.get_json() or {}
+    enabled       = bool(body.get('enabled', True))
+    freq_min      = int(body.get('freq_min', 5))
+    threshold_pct = float(body.get('threshold_pct', 0.3))
+    if freq_min not in (2, 5, 10, 15):
+        return jsonify({'error': 'freq_min must be 2, 5, 10, or 15'}), 400
+    if not (0.05 <= threshold_pct <= 5.0):
+        return jsonify({'error': 'threshold_pct must be 0.05–5.0'}), 400
+    set_setting('sr_monitor_enabled',  'true' if enabled else 'false')
+    set_setting('sr_monitor_freq_min', str(freq_min))
+    set_setting('sr_threshold_pct',    str(threshold_pct))
+    try:
+        from modules.scheduler import run_sr_monitor
+        if _scheduler.get_job('sr_monitor'):
+            _scheduler.remove_job('sr_monitor')
+        if enabled:
+            _scheduler.add_job(run_sr_monitor, 'interval', minutes=freq_min,
+                               id='sr_monitor', max_instances=1, misfire_grace_time=60)
+    except Exception as e:
+        return jsonify({'error': f'Scheduler update failed: {e}'}), 500
+    return jsonify({'success': True, 'enabled': enabled,
+                    'freq_min': freq_min, 'threshold_pct': threshold_pct})
 
 
 @app.route('/api/snapshots')
