@@ -515,7 +515,9 @@ def api_chart_data():
     if idx not in INDEX_MAP:
         return jsonify({'error': f'Unknown index: {idx}'}), 400
     cfg = INDEX_MAP[idx]
-    return jsonify(get_chart_data(client, cfg['feed_exch'], cfg['feed_scrip'], interval, days))
+    c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
+    c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
+    return jsonify(get_chart_data(client, c_exch, c_scrip, interval, days))
 
 
 @app.route('/api/analyze-sr')
@@ -529,7 +531,9 @@ def api_analyze_sr():
     cfg = INDEX_MAP[idx]
 
     # Fetch 1-year daily candles
-    chart = get_chart_data(client, cfg['feed_exch'], cfg['feed_scrip'], interval='1d', days=380)
+    c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
+    c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
+    chart = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
     if 'error' in chart or not chart.get('candles'):
         return jsonify({'error': 'Could not fetch historical data for S/R analysis'})
 

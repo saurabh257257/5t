@@ -5,7 +5,9 @@
     "feed_exch": "B",
     "feed_scrip": 999901,
     "opt_exch": "B",
-    "opt_symbol": "SENSEX"
+    "opt_symbol": "SENSEX",
+    "chart_exch": "B",
+    "chart_scrip": 1
   },
   {
     "id": "NIFTY",

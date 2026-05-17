@@ -129,10 +129,8 @@ def run_sr_monitor():
     """
     Check SENSEX + NIFTY LTP against stored S/R levels.
     Fires Telegram alert when within threshold%. Runs at configurable interval.
+    Runs any time (not restricted to market hours) so you can monitor pre/post market.
     """
-    if not _is_market_hours():
-        return
-
     if get_setting('sr_monitor_enabled', 'true') != 'true':
         return
 
