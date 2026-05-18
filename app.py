@@ -809,6 +809,7 @@ def api_monitor_config_get():
         'freq_min':      int(get_setting('sr_monitor_freq_min', '5')),
         'threshold_pct': float(get_setting('sr_threshold_pct', '0.3')),
         'indices':       get_setting('sr_monitor_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
+        'market_hours':  get_setting('sr_monitor_market_hours', 'false') == 'true',
     })
 
 
@@ -822,14 +823,16 @@ def api_monitor_config_set():
     freq_min      = int(body.get('freq_min', 5))
     threshold_pct = float(body.get('threshold_pct', 0.3))
     indices       = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
+    market_hours  = bool(body.get('market_hours', False))
     if freq_min not in (2, 5, 10, 15):
         return jsonify({'error': 'freq_min must be 2, 5, 10, or 15'}), 400
     if not (0.05 <= threshold_pct <= 5.0):
         return jsonify({'error': 'threshold_pct must be 0.05–5.0'}), 400
-    set_setting('sr_monitor_enabled',  'true' if enabled else 'false')
-    set_setting('sr_monitor_freq_min', str(freq_min))
-    set_setting('sr_threshold_pct',    str(threshold_pct))
-    set_setting('sr_monitor_indices',  str(indices))
+    set_setting('sr_monitor_enabled',      'true' if enabled else 'false')
+    set_setting('sr_monitor_freq_min',     str(freq_min))
+    set_setting('sr_threshold_pct',        str(threshold_pct))
+    set_setting('sr_monitor_indices',      str(indices))
+    set_setting('sr_monitor_market_hours', 'true' if market_hours else 'false')
     try:
         from modules.scheduler import run_sr_monitor
         if _scheduler.get_job('sr_monitor'):
@@ -840,7 +843,8 @@ def api_monitor_config_set():
     except Exception as e:
         return jsonify({'error': f'Scheduler update failed: {e}'}), 500
     return jsonify({'success': True, 'enabled': enabled,
-                    'freq_min': freq_min, 'threshold_pct': threshold_pct, 'indices': indices})
+                    'freq_min': freq_min, 'threshold_pct': threshold_pct,
+                    'indices': indices, 'market_hours': market_hours})
 
 
 @app.route('/api/market-update/config', methods=['GET'])
@@ -849,9 +853,10 @@ def api_market_update_config_get():
     if not client:
         return jsonify({'error': 'Not authenticated'}), 401
     return jsonify({
-        'enabled':  get_setting('market_update_enabled',  'false') == 'true',
-        'freq_min': int(get_setting('market_update_freq_min', '5')),
-        'indices':  get_setting('market_update_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
+        'enabled':      get_setting('market_update_enabled',      'false') == 'true',
+        'freq_min':     int(get_setting('market_update_freq_min', '5')),
+        'indices':      get_setting('market_update_indices',      'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
+        'market_hours': get_setting('market_update_market_hours', 'false') == 'true',
     })
 
 
@@ -863,12 +868,14 @@ def api_market_update_config_set():
     body     = request.get_json() or {}
     enabled  = bool(body.get('enabled', False))
     freq_min = int(body.get('freq_min', 5))
-    indices  = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
+    indices      = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
+    market_hours = bool(body.get('market_hours', False))
     if freq_min not in (1, 2, 5, 10, 15):
         return jsonify({'error': 'freq_min must be 1, 2, 5, 10, or 15'}), 400
-    set_setting('market_update_enabled',  'true' if enabled else 'false')
-    set_setting('market_update_freq_min', str(freq_min))
-    set_setting('market_update_indices',  str(indices))
+    set_setting('market_update_enabled',      'true' if enabled else 'false')
+    set_setting('market_update_freq_min',     str(freq_min))
+    set_setting('market_update_indices',      str(indices))
+    set_setting('market_update_market_hours', 'true' if market_hours else 'false')
     try:
         from modules.scheduler import run_market_update
         if _scheduler.get_job('market_update'):
@@ -878,7 +885,8 @@ def api_market_update_config_set():
                                id='market_update', max_instances=1, misfire_grace_time=60)
     except Exception as e:
         return jsonify({'error': f'Scheduler update failed: {e}'}), 500
-    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min, 'indices': indices})
+    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min,
+                    'indices': indices, 'market_hours': market_hours})
 
 
 @app.route('/api/breach-monitor/config', methods=['GET'])
@@ -887,9 +895,10 @@ def api_breach_monitor_config_get():
     if not client:
         return jsonify({'error': 'Not authenticated'}), 401
     return jsonify({
-        'enabled':  get_setting('breach_monitor_enabled',  'false') == 'true',
-        'freq_min': int(get_setting('breach_monitor_freq_min', '2')),
-        'indices':  get_setting('breach_monitor_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
+        'enabled':      get_setting('breach_monitor_enabled',      'false') == 'true',
+        'freq_min':     int(get_setting('breach_monitor_freq_min', '2')),
+        'indices':      get_setting('breach_monitor_indices',      'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
+        'market_hours': get_setting('breach_monitor_market_hours', 'false') == 'true',
     })
 
 
@@ -901,12 +910,14 @@ def api_breach_monitor_config_set():
     body     = request.get_json() or {}
     enabled  = bool(body.get('enabled', False))
     freq_min = int(body.get('freq_min', 2))
-    indices  = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
+    indices      = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
+    market_hours = bool(body.get('market_hours', False))
     if freq_min not in (1, 2, 5):
         return jsonify({'error': 'freq_min must be 1, 2, or 5'}), 400
-    set_setting('breach_monitor_enabled',  'true' if enabled else 'false')
-    set_setting('breach_monitor_freq_min', str(freq_min))
-    set_setting('breach_monitor_indices',  str(indices))
+    set_setting('breach_monitor_enabled',       'true' if enabled else 'false')
+    set_setting('breach_monitor_freq_min',      str(freq_min))
+    set_setting('breach_monitor_indices',       str(indices))
+    set_setting('breach_monitor_market_hours',  'true' if market_hours else 'false')
     try:
         from modules.scheduler import run_breach_monitor
         if _scheduler.get_job('breach_monitor'):
@@ -916,7 +927,8 @@ def api_breach_monitor_config_set():
                                id='breach_monitor', max_instances=1, misfire_grace_time=60)
     except Exception as e:
         return jsonify({'error': f'Scheduler update failed: {e}'}), 500
-    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min, 'indices': indices})
+    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min,
+                    'indices': indices, 'market_hours': market_hours})
 
 
 @app.route('/api/snapshots')

@@ -32,6 +32,24 @@ def _is_market_hours():
     return market_open <= now <= market_close
 
 
+def _in_trading_window():
+    """True if IST time is 9:00 AM – 3:30 PM, Mon–Fri."""
+    from datetime import time as _t
+    now = datetime.now(_IST)
+    if now.weekday() >= 5:
+        return False
+    t = now.time()
+    return _t(9, 0) <= t <= _t(15, 30)
+
+
+def _check_market_hours_gate(setting_key):
+    """Return False (skip job) if market-hours filter is ON and we're outside window."""
+    if get_setting(setting_key, 'false') == 'true' and not _in_trading_window():
+        print(f'[SCHEDULER] {setting_key} gate: outside market hours, skipping', flush=True)
+        return False
+    return True
+
+
 def run_sensex_snapshot():
     """
     Fetch SENSEX nearest-expiry option chain, generate AI summary, save to DB.
@@ -139,6 +157,8 @@ def run_sr_monitor():
     """
     if get_setting('sr_monitor_enabled', 'true') != 'true':
         return
+    if not _check_market_hours_gate('sr_monitor_market_hours'):
+        return
 
     threshold_pct = float(get_setting('sr_threshold_pct', '0.3'))
 
@@ -225,6 +245,8 @@ def run_market_update():
     for all 4 indices. Runs at configurable frequency (default 5 min).
     """
     if get_setting('market_update_enabled', 'false') != 'true':
+        return
+    if not _check_market_hours_gate('market_update_market_hours'):
         return
 
     print('[MARKET_UPDATE] run_market_update called', flush=True)
@@ -329,6 +351,8 @@ def run_breach_monitor():
     Runs at configurable frequency (default 2 min).
     """
     if get_setting('breach_monitor_enabled', 'false') != 'true':
+        return
+    if not _check_market_hours_gate('breach_monitor_market_hours'):
         return
 
     print('[BREACH_MONITOR] run_breach_monitor called', flush=True)
