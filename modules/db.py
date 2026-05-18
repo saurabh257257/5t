@@ -84,6 +84,20 @@ def init_db():
             )
         ''')
         c.execute('''
+            CREATE TABLE IF NOT EXISTS market_summary (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id     TEXT    NOT NULL,
+                expiry_label TEXT,
+                date         TEXT    NOT NULL,
+                time         TEXT    NOT NULL,
+                ltp          REAL,
+                pcr          REAL,
+                max_pain     REAL,
+                analysis     TEXT    NOT NULL,
+                saved_at     TEXT    NOT NULL
+            )
+        ''')
+        c.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -191,6 +205,51 @@ def get_chain_analysis_history(index_id, limit=20):
 def delete_chain_analysis(record_id):
     with _conn() as c:
         c.execute('DELETE FROM chain_analysis WHERE id = ?', (record_id,))
+        c.commit()
+        return c.execute('SELECT changes()').fetchone()[0]
+
+
+# ── Market Summary (enhanced chain analysis per segment) ──────────────────────
+
+def save_market_summary(index_id, expiry_label, ltp, pcr, max_pain, analysis):
+    now = datetime.now(_IST)
+    with _conn() as c:
+        cur = c.execute('''
+            INSERT INTO market_summary
+            (index_id, expiry_label, date, time, ltp, pcr, max_pain, analysis, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            index_id, expiry_label,
+            now.strftime('%Y-%m-%d'), now.strftime('%H:%M'),
+            ltp, pcr, max_pain, analysis,
+            now.strftime('%Y-%m-%d %H:%M:%S'),
+        ))
+        c.commit()
+        return cur.lastrowid
+
+
+def get_latest_market_summary(index_id):
+    """Return the most recent market summary for an index, or None."""
+    with _conn() as c:
+        row = c.execute(
+            'SELECT * FROM market_summary WHERE index_id=? ORDER BY saved_at DESC LIMIT 1',
+            (index_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_market_summary_history(index_id, limit=20):
+    with _conn() as c:
+        rows = c.execute(
+            'SELECT * FROM market_summary WHERE index_id=? ORDER BY saved_at DESC LIMIT ?',
+            (index_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_market_summary(record_id):
+    with _conn() as c:
+        c.execute('DELETE FROM market_summary WHERE id = ?', (record_id,))
         c.commit()
         return c.execute('SELECT changes()').fetchone()[0]
 

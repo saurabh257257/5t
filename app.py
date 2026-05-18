@@ -12,7 +12,9 @@ from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
 from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapshots,
                         save_chain_analysis, get_chain_analysis_history, delete_chain_analysis,
                         save_sr_alert, get_sr_alerts, get_setting, set_setting,
-                        get_breach_alerts)
+                        get_breach_alerts,
+                        save_market_summary, get_latest_market_summary, get_market_summary_history,
+                        delete_market_summary)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -381,15 +383,23 @@ def api_analyze_chain():
     total_pe_oi = sum(r['pe_oi'] for r in rows)
     pcr         = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
 
-    # Max pain — strike with highest total OI
-    max_pain = max(rows, key=lambda r: r['ce_oi'] + r['pe_oi'], default={}).get('strike', 0)
+    # Max pain — strike with min total option pain across all strikes
+    pain_rows = []
+    for strike_row in rows:
+        pain = sum(
+            max(0, (strike_row['strike'] - r['strike'])) * r['ce_oi'] +
+            max(0, (r['strike'] - strike_row['strike'])) * r['pe_oi']
+            for r in rows
+        )
+        pain_rows.append((pain, strike_row['strike']))
+    max_pain = min(pain_rows, key=lambda x: x[0])[1] if pain_rows else 0
 
-    # Highest CE & PE OI strikes (resistance / support)
-    top_ce = sorted(rows, key=lambda r: r['ce_oi'], reverse=True)[:3]
-    top_pe = sorted(rows, key=lambda r: r['pe_oi'], reverse=True)[:3]
+    # Highest CE & PE OI strikes
+    top_ce = sorted(rows, key=lambda r: r['ce_oi'], reverse=True)[:5]
+    top_pe = sorted(rows, key=lambda r: r['pe_oi'], reverse=True)[:5]
 
-    # 15 strikes nearest to LTP for detailed analysis
-    near_rows = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:15]
+    # 20 strikes nearest to LTP for detailed analysis
+    near_rows = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:20]
     chain_txt = "Strike | CE_LTP | CE_OI | CE_ChgOI | CE_Vol | PE_LTP | PE_OI | PE_ChgOI | PE_Vol\n"
     for r in near_rows:
         chain_txt += (f"{int(r['strike'])} | {r['ce_ltp']} | {r['ce_oi']} | {r['ce_chg_oi']} | "
@@ -398,36 +408,78 @@ def api_analyze_chain():
     chg_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0
     chg_abs = round(ltp - prev_close, 2)
 
-    prompt = f"""You are an expert options trader. Analyze this {idx} option chain and provide a market summary.
+    # ── S/R context from last saved analysis ──────────────────────────────────
+    sr_text = 'No saved S/R analysis available.'
+    try:
+        sr_history = get_sr_history(idx, limit=1)
+        if sr_history:
+            sr = sr_history[0]
+            sup_str = ', '.join(str(s['level']) for s in (sr.get('supports') or [])[:4])
+            res_str = ', '.join(str(r['level']) for r in (sr.get('resistances') or [])[:4])
+            sr_text = (f"Supports: {sup_str or '—'}\n"
+                       f"Resistances: {res_str or '—'}\n"
+                       f"(Analysed at LTP {sr['ltp']} on {sr['saved_at']})")
+    except Exception as _e:
+        print(f'[SR] fetch error: {_e}')
 
-Index: {idx}  |  Expiry: {expiry_lbl}
-Current Price: {ltp}  |  Prev Close: {prev_close}  |  Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
-PCR (PE OI / CE OI): {pcr}  |  Max Pain: {int(max_pain)}
-Top CE OI (resistance): {', '.join(str(int(r['strike'])) for r in top_ce)}
-Top PE OI (support): {', '.join(str(int(r['strike'])) for r in top_pe)}
+    # ── Previous market summary for context ───────────────────────────────────
+    prev_context = ''
+    try:
+        prev = get_latest_market_summary(idx)
+        if prev:
+            prev_context = (
+                f"\n═══ PREVIOUS MARKET SUMMARY ({prev['date']} {prev['time']}, LTP {prev['ltp']}) ═══\n"
+                f"{prev['analysis']}\n"
+                f"[Compare with current data — note bias shifts, new OI walls, level changes]\n\n"
+            )
+    except Exception as _e:
+        print(f'[MS] prev fetch error: {_e}')
 
-Option Chain (15 strikes near current price):
+    prompt = f"""You are an expert Indian options trader. Give a crisp, actionable market summary for {idx}.
+
+═══ LIVE DATA ═══
+Index: {idx}  |  LTP: {ltp}  |  Prev Close: {prev_close}  |  Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
+Expiry: {expiry_lbl}  |  PCR: {pcr}  |  Max Pain: {int(max_pain)}
+Top CE OI walls (resistance): {', '.join(str(int(r['strike'])) for r in top_ce)}
+Top PE OI walls (support):    {', '.join(str(int(r['strike'])) for r in top_pe)}
+
+═══ KEY S/R LEVELS (Technical Analysis) ═══
+{sr_text}
+
+═══ OPTION CHAIN (20 strikes near LTP) ═══
 {chain_txt}
-Provide analysis in exactly these sections:
-1. **Market Bias** — bullish/bearish/neutral, one clear reason
-2. **Key Support** — top 2 PE OI levels protecting downside
-3. **Key Resistance** — top 2 CE OI levels capping upside
-4. **PCR Signal** — what {pcr} PCR means for market sentiment
-5. **Max Pain** — implication of {int(max_pain)} max pain vs current {ltp}
-6. **Watch Out** — any unusual OI buildup, unwinding, or red flags
+{prev_context}Provide analysis in exactly these 8 sections:
+1. **Market Bias** — bullish/bearish/neutral with one clear reason
+2. **Key Support** — strongest support (OI wall + S/R confluence) with exact level
+3. **Key Resistance** — strongest resistance (OI wall + S/R confluence) with exact level
+4. **PCR Signal** — what PCR {pcr} implies about current market positioning
+5. **Max Pain** — max pain at {int(max_pain)} vs LTP {ltp}, expiry impact
+6. **Best Call (CE)** — most valuable CE to trade: exact strike, current premium ₹, why (OI, level, risk/reward)
+7. **Best Put (PE)** — most valuable PE to trade: exact strike, current premium ₹, why (OI, level, risk/reward)
+8. **Watch Out** — one key risk, unusual OI shift, or red flag right now
 
-Max 220 words. Be specific with levels."""
+Max 280 words. Be specific with exact strikes and ₹ premiums."""
 
     try:
         ac = _anthropic.Anthropic()
         resp = ac.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=700,
+            max_tokens=900,
             messages=[{"role": "user", "content": prompt}]
         )
         analysis_text = resp.content[0].text
 
-        # Auto-save every analysis to DB
+        # Save to market_summary table (per-index segment)
+        try:
+            save_market_summary(
+                index_id=idx, expiry_label=expiry_lbl,
+                ltp=ltp, pcr=pcr, max_pain=max_pain,
+                analysis=analysis_text,
+            )
+        except Exception as _se:
+            print(f'[DB] market summary save error: {_se}')
+
+        # Also keep legacy chain_analysis save
         try:
             save_chain_analysis(
                 index_id=idx, expiry_label=expiry_lbl,
@@ -448,6 +500,25 @@ Max 220 words. Be specific with levels."""
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/market-summary/history')
+def api_market_summary_history():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx   = request.args.get('index', 'SENSEX').upper()
+    limit = int(request.args.get('limit', 20))
+    return jsonify({'history': get_market_summary_history(idx, limit)})
+
+
+@app.route('/api/market-summary/history/<int:record_id>', methods=['DELETE'])
+def api_delete_market_summary(record_id):
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    deleted = delete_market_summary(record_id)
+    return jsonify({'success': True, 'deleted': deleted})
 
 
 @app.route('/api/analyze')
@@ -1137,7 +1208,7 @@ def api_scheduler_toggle():
 
 _ALLOWED_TABLES = {
     'sr_levels', 'chain_snapshots', 'chain_analysis',
-    'sr_alerts', 'breach_alerts', 'settings',
+    'sr_alerts', 'breach_alerts', 'settings', 'market_summary',
 }
 
 def _db_conn():

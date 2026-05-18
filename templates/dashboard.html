@@ -571,6 +571,7 @@ header {
         <span class="cs-badge">Claude AI</span>
       </div>
       <div style="display:flex;gap:7px;align-items:center">
+        <span id="csPrevTime" style="font-size:0.7em;color:#4b5563;display:none">prev: <span id="csPrevTimeVal"></span></span>
         <button class="cs-tab-btn active" id="csTabLatest"  onclick="switchCsTab('latest')">Latest</button>
         <button class="cs-tab-btn"        id="csTabHistory" onclick="switchCsTab('history')">📋 History</button>
         <button class="cs-refresh" id="csRefreshBtn" onclick="loadChainSummary()">↻ Refresh</button>
@@ -1453,10 +1454,20 @@ async function loadChainSummary() {
   document.getElementById('csSummaryTitle').textContent =
     `${cfg?.label || currentIndex} · ${currentExpiryLabel} · Market Summary`;
 
+  // Show previous analysis timestamp if available
+  try {
+    const hist = await get(`/api/market-summary/history?index=${currentIndex}&limit=1`);
+    const prev = hist.history?.[0];
+    if (prev) {
+      document.getElementById('csPrevTime').style.display = 'inline';
+      document.getElementById('csPrevTimeVal').textContent = `${prev.date} ${prev.time}`;
+    }
+  } catch (_) {}
+
   // Reset stats
   ['csPcr','csMaxPain','csCeOi','csPeOi','csPriceChg'].forEach(id =>
     document.getElementById(id).textContent = '—');
-  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude is analyzing option chain…</div></div>';
+  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude is analyzing with S/R + chain data…</div></div>';
 
   const d = await get(
     `/api/analyze-chain?index=${currentIndex}&expiry_ts=${currentExpiryTs}` +
@@ -1484,6 +1495,14 @@ async function loadChainSummary() {
   chgEl.className    = 'cs-stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
 
   body.innerHTML = renderAnalysis(d.summary);
+
+  // Update prev timestamp after fresh save
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('csPrevTime').style.display = 'inline';
+  document.getElementById('csPrevTimeVal').textContent =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
+    `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
 // ── Strike AI Panel ───────────────────────────────────────────────────────────
@@ -1546,7 +1565,7 @@ function inlineMd(text) {
     .replace(/bearish/gi, '<span class="bear">Bearish</span>')
     .replace(/neutral/gi, '<span class="neu">Neutral</span>');
 }
-const ICONS = { trend:'📈', 'key support':'🛡️', 'key resistance':'🚧', support:'🛡️', resistance:'🚧', volume:'📊', bias:'⚖️', 'market bias':'⚖️', trade:'💡', 'trade idea':'💡', 'pcr':'📉', 'max pain':'🎯', 'watch':'⚠️', 'watch out':'⚠️', 'smart money':'🧠' };
+const ICONS = { trend:'📈', 'key support':'🛡️', 'key resistance':'🚧', support:'🛡️', resistance:'🚧', volume:'📊', bias:'⚖️', 'market bias':'⚖️', trade:'💡', 'trade idea':'💡', 'pcr':'📉', 'max pain':'🎯', 'watch':'⚠️', 'watch out':'⚠️', 'smart money':'🧠', 'best call':'🟢', 'best put':'🔴', 'call (ce)':'🟢', 'put (pe)':'🔴' };
 
 function renderAnalysis(text) {
   if (!text) return '<div class="ai-error">No response.</div>';
@@ -1558,7 +1577,10 @@ function renderAnalysis(text) {
     return '<div class="ai-content">' + sections.map(s => {
       const key  = Object.keys(ICONS).find(k => s.title.toLowerCase().includes(k));
       const icon = key ? ICONS[key] : '•';
-      const isTradeIdea = s.title.toLowerCase().includes('trade') || s.title.toLowerCase().includes('watch');
+      const isTradeIdea = s.title.toLowerCase().includes('trade') ||
+                          s.title.toLowerCase().includes('watch') ||
+                          s.title.toLowerCase().includes('best call') ||
+                          s.title.toLowerCase().includes('best put');
       const bodyHtml = inlineMd(s.body.replace(/\n/g, ' '));
       return `<div class="ai-section">
         <div class="ai-section-title">${icon} ${s.title}</div>
