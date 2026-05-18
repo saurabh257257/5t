@@ -24,9 +24,11 @@ SESSION_FILE = os.path.join(os.path.dirname(__file__), '..', '.5paisa_session.js
 def _save_session(client):
     """Save JWT + client_code to disk after successful login."""
     try:
+        jwt = (getattr(client, 'access_token', None) or
+               getattr(client, 'Jwt_token',    None))
         data = {
-            "jwt":         getattr(client, 'Jwt_token',    None),
-            "client_code": getattr(client, 'client_code',  None),
+            "jwt":         jwt,
+            "client_code": getattr(client, 'client_code', None),
         }
         if data["jwt"]:
             with open(SESSION_FILE, 'w') as f:
@@ -46,8 +48,13 @@ def _restore_client():
         if not jwt:
             return None
         c = FivePaisaClient(cred=cred)
-        c.Jwt_token   = jwt
-        c.client_code = data.get("client_code", "")
+        c.Jwt_token    = jwt
+        c.access_token = jwt
+        c.client_code  = data.get("client_code", "")
+        try:
+            c.set_access_token(jwt)
+        except Exception:
+            pass
         # Quick test — fetch SENSEX LTP to validate token
         result = c.fetch_market_feed([{"Exch": "B", "ExchangeType": "C", "ScripCode": 999901}])
         if result is not None:
