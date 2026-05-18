@@ -262,13 +262,16 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
     today     = last_trading.strftime('%Y-%m-%d')
     from_date = (last_trading - _td(days=days)).strftime('%Y-%m-%d')
 
-    fallbacks = {'4h': ['4h', '1h', '1d'], '1h': ['1h', '1d'], '1d': ['1d']}
-    ivl_list  = fallbacks.get(interval, ['4h', '1h', '1d'])
+    # 5paisa requires uppercase intervals: '1D' not '1d', '60m' not '1h'
+    ivl_map   = {'4h': '60m', '1h': '60m', '1d': '1D'}
+    fallbacks = {'4h': ['60m', '1D'], '1h': ['60m', '1D'], '1d': ['1D']}
+    ivl_list  = fallbacks.get(interval, ['60m', '1D'])
 
     for ivl in ivl_list:
         for et in ('C', 'D'):
             try:
-                df = client.historical_data(exch, et, int(scrip_code), ivl, from_date, today)
+                api_ivl = ivl_map.get(ivl, ivl)
+                df = client.historical_data(exch, et, int(scrip_code), api_ivl, from_date, today)
                 if df is None or len(df) < 5:
                     continue
                 candles = []
