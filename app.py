@@ -58,6 +58,20 @@ try:
         _scheduler.add_job(run_sr_monitor, 'interval', minutes=_sr_freq,
                            id='sr_monitor', max_instances=1, misfire_grace_time=60)
         print(f'[SCHEDULER] SR Monitor started — every {_sr_freq} min')
+    # Market Update job
+    from modules.scheduler import run_market_update
+    _mu_freq = int(get_setting('market_update_freq_min', '5'))
+    if get_setting('market_update_enabled', 'false') == 'true':
+        _scheduler.add_job(run_market_update, 'interval', minutes=_mu_freq,
+                           id='market_update', max_instances=1, misfire_grace_time=60)
+        print(f'[SCHEDULER] Market Update started — every {_mu_freq} min')
+    # Breach Monitor job
+    from modules.scheduler import run_breach_monitor
+    _bm_freq = int(get_setting('breach_monitor_freq_min', '2'))
+    if get_setting('breach_monitor_enabled', 'false') == 'true':
+        _scheduler.add_job(run_breach_monitor, 'interval', minutes=_bm_freq,
+                           id='breach_monitor', max_instances=1, misfire_grace_time=60)
+        print(f'[SCHEDULER] Breach Monitor started — every {_bm_freq} min')
     _scheduler.start()
     print('[SCHEDULER] Started — SENSEX snapshots every 1 min during market hours')
 except Exception as _e:
@@ -776,6 +790,76 @@ def api_monitor_config_set():
         return jsonify({'error': f'Scheduler update failed: {e}'}), 500
     return jsonify({'success': True, 'enabled': enabled,
                     'freq_min': freq_min, 'threshold_pct': threshold_pct})
+
+
+@app.route('/api/market-update/config', methods=['GET'])
+def api_market_update_config_get():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    return jsonify({
+        'enabled':  get_setting('market_update_enabled',  'false') == 'true',
+        'freq_min': int(get_setting('market_update_freq_min', '5')),
+    })
+
+
+@app.route('/api/market-update/config', methods=['POST'])
+def api_market_update_config_set():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    body     = request.get_json() or {}
+    enabled  = bool(body.get('enabled', False))
+    freq_min = int(body.get('freq_min', 5))
+    if freq_min not in (1, 2, 5, 10, 15):
+        return jsonify({'error': 'freq_min must be 1, 2, 5, 10, or 15'}), 400
+    set_setting('market_update_enabled',  'true' if enabled else 'false')
+    set_setting('market_update_freq_min', str(freq_min))
+    try:
+        from modules.scheduler import run_market_update
+        if _scheduler.get_job('market_update'):
+            _scheduler.remove_job('market_update')
+        if enabled:
+            _scheduler.add_job(run_market_update, 'interval', minutes=freq_min,
+                               id='market_update', max_instances=1, misfire_grace_time=60)
+    except Exception as e:
+        return jsonify({'error': f'Scheduler update failed: {e}'}), 500
+    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min})
+
+
+@app.route('/api/breach-monitor/config', methods=['GET'])
+def api_breach_monitor_config_get():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    return jsonify({
+        'enabled':  get_setting('breach_monitor_enabled',  'false') == 'true',
+        'freq_min': int(get_setting('breach_monitor_freq_min', '2')),
+    })
+
+
+@app.route('/api/breach-monitor/config', methods=['POST'])
+def api_breach_monitor_config_set():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    body     = request.get_json() or {}
+    enabled  = bool(body.get('enabled', False))
+    freq_min = int(body.get('freq_min', 2))
+    if freq_min not in (1, 2, 5):
+        return jsonify({'error': 'freq_min must be 1, 2, or 5'}), 400
+    set_setting('breach_monitor_enabled',  'true' if enabled else 'false')
+    set_setting('breach_monitor_freq_min', str(freq_min))
+    try:
+        from modules.scheduler import run_breach_monitor
+        if _scheduler.get_job('breach_monitor'):
+            _scheduler.remove_job('breach_monitor')
+        if enabled:
+            _scheduler.add_job(run_breach_monitor, 'interval', minutes=freq_min,
+                               id='breach_monitor', max_instances=1, misfire_grace_time=60)
+    except Exception as e:
+        return jsonify({'error': f'Scheduler update failed: {e}'}), 500
+    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min})
 
 
 @app.route('/api/snapshots')

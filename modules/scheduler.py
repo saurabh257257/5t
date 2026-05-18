@@ -9,11 +9,14 @@ import anthropic as _anthropic
 from datetime import datetime, timezone, timedelta
 
 from modules.auth import _restore_client
-from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp
+from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp, get_today_ohlc
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, save_sr_alert, was_recently_alerted,
                         get_setting, cleanup_old_alerts)
 from modules.telegram import send_sr_alert, send_message
+
+# Module-level dict to track previous LTP per index for breach detection
+_prev_ltp = {}
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -203,3 +206,194 @@ def _check_sr_proximity(client, index_id, exch, scrip, threshold_pct):
                 now_s = datetime.now(_IST).strftime('%H:%M:%S')
                 print(f'[SR_MONITOR] {index_id} @ {ltp} near {entry["type"]} '
                       f'{level} ({dist_pct:.3f}%) @ {now_s}')
+
+
+# ── Market Update ──────────────────────────────────────────────────────────────
+
+def _load_indices_cfg():
+    """Load all indices from indices.json relative to this file."""
+    try:
+        _idx_file = os.path.join(os.path.dirname(__file__), '..', 'indices.json')
+        with open(_idx_file) as f:
+            return json.load(f)
+    except Exception:
+        return [
+            {'id': 'SENSEX',    'label': 'SENSEX',    'feed_exch': 'B', 'feed_scrip': 999901, 'chart_exch': 'B', 'chart_scrip': 999901},
+            {'id': 'NIFTY',     'label': 'NIFTY 50',  'feed_exch': 'N', 'feed_scrip': 999920, 'chart_exch': 'N', 'chart_scrip': 999920000},
+            {'id': 'BANKNIFTY', 'label': 'BANK NIFTY','feed_exch': 'N', 'feed_scrip': 999921, 'chart_exch': 'N', 'chart_scrip': 999920005},
+            {'id': 'FINNIFTY',  'label': 'FIN NIFTY', 'feed_exch': 'N', 'feed_scrip': 999922, 'chart_exch': 'N', 'chart_scrip': 999920041},
+        ]
+
+
+def run_market_update():
+    """
+    Send a combined Telegram message with LTP, OHLC, and nearest S/R levels
+    for all 4 indices. Runs at configurable frequency (default 5 min).
+    """
+    if get_setting('market_update_enabled', 'false') != 'true':
+        return
+
+    print('[MARKET_UPDATE] run_market_update called', flush=True)
+
+    from modules.auth import _restore_client
+    client = _restore_client()
+    if not client:
+        print('[MARKET_UPDATE] No saved session — skipping')
+        return
+
+    all_indices = _load_indices_cfg()
+    now_str = datetime.now(_IST).strftime('%H:%M')
+    lines = [f'📈 <b>Market Update — {now_str} IST</b>']
+
+    for idx in all_indices:
+        try:
+            index_id = idx['id']
+            label    = idx.get('label', index_id)
+
+            # Fetch LTP + change%
+            ltp_data   = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'))
+            ltp        = ltp_data.get('ltp', 0)
+            change_pct = ltp_data.get('change_pct', 0)
+            if ltp == 0:
+                print(f'[MARKET_UPDATE] {index_id} LTP=0, skipping')
+                continue
+
+            direction = '▲' if change_pct >= 0 else '▼'
+            sign      = '+' if change_pct >= 0 else ''
+
+            # Fetch today's OHLC using chart_exch / chart_scrip
+            ohlc_line = ''
+            try:
+                c_exch  = idx.get('chart_exch', idx['feed_exch'])
+                c_scrip = idx.get('chart_scrip', idx['feed_scrip'])
+                ohlc = get_today_ohlc(client, c_exch, c_scrip)
+                if 'error' not in ohlc:
+                    o = int(ohlc.get('open', 0))
+                    h = int(ohlc.get('high', 0))
+                    l = int(ohlc.get('low',  0))
+                    ohlc_line = f'O:{o:,} H:{h:,} L:{l:,}'
+            except Exception as oe:
+                print(f'[MARKET_UPDATE] {index_id} OHLC error: {oe}')
+
+            # Nearest S/R
+            sup_line = ''
+            res_line = ''
+            try:
+                history = get_sr_history(index_id, limit=1)
+                if history:
+                    latest  = history[0]
+                    supports    = [float(s['level']) for s in latest.get('supports', [])]
+                    resistances = [float(r['level']) for r in latest.get('resistances', [])]
+                    # Nearest support BELOW ltp
+                    below_sups = [s for s in supports if s < ltp]
+                    if below_sups:
+                        nearest_sup = max(below_sups)
+                        sup_dist    = abs(ltp - nearest_sup) / nearest_sup * 100
+                        sup_line    = f'🛡️ Support: {int(nearest_sup):,} ({sup_dist:.2f}% away)'
+                    # Nearest resistance ABOVE ltp
+                    above_res = [r for r in resistances if r > ltp]
+                    if above_res:
+                        nearest_res = min(above_res)
+                        res_dist    = abs(nearest_res - ltp) / nearest_res * 100
+                        res_line    = f'🚧 Resist:  {int(nearest_res):,} ({res_dist:.2f}% away)'
+            except Exception as sre:
+                print(f'[MARKET_UPDATE] {index_id} S/R error: {sre}')
+
+            # Build block for this index
+            block = f'\n<b>{label}</b>: ₹{ltp:,.2f} {direction}{sign}{change_pct:.2f}%'
+            if ohlc_line:
+                block += f'\n{ohlc_line}'
+            if sup_line:
+                block += f'\n{sup_line}'
+            if res_line:
+                block += f'\n{res_line}'
+            lines.append(block)
+
+        except Exception as e:
+            print(f'[MARKET_UPDATE] Error for {idx.get("id","?")}: {e}')
+
+    if len(lines) > 1:
+        send_message('\n'.join(lines))
+        print(f'[MARKET_UPDATE] Sent update for {len(lines)-1} indices @ {now_str}')
+    else:
+        print('[MARKET_UPDATE] No data to send')
+
+
+# ── Breach Monitor ─────────────────────────────────────────────────────────────
+
+def run_breach_monitor():
+    """
+    Compare current vs previous LTP against stored S/R levels.
+    Fires a Telegram alert per breach. First run is skipped (no prev LTP).
+    Runs at configurable frequency (default 2 min).
+    """
+    if get_setting('breach_monitor_enabled', 'false') != 'true':
+        return
+
+    print('[BREACH_MONITOR] run_breach_monitor called', flush=True)
+
+    from modules.auth import _restore_client
+    client = _restore_client()
+    if not client:
+        print('[BREACH_MONITOR] No saved session — skipping')
+        return
+
+    all_indices = _load_indices_cfg()
+
+    for idx in all_indices:
+        try:
+            index_id = idx['id']
+            label    = idx.get('label', index_id)
+
+            ltp_data = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'))
+            ltp      = ltp_data.get('ltp', 0)
+            if ltp == 0:
+                continue
+
+            prev = _prev_ltp.get(index_id)
+            _prev_ltp[index_id] = ltp  # update for next run
+
+            if prev is None:
+                print(f'[BREACH_MONITOR] {index_id} first run — storing LTP {ltp}, will check next cycle')
+                continue
+
+            # Load latest S/R levels
+            history = get_sr_history(index_id, limit=1)
+            if not history:
+                continue
+
+            latest      = history[0]
+            supports    = [float(s['level']) for s in latest.get('supports', [])]
+            resistances = [float(r['level']) for r in latest.get('resistances', [])]
+            now_str     = datetime.now(_IST).strftime('%H:%M')
+
+            for level in supports:
+                # Support breached: was above, now below
+                if prev > level and ltp < level:
+                    msg = (
+                        f'🚨 <b>S/R Breach — {label}</b>\n\n'
+                        f'<b>Support {int(level):,} BREACHED!</b>\n'
+                        f'Previous LTP: ₹{prev:,.2f}\n'
+                        f'Current LTP:  ₹{ltp:,.2f}\n'
+                        f'Direction: ↓ Broken below support\n'
+                        f'Time: {now_str} IST'
+                    )
+                    send_message(msg)
+                    print(f'[BREACH_MONITOR] {index_id} support {level} breached @ {now_str}')
+
+            for level in resistances:
+                # Resistance breached: was below, now above
+                if prev < level and ltp > level:
+                    msg = (
+                        f'🚨 <b>S/R Breach — {label}</b>\n\n'
+                        f'<b>Resistance {int(level):,} BREACHED!</b>\n'
+                        f'Previous LTP: ₹{prev:,.2f}\n'
+                        f'Current LTP:  ₹{ltp:,.2f}\n'
+                        f'Direction: ↑ Broken above resistance\n'
+                        f'Time: {now_str} IST'
+                    )
+                    send_message(msg)
+                    print(f'[BREACH_MONITOR] {index_id} resistance {level} breached @ {now_str}')
+
+        except Exception as e:
+            print(f'[BREACH_MONITOR] Error for {idx.get("id","?")}: {e}')

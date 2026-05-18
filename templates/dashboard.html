@@ -595,6 +595,60 @@ header {
     </div>
   </div>
 
+  <!-- Market Update config -->
+  <div class="monitor-card">
+    <div class="mc-hd">
+      <span class="mc-hd-title">📈 Market Update</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="mc-badge off" id="marketUpdateBadge">loading…</span>
+        <label class="mc-toggle" title="Enable / Disable market update">
+          <input type="checkbox" id="marketUpdateEnabled" onchange="saveMarketUpdateConfig()">
+          <span class="mc-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="mc-body">
+      <div class="mc-row">
+        <span class="mc-lbl">Frequency</span>
+        <select class="mc-sel" id="marketUpdateFreq">
+          <option value="1">Every 1 min</option>
+          <option value="2">Every 2 min</option>
+          <option value="5" selected>Every 5 min</option>
+          <option value="10">Every 10 min</option>
+          <option value="15">Every 15 min</option>
+        </select>
+      </div>
+      <button class="mc-save" onclick="saveMarketUpdateConfig()">Save Settings</button>
+      <span class="mc-hint" id="marketUpdateHint"></span>
+    </div>
+  </div>
+
+  <!-- Breach Monitor config -->
+  <div class="monitor-card">
+    <div class="mc-hd">
+      <span class="mc-hd-title">🔔 Breach Monitor</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="mc-badge off" id="breachMonitorBadge">loading…</span>
+        <label class="mc-toggle" title="Enable / Disable breach monitor">
+          <input type="checkbox" id="breachMonitorEnabled" onchange="saveBreachMonitorConfig()">
+          <span class="mc-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="mc-body">
+      <div class="mc-row">
+        <span class="mc-lbl">Frequency</span>
+        <select class="mc-sel" id="breachMonitorFreq">
+          <option value="1">Every 1 min</option>
+          <option value="2" selected>Every 2 min</option>
+          <option value="5">Every 5 min</option>
+        </select>
+      </div>
+      <button class="mc-save" onclick="saveBreachMonitorConfig()">Save Settings</button>
+      <span class="mc-hint" id="breachMonitorHint"></span>
+    </div>
+  </div>
+
   <!-- Alert log -->
   <div class="alert-card">
     <div class="al-hd">
@@ -800,6 +854,76 @@ async function saveMonitorConfig() {
     hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
     setTimeout(() => { hint.textContent = ''; }, 2200);
     loadMonitorConfig();
+  } else {
+    hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
+  }
+}
+
+// ── Market Update Config ──────────────────────────────────────────────────────
+async function loadMarketUpdateConfig() {
+  const d = await get('/api/market-update/config');
+  if (d.error) return;
+  document.getElementById('marketUpdateEnabled').checked = d.enabled;
+  document.getElementById('marketUpdateFreq').value      = d.freq_min;
+  const badge = document.getElementById('marketUpdateBadge');
+  if (d.enabled) {
+    badge.textContent = `ON · every ${d.freq_min} min`;
+    badge.className   = 'mc-badge on';
+  } else {
+    badge.textContent = 'OFF';
+    badge.className   = 'mc-badge off';
+  }
+}
+
+async function saveMarketUpdateConfig() {
+  const enabled  = document.getElementById('marketUpdateEnabled').checked;
+  const freq_min = parseInt(document.getElementById('marketUpdateFreq').value);
+  const hint     = document.getElementById('marketUpdateHint');
+  hint.textContent = 'Saving…'; hint.style.color = '#6b7280';
+  const r = await fetch('/api/market-update/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled, freq_min}),
+  });
+  const d = await r.json();
+  if (d.success) {
+    hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
+    setTimeout(() => { hint.textContent = ''; }, 2200);
+    loadMarketUpdateConfig();
+  } else {
+    hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
+  }
+}
+
+// ── Breach Monitor Config ─────────────────────────────────────────────────────
+async function loadBreachMonitorConfig() {
+  const d = await get('/api/breach-monitor/config');
+  if (d.error) return;
+  document.getElementById('breachMonitorEnabled').checked = d.enabled;
+  document.getElementById('breachMonitorFreq').value      = d.freq_min;
+  const badge = document.getElementById('breachMonitorBadge');
+  if (d.enabled) {
+    badge.textContent = `ON · every ${d.freq_min} min`;
+    badge.className   = 'mc-badge on';
+  } else {
+    badge.textContent = 'OFF';
+    badge.className   = 'mc-badge off';
+  }
+}
+
+async function saveBreachMonitorConfig() {
+  const enabled  = document.getElementById('breachMonitorEnabled').checked;
+  const freq_min = parseInt(document.getElementById('breachMonitorFreq').value);
+  const hint     = document.getElementById('breachMonitorHint');
+  hint.textContent = 'Saving…'; hint.style.color = '#6b7280';
+  const r = await fetch('/api/breach-monitor/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled, freq_min}),
+  });
+  const d = await r.json();
+  if (d.success) {
+    hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
+    setTimeout(() => { hint.textContent = ''; }, 2200);
+    loadBreachMonitorConfig();
   } else {
     hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
   }
@@ -1337,6 +1461,8 @@ loadIndices().then(() => {
   loadLtp();
   loadOHLC();
   loadMonitorConfig();
+  loadMarketUpdateConfig();
+  loadBreachMonitorConfig();
   loadAlertLog();
   loadExpiries().then(() => {
     const sel = document.getElementById('expirySelect');

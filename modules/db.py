@@ -80,9 +80,13 @@ def init_db():
         ''')
         # Seed default settings
         defaults = [
-            ('sr_monitor_enabled',  'true'),
-            ('sr_monitor_freq_min', '5'),
-            ('sr_threshold_pct',    '0.3'),
+            ('sr_monitor_enabled',      'true'),
+            ('sr_monitor_freq_min',     '5'),
+            ('sr_threshold_pct',        '0.3'),
+            ('market_update_enabled',   'false'),
+            ('market_update_freq_min',  '5'),
+            ('breach_monitor_enabled',  'false'),
+            ('breach_monitor_freq_min', '2'),
         ]
         for key, val in defaults:
             c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, val))
