@@ -45,9 +45,6 @@ except Exception as _e:
     print(f'[DB] init failed: {_e}')
 
 # ── Background scheduler ────────────────────────────────────────────────────────
-import logging
-logging.basicConfig(level=logging.WARNING)
-logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
     from modules.scheduler import run_sensex_snapshot
