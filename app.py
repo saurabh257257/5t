@@ -11,7 +11,8 @@ from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
                             get_today_ohlc, get_chart_data, get_components_ltp)
 from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapshots,
                         save_chain_analysis, get_chain_analysis_history, delete_chain_analysis,
-                        save_sr_alert, get_sr_alerts, get_setting, set_setting)
+                        save_sr_alert, get_sr_alerts, get_setting, set_setting,
+                        get_breach_alerts)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -749,6 +750,24 @@ def api_sr_alerts():
         return jsonify({'error': 'Not authenticated'}), 401
     limit = int(request.args.get('limit', 30))
     return jsonify({'alerts': get_sr_alerts(limit)})
+
+
+@app.route('/api/breach-alerts')
+def api_breach_alerts():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    limit = int(request.args.get('limit', 30))
+    return jsonify({'alerts': get_breach_alerts(limit=limit)})
+
+
+@app.route('/api/market-update/last-sent')
+def api_market_update_last_sent():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    last = get_setting('market_update_last_sent', '')
+    return jsonify({'last_sent': last})
 
 
 @app.route('/api/monitor/config', methods=['GET'])

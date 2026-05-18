@@ -73,6 +73,17 @@ def init_db():
             )
         ''')
         c.execute('''
+            CREATE TABLE IF NOT EXISTS breach_alerts (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id   TEXT    NOT NULL,
+                level      REAL    NOT NULL,
+                level_type TEXT    NOT NULL,
+                prev_ltp   REAL    NOT NULL,
+                ltp        REAL    NOT NULL,
+                alerted_at TEXT    NOT NULL
+            )
+        ''')
+        c.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -218,6 +229,40 @@ def cleanup_old_alerts(days=30):
     with _conn() as c:
         cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
         c.execute('DELETE FROM sr_alerts WHERE alerted_at < ?', (cutoff,))
+        c.commit()
+
+
+# ── Breach Alerts ─────────────────────────────────────────────────────────────
+
+def save_breach_alert(index_id, level, level_type, prev_ltp, ltp):
+    with _conn() as c:
+        cur = c.execute('''
+            INSERT INTO breach_alerts (index_id, level, level_type, prev_ltp, ltp, alerted_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (index_id, level, level_type, prev_ltp, ltp,
+              datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')))
+        c.commit()
+        return cur.lastrowid
+
+
+def get_breach_alerts(index_id=None, limit=30):
+    with _conn() as c:
+        if index_id:
+            rows = c.execute(
+                'SELECT * FROM breach_alerts WHERE index_id=? ORDER BY alerted_at DESC LIMIT ?',
+                (index_id, limit)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                'SELECT * FROM breach_alerts ORDER BY alerted_at DESC LIMIT ?', (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def cleanup_old_breach_alerts(days=30):
+    with _conn() as c:
+        cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        c.execute('DELETE FROM breach_alerts WHERE alerted_at < ?', (cutoff,))
         c.commit()
 
 

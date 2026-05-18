@@ -398,31 +398,38 @@ header {
   color: #a78bfa; cursor: pointer; user-select: none; }
 .mc-idx-chk input[type=checkbox] { accent-color: #7c3aed; width: 14px; height: 14px; cursor: pointer; }
 
-/* Alert log */
-.alert-card {
-  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; margin-bottom: 14px;
+/* Inline alert log inside monitor card */
+.mc-log-wrap {
+  border-top: 1px solid #2d2b4e;
 }
-.alert-card .al-hd {
+.mc-log-hd {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 18px; background: #12111f; border-bottom: 1px solid #2d2b4e;
+  padding: 7px 18px; background: #12111f;
 }
-.al-hd-title { font-weight: 700; font-size: 0.88em; color: #e2e8f0; }
-.al-refresh { padding:4px 10px; border-radius:6px; font-size:0.75em; font-weight:600;
-  cursor:pointer; border:1px solid #2d2b4e; background:transparent; color:#94a3b8; }
-.al-refresh:hover { border-color:#7c3aed; color:#a78bfa; }
-.al-row {
-  display:flex; align-items:center; gap:12px; padding:8px 18px;
-  border-bottom:1px solid #1e1c35; font-size:0.8em; flex-wrap:wrap;
+.mc-log-title { font-size: 0.75em; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+.mc-log-refresh { padding:2px 8px; border-radius:5px; font-size:0.72em; font-weight:600;
+  cursor:pointer; border:1px solid #2d2b4e; background:transparent; color:#6b7280; }
+.mc-log-refresh:hover { border-color:#7c3aed; color:#a78bfa; }
+.mc-log-body {
+  max-height: 160px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #2d2b4e transparent;
 }
-.al-row:last-child { border-bottom:none; }
-.al-idx  { font-weight:700; color:#a78bfa; min-width:56px; }
-.al-time { color:#6b7280; min-width:44px; font-size:0.9em; }
-.al-sup  { color:#34d399; font-weight:700; }
-.al-res  { color:#f87171; font-weight:700; }
-.al-ltp  { color:#e2e8f0; }
-.al-dist { color:#fbbf24; font-size:0.85em; }
-.al-date { color:#4b5563; font-size:0.78em; }
+.mc-log-body::-webkit-scrollbar { width: 5px; }
+.mc-log-body::-webkit-scrollbar-track { background: transparent; }
+.mc-log-body::-webkit-scrollbar-thumb { background: #2d2b4e; border-radius: 3px; }
+.mc-log-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 18px;
+  border-bottom: 1px solid #1a1830; font-size: 0.78em; flex-wrap: wrap;
+}
+.mc-log-row:last-child { border-bottom: none; }
+.mc-log-idx  { font-weight: 700; color: #a78bfa; min-width: 60px; }
+.mc-log-time { color: #4b5563; min-width: 42px; font-size: 0.9em; }
+.mc-log-sup  { color: #34d399; font-weight: 700; }
+.mc-log-res  { color: #f87171; font-weight: 700; }
+.mc-log-ltp  { color: #94a3b8; }
+.mc-log-dist { color: #fbbf24; font-size: 0.88em; }
+.mc-log-empty { padding: 10px 18px; font-size: 0.78em; color: #4b5563; }
+
 
 </style>
 </head>
@@ -570,6 +577,15 @@ header {
       <button class="mc-save" onclick="saveMonitorConfig()">Save Settings</button>
       <span class="mc-hint" id="monitorHint"></span>
     </div>
+    <div class="mc-log-wrap">
+      <div class="mc-log-hd">
+        <span class="mc-log-title">Recent Alerts</span>
+        <button class="mc-log-refresh" onclick="loadSrAlertLog()">↻</button>
+      </div>
+      <div class="mc-log-body" id="srAlertLog">
+        <div class="mc-log-empty">No alerts yet.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Market Update config -->
@@ -607,6 +623,14 @@ header {
       <button class="mc-save" onclick="saveMarketUpdateConfig()">Save Settings</button>
       <span class="mc-hint" id="marketUpdateHint"></span>
     </div>
+    <div class="mc-log-wrap">
+      <div class="mc-log-hd">
+        <span class="mc-log-title">Last Sent</span>
+      </div>
+      <div class="mc-log-body" id="marketUpdateLog">
+        <div class="mc-log-empty">Not sent yet.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Breach Monitor config -->
@@ -642,16 +666,14 @@ header {
       <button class="mc-save" onclick="saveBreachMonitorConfig()">Save Settings</button>
       <span class="mc-hint" id="breachMonitorHint"></span>
     </div>
-  </div>
-
-  <!-- Alert log -->
-  <div class="alert-card">
-    <div class="al-hd">
-      <span class="al-hd-title">🔔 S/R Alert Log</span>
-      <button class="al-refresh" onclick="loadAlertLog()">↻ Refresh</button>
-    </div>
-    <div id="alertLogContent">
-      <div style="color:#6b7280;font-size:0.85em;padding:14px 18px">Loading…</div>
+    <div class="mc-log-wrap">
+      <div class="mc-log-hd">
+        <span class="mc-log-title">Recent Breaches</span>
+        <button class="mc-log-refresh" onclick="loadBreachAlertLog()">↻</button>
+      </div>
+      <div class="mc-log-body" id="breachAlertLog">
+        <div class="mc-log-empty">No breaches detected yet.</div>
+      </div>
     </div>
   </div>
 
@@ -943,24 +965,55 @@ async function saveBreachMonitorConfig() {
   }
 }
 
-// ── Alert Log ─────────────────────────────────────────────────────────────────
-async function loadAlertLog() {
-  const el = document.getElementById('alertLogContent');
-  const d  = await get('/api/sr-alerts?limit=30');
+// ── Inline Alert Logs ─────────────────────────────────────────────────────────
+async function loadSrAlertLog() {
+  const el = document.getElementById('srAlertLog');
+  const d  = await get('/api/sr-alerts?limit=40');
   if (!d.alerts?.length) {
-    el.innerHTML = '<div style="color:#6b7280;font-size:0.85em;padding:12px 18px">No alerts yet. Save S/R levels and enable the monitor to start receiving alerts.</div>';
+    el.innerHTML = '<div class="mc-log-empty">No proximity alerts yet.</div>';
     return;
   }
   el.innerHTML = d.alerts.map(a => `
-    <div class="al-row">
-      <span class="al-idx">${a.index_id}</span>
-      <span class="al-time">${(a.alerted_at||'').substring(11,16)}</span>
-      <span class="${a.level_type==='support'?'al-sup':'al-res'}">
-        ${a.level_type==='support'?'🛡️':'🚧'} ${fmt2(a.level)}
+    <div class="mc-log-row">
+      <span class="mc-log-idx">${a.index_id}</span>
+      <span class="mc-log-time">${(a.alerted_at||'').substring(11,16)}</span>
+      <span class="${a.level_type==='support'?'mc-log-sup':'mc-log-res'}">
+        ${a.level_type==='support'?'🛡️':'🚧'} ₹${fmt2(a.level)}
       </span>
-      <span class="al-ltp">LTP ₹${fmt2(a.ltp)}</span>
-      <span class="al-dist">${parseFloat(a.distance_pct||0).toFixed(3)}% away</span>
-      <span class="al-date">${(a.alerted_at||'').substring(0,10)}</span>
+      <span class="mc-log-ltp">LTP ₹${fmt2(a.ltp)}</span>
+      <span class="mc-log-dist">${parseFloat(a.distance_pct||0).toFixed(3)}% away</span>
+      <span class="mc-log-time" style="margin-left:auto">${(a.alerted_at||'').substring(0,10)}</span>
+    </div>`).join('');
+}
+
+async function loadMarketUpdateLog() {
+  const el = document.getElementById('marketUpdateLog');
+  const d  = await get('/api/market-update/last-sent');
+  if (!d.last_sent) {
+    el.innerHTML = '<div class="mc-log-empty">Not sent yet.</div>';
+    return;
+  }
+  const t = d.last_sent.substring(11,16);
+  const dt = d.last_sent.substring(0,10);
+  el.innerHTML = `<div class="mc-log-row"><span class="mc-log-ltp">Last sent:</span><span class="mc-log-sup">${t} IST</span><span class="mc-log-time" style="margin-left:auto">${dt}</span></div>`;
+}
+
+async function loadBreachAlertLog() {
+  const el = document.getElementById('breachAlertLog');
+  const d  = await get('/api/breach-alerts?limit=40');
+  if (!d.alerts?.length) {
+    el.innerHTML = '<div class="mc-log-empty">No breaches detected yet.</div>';
+    return;
+  }
+  el.innerHTML = d.alerts.map(a => `
+    <div class="mc-log-row">
+      <span class="mc-log-idx">${a.index_id}</span>
+      <span class="mc-log-time">${(a.alerted_at||'').substring(11,16)}</span>
+      <span class="${a.level_type==='support'?'mc-log-sup':'mc-log-res'}">
+        ${a.level_type==='support'?'🛡️↓':'🚧↑'} ₹${fmt2(a.level)}
+      </span>
+      <span class="mc-log-ltp">₹${fmt2(a.prev_ltp)} → ₹${fmt2(a.ltp)}</span>
+      <span class="mc-log-time" style="margin-left:auto">${(a.alerted_at||'').substring(0,10)}</span>
     </div>`).join('');
 }
 
@@ -1441,15 +1494,19 @@ loadIndices().then(() => {
   loadMonitorConfig();
   loadMarketUpdateConfig();
   loadBreachMonitorConfig();
-  loadAlertLog();
+  loadSrAlertLog();
+  loadMarketUpdateLog();
+  loadBreachAlertLog();
   loadExpiries().then(() => {
     const sel = document.getElementById('expirySelect');
     if (sel?.value) loadChain();
   });
 });
-setInterval(loadLtp,      5000);           // LTP every 5s
-setInterval(loadOHLC,     5 * 60 * 1000);  // OHLC every 5 min
-setInterval(loadAlertLog, 60 * 1000);      // Alert log every 1 min
+setInterval(loadLtp,           5000);           // LTP every 5s
+setInterval(loadOHLC,          5 * 60 * 1000);  // OHLC every 5 min
+setInterval(loadSrAlertLog,    60 * 1000);       // SR alert log every 1 min
+setInterval(loadMarketUpdateLog, 60 * 1000);     // Market update log every 1 min
+setInterval(loadBreachAlertLog,  60 * 1000);     // Breach alert log every 1 min
 </script>
 </body>
 </html>

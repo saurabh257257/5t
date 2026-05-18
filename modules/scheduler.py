@@ -12,7 +12,8 @@ from modules.auth import _restore_client
 from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp, get_today_ohlc
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, save_sr_alert, was_recently_alerted,
-                        get_setting, cleanup_old_alerts)
+                        get_setting, set_setting, cleanup_old_alerts,
+                        save_breach_alert, cleanup_old_breach_alerts)
 from modules.telegram import send_sr_alert, send_message
 
 # Module-level dict to track previous LTP per index for breach detection
@@ -123,17 +124,6 @@ In 80 words max: (1) Bias bullish/bearish/neutral + reason, (2) Key support leve
 
         now_str = datetime.now(_IST).strftime('%H:%M:%S')
         print(f'[SCHEDULER] SENSEX snapshot saved @ {now_str} | LTP={ltp} | PCR={pcr}')
-
-        # Send Telegram alert
-        direction = '▲' if change_abs >= 0 else '▼'
-        msg = (
-            f'📊 <b>SENSEX Snapshot — {now_str} IST</b>\n\n'
-            f'<b>LTP:</b> ₹{ltp:,.2f} {direction} {change_abs:+.0f} ({change_pct:+.2f}%)\n'
-            f'<b>Expiry:</b> {expiry_lbl}\n'
-            f'<b>PCR:</b> {pcr} | <b>Max Pain:</b> ₹{int(max_pain):,}\n\n'
-            f'<b>AI Summary:</b>\n{summary}'
-        )
-        send_message(msg)
 
     except Exception as e:
         print(f'[SCHEDULER] Error in run_sensex_snapshot: {e}')
@@ -323,6 +313,7 @@ def run_market_update():
 
     if len(lines) > 1:
         send_message('\n'.join(lines))
+        set_setting('market_update_last_sent', datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S'))
         print(f'[MARKET_UPDATE] Sent update for {len(lines)-1} indices @ {now_str}')
     else:
         print('[MARKET_UPDATE] No data to send')
@@ -382,6 +373,7 @@ def run_breach_monitor():
             for level in supports:
                 # Support breached: was above, now below
                 if prev > level and ltp < level:
+                    save_breach_alert(index_id, level, 'support', prev, ltp)
                     msg = (
                         f'🚨 <b>S/R Breach — {label}</b>\n\n'
                         f'<b>Support {int(level):,} BREACHED!</b>\n'
@@ -396,6 +388,7 @@ def run_breach_monitor():
             for level in resistances:
                 # Resistance breached: was below, now above
                 if prev < level and ltp > level:
+                    save_breach_alert(index_id, level, 'resistance', prev, ltp)
                     msg = (
                         f'🚨 <b>S/R Breach — {label}</b>\n\n'
                         f'<b>Resistance {int(level):,} BREACHED!</b>\n'
@@ -409,3 +402,5 @@ def run_breach_monitor():
 
         except Exception as e:
             print(f'[BREACH_MONITOR] Error for {idx.get("id","?")}: {e}')
+
+    cleanup_old_breach_alerts(days=30)
