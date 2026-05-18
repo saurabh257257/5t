@@ -55,11 +55,8 @@ def _restore_client():
             c.set_access_token(jwt)
         except Exception:
             pass
-        # Quick test — validate token by fetching SENSEX (BSE) + NIFTY (NSE)
-        result = c.fetch_market_feed([
-            {"Exch": "B", "ExchangeType": "C", "ScripCode": 999901},
-            {"Exch": "N", "ExchangeType": "C", "ScripCode": 999920},
-        ])
+        # Quick test — validate token using NIFTY (NSE always works)
+        result = c.fetch_market_feed([{"Exch": "N", "ExchangeType": "C", "ScripCode": 999920}])
         if result is not None:
             return c
     except Exception:
