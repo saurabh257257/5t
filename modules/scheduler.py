@@ -13,7 +13,7 @@ from modules.market import get_expiry_dates, get_option_chain_data, get_index_lt
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, save_sr_alert, was_recently_alerted,
                         get_setting, cleanup_old_alerts)
-from modules.telegram import send_sr_alert
+from modules.telegram import send_sr_alert, send_message
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -118,6 +118,17 @@ In 80 words max: (1) Bias bullish/bearish/neutral + reason, (2) Key support leve
 
         now_str = datetime.now(_IST).strftime('%H:%M:%S')
         print(f'[SCHEDULER] SENSEX snapshot saved @ {now_str} | LTP={ltp} | PCR={pcr}')
+
+        # Send Telegram alert
+        direction = '▲' if change_abs >= 0 else '▼'
+        msg = (
+            f'📊 <b>SENSEX Snapshot — {now_str} IST</b>\n\n'
+            f'<b>LTP:</b> ₹{ltp:,.2f} {direction} {change_abs:+.0f} ({change_pct:+.2f}%)\n'
+            f'<b>Expiry:</b> {expiry_lbl}\n'
+            f'<b>PCR:</b> {pcr} | <b>Max Pain:</b> ₹{int(max_pain):,}\n\n'
+            f'<b>AI Summary:</b>\n{summary}'
+        )
+        send_message(msg)
 
     except Exception as e:
         print(f'[SCHEDULER] Error in run_sensex_snapshot: {e}')
