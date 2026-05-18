@@ -167,7 +167,11 @@ def run_sr_monitor():
             {'id': 'NIFTY',  'feed_exch': 'N', 'feed_scrip': 999920},
         ]
 
+    enabled_ids = set(get_setting('sr_monitor_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY').split(','))
+
     for idx in all_indices:
+        if idx['id'] not in enabled_ids:
+            continue
         try:
             _check_sr_proximity(client, idx['id'], idx['feed_exch'],
                                 idx['feed_scrip'], threshold_pct)
@@ -241,25 +245,30 @@ def run_market_update():
         print('[MARKET_UPDATE] No saved session — skipping')
         return
 
-    all_indices = _load_indices_cfg()
-    now_str = datetime.now(_IST).strftime('%H:%M')
-    lines = [f'📈 <b>Market Update — {now_str} IST</b>']
+    all_indices  = _load_indices_cfg()
+    enabled_ids  = set(get_setting('market_update_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY').split(','))
+    now_str      = datetime.now(_IST).strftime('%H:%M')
+    lines        = [f'📈 <b>Market Update — {now_str} IST</b>']
 
     for idx in all_indices:
+        if idx['id'] not in enabled_ids:
+            continue
         try:
             index_id = idx['id']
             label    = idx.get('label', index_id)
 
-            # Fetch LTP + change%
+            # Fetch LTP + prev_close + change
             ltp_data   = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'))
             ltp        = ltp_data.get('ltp', 0)
+            prev_close = ltp_data.get('prev_close', 0)
+            change     = ltp_data.get('change', 0)
             change_pct = ltp_data.get('change_pct', 0)
             if ltp == 0:
                 print(f'[MARKET_UPDATE] {index_id} LTP=0, skipping')
                 continue
 
             direction = '▲' if change_pct >= 0 else '▼'
-            sign      = '+' if change_pct >= 0 else ''
+            sign      = '+' if change >= 0 else ''
 
             # Fetch today's OHLC using chart_exch / chart_scrip
             ohlc_line = ''
@@ -281,7 +290,7 @@ def run_market_update():
             try:
                 history = get_sr_history(index_id, limit=1)
                 if history:
-                    latest  = history[0]
+                    latest      = history[0]
                     supports    = [float(s['level']) for s in latest.get('supports', [])]
                     resistances = [float(r['level']) for r in latest.get('resistances', [])]
                     # Nearest support BELOW ltp
@@ -289,24 +298,24 @@ def run_market_update():
                     if below_sups:
                         nearest_sup = max(below_sups)
                         sup_dist    = abs(ltp - nearest_sup) / nearest_sup * 100
-                        sup_line    = f'🛡️ Support: {int(nearest_sup):,} ({sup_dist:.2f}% away)'
+                        sup_line    = f'🛡️ S: {int(nearest_sup):,} ({sup_dist:.2f}% away)'
                     # Nearest resistance ABOVE ltp
                     above_res = [r for r in resistances if r > ltp]
                     if above_res:
                         nearest_res = min(above_res)
                         res_dist    = abs(nearest_res - ltp) / nearest_res * 100
-                        res_line    = f'🚧 Resist:  {int(nearest_res):,} ({res_dist:.2f}% away)'
+                        res_line    = f'🚧 R: {int(nearest_res):,} ({res_dist:.2f}% away)'
             except Exception as sre:
                 print(f'[MARKET_UPDATE] {index_id} S/R error: {sre}')
 
             # Build block for this index
-            block = f'\n<b>{label}</b>: ₹{ltp:,.2f} {direction}{sign}{change_pct:.2f}%'
+            block = f'\n<b>{label}</b>: ₹{ltp:,.2f} {direction} {sign}{change:.0f} ({sign}{change_pct:.2f}%)'
+            if prev_close > 0:
+                block += f'\nPrev close: ₹{prev_close:,.2f}'
             if ohlc_line:
                 block += f'\n{ohlc_line}'
-            if sup_line:
-                block += f'\n{sup_line}'
-            if res_line:
-                block += f'\n{res_line}'
+            if sup_line or res_line:
+                block += f'\n{sup_line}  {res_line}'.rstrip()
             lines.append(block)
 
         except Exception as e:
@@ -339,8 +348,11 @@ def run_breach_monitor():
         return
 
     all_indices = _load_indices_cfg()
+    enabled_ids = set(get_setting('breach_monitor_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY').split(','))
 
     for idx in all_indices:
+        if idx['id'] not in enabled_ids:
+            continue
         try:
             index_id = idx['id']
             label    = idx.get('label', index_id)
