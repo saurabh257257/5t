@@ -812,7 +812,7 @@ header {
         </div>
         <div class="buy-detail-row">
           <span class="buy-detail-label">Order Type</span>
-          <span class="buy-detail-val" style="color:#fbbf24">Market (Intraday)</span>
+          <span class="buy-detail-val" style="color:#fbbf24">Limit @ LTP+2% (Intraday)</span>
         </div>
       </div>
       <div class="buy-inp-row">
@@ -1785,7 +1785,7 @@ document.getElementById('chartModal').addEventListener('click', e => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // State for the buy modal
-let _buyScripCode = 0, _buyLotSize = 1, _buyExch = 'N';
+let _buyScripCode = 0, _buyLotSize = 1, _buyExch = 'N', _buyLtp = 0;
 
 function applyITMHighlight() {
   if (!chainData || !chainData.length) return;
@@ -1808,6 +1808,7 @@ function openBuyModal(scrip, side, strike, ltpVal, exch, lotSize) {
   _buyScripCode = scrip;
   _buyLotSize   = lotSize || 1;
   _buyExch      = exch || 'N';
+  _buyLtp       = ltpVal || 0;
 
   document.getElementById('buyModalTitle').textContent =
     `🛒 Buy ${currentIndex} ${strike} ${side}`;
@@ -1850,6 +1851,7 @@ async function confirmBuy() {
         scrip_code: _buyScripCode,
         exch:       _buyExch,
         qty:        qty,
+        ltp:        _buyLtp,
       }),
     });
     const d = await resp.json();

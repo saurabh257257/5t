@@ -944,13 +944,17 @@ def api_place_order():
         return jsonify({'error': 'scrip_code and qty are required'}), 400
     try:
         exch_type = 'D'   # Derivatives
+        # 5paisa requires a LIMIT price for derivative orders (market orders rejected).
+        # Use LTP + 2% as limit price so the buy fills immediately at market.
+        ltp   = float(body.get('ltp', 0))
+        price = round(ltp * 1.02, 2) if ltp > 0 else 0
         result = client.place_order(
             OrderType    = 'B',
             Exchange     = exch,
             ExchangeType = exch_type,
             ScripCode    = scrip_code,
             Qty          = qty,
-            Price        = 0,
+            Price        = price,
             IsIntraday   = True,
             StopLossPrice = 0,
             IsIOCOrder   = False,
