@@ -255,8 +255,12 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
     Returns {candles:[{time(unix_sec), open, high, low, close, volume}], interval_used, count}
     """
     from datetime import timedelta as _td, datetime as _dt
-    today     = _date.today().strftime('%Y-%m-%d')
-    from_date = (_date.today() - _td(days=days)).strftime('%Y-%m-%d')
+    # Use last trading day as to_date (skip weekends)
+    last_trading = _date.today()
+    while last_trading.weekday() >= 5:   # 5=Sat, 6=Sun
+        last_trading -= _td(days=1)
+    today     = last_trading.strftime('%Y-%m-%d')
+    from_date = (last_trading - _td(days=days)).strftime('%Y-%m-%d')
 
     fallbacks = {'4h': ['4h', '1h', '1d'], '1h': ['1h', '1d'], '1d': ['1d']}
     ivl_list  = fallbacks.get(interval, ['4h', '1h', '1d'])
