@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture — Options Dashboard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
+
+header {
+  background: #1a1830; border-bottom: 1px solid #2d2b4e;
+  padding: 0 24px; display: flex; align-items: center;
+  justify-content: space-between; height: 56px;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 1em; font-weight: 700; color: #a78bfa; }
+.nav { display: flex; gap: 6px; }
+.nav a {
+  padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600;
+  text-decoration: none; color: #94a3b8; border: 1px solid transparent; transition: all 0.15s;
+}
+.nav a:hover { background: #2d2b4e; color: #e2e8f0; }
+.nav a.active { background: #2d2b4e; color: #a78bfa; border-color: #4c3f8a; }
+
+.page { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+
+.page-title {
+  font-size: 1.25em; font-weight: 800; color: #e2e8f0;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+}
+.page-sub { font-size: 0.83em; color: #6b7280; margin-bottom: 28px; }
+
+/* ── Row layouts ─────────────────────────────────────────────────────────────── */
+.arch-row { display: flex; gap: 16px; margin-bottom: 16px; align-items: stretch; flex-wrap: wrap; }
+.arch-row.center { justify-content: center; }
+.arch-row.three  > * { flex: 1; min-width: 220px; }
+.arch-row.four   > * { flex: 1; min-width: 180px; }
+.arch-row.five   > * { flex: 1; min-width: 160px; }
+
+/* ── Base card ───────────────────────────────────────────────────────────────── */
+.card {
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
+  padding: 18px 20px; position: relative; transition: border-color 0.2s;
+}
+.card:hover { border-color: #4c3f8a; }
+.card-icon { font-size: 1.6em; margin-bottom: 10px; }
+.card-title {
+  font-size: 0.88em; font-weight: 800; color: #e2e8f0;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 7px;
+}
+.card-title .badge {
+  font-size: 0.65em; padding: 2px 7px; border-radius: 10px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.card-sub { font-size: 0.76em; color: #6b7280; line-height: 1.55; }
+.card-items { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 0.78em; color: #94a3b8; line-height: 1.4;
+}
+.item-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.item code {
+  font-family: 'Consolas', monospace; font-size: 0.88em;
+  color: #a78bfa; background: #12111f; padding: 1px 5px; border-radius: 4px;
+}
+
+/* colour themes */
+.card.purple  { border-color: #4c3f8a; background: linear-gradient(135deg, #1e1c45 0%, #1a1830 60%); }
+.card.green   { border-color: #065f46; background: linear-gradient(135deg, #064e3b 0%, #1a1830 60%); }
+.card.blue    { border-color: #1e3a5f; background: linear-gradient(135deg, #1e3a5f 0%, #1a1830 60%); }
+.card.amber   { border-color: #78350f; background: linear-gradient(135deg, #451a03 0%, #1a1830 60%); }
+.card.red     { border-color: #7f1d1d; background: linear-gradient(135deg, #450a0a 0%, #1a1830 60%); }
+.card.teal    { border-color: #134e4a; background: linear-gradient(135deg, #0f3e3a 0%, #1a1830 60%); }
+.card.slate   { border-color: #374151; background: linear-gradient(135deg, #1f2937 0%, #1a1830 60%); }
+
+.badge.purple  { background: #4c3f8a; color: #c4b5fd; }
+.badge.green   { background: #065f46; color: #6ee7b7; }
+.badge.blue    { background: #1e3a5f; color: #93c5fd; }
+.badge.amber   { background: #78350f; color: #fcd34d; }
+.badge.red     { background: #7f1d1d; color: #fca5a5; }
+.badge.teal    { background: #134e4a; color: #5eead4; }
+.badge.slate   { background: #374151; color: #9ca3af; }
+.item-dot.purple { background: #7c3aed; }
+.item-dot.green  { background: #10b981; }
+.item-dot.blue   { background: #3b82f6; }
+.item-dot.amber  { background: #f59e0b; }
+.item-dot.red    { background: #f87171; }
+.item-dot.teal   { background: #14b8a6; }
+.item-dot.slate  { background: #6b7280; }
+
+/* ── Section labels ──────────────────────────────────────────────────────────── */
+.section-label {
+  font-size: 0.72em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: #4b5563; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-label::before, .section-label::after {
+  content: ''; flex: 1; height: 1px; background: #1e1c35;
+}
+
+/* ── Arrows ──────────────────────────────────────────────────────────────────── */
+.arrow-row {
+  display: flex; justify-content: center; align-items: center; gap: 0;
+  margin: 4px 0; font-size: 1em; color: #2d2b4e;
+}
+.arrow-down { text-align: center; font-size: 1.5em; color: #2d2b4e; margin: 2px 0; line-height: 1; }
+.arrows-horiz {
+  display: flex; justify-content: space-around; margin: 6px 0;
+}
+.arrows-horiz span { color: #2d2b4e; font-size: 0.9em; }
+
+/* ── Flow diagram (center big card) ─────────────────────────────────────────── */
+.flow-center {
+  background: linear-gradient(135deg, #1e1c45 0%, #1a1830 60%);
+  border: 2px solid #4c3f8a; border-radius: 16px;
+  padding: 20px 28px; flex: 2; min-width: 300px;
+}
+.flow-center .card-title { font-size: 1em; }
+
+/* ── DB table grid ───────────────────────────────────────────────────────────── */
+.db-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;
+}
+.db-tbl {
+  background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px;
+  padding: 8px 12px;
+}
+.db-tbl-name { font-size: 0.78em; font-weight: 700; color: #a78bfa; font-family: 'Consolas', monospace; }
+.db-tbl-cols { font-size: 0.68em; color: #6b7280; margin-top: 3px; line-height: 1.5; }
+
+/* ── Routes table ────────────────────────────────────────────────────────────── */
+.routes-wrap { overflow-x: auto; }
+.routes-tbl { width: 100%; border-collapse: collapse; font-size: 0.78em; }
+.routes-tbl th {
+  text-align: left; padding: 7px 12px; background: #12111f;
+  border-bottom: 1px solid #2d2b4e; font-size: 0.72em; text-transform: uppercase;
+  letter-spacing: 0.5px; color: #6b7280; white-space: nowrap;
+}
+.routes-tbl td { padding: 6px 12px; border-bottom: 1px solid #1e1c35; color: #94a3b8; }
+.routes-tbl tr:last-child td { border-bottom: none; }
+.routes-tbl code {
+  font-family: 'Consolas', monospace; color: #a78bfa;
+  background: #12111f; padding: 1px 5px; border-radius: 3px; font-size: 0.9em;
+}
+.method { font-size: 0.72em; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.get  { background: #1e3a5f; color: #93c5fd; }
+.post { background: #064e3b; color: #6ee7b7; }
+.del  { background: #450a0a; color: #fca5a5; }
+
+/* ── Job cards ───────────────────────────────────────────────────────────────── */
+.job-card {
+  background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px;
+  padding: 8px 12px; margin-top: 8px;
+}
+.job-name { font-size: 0.8em; font-weight: 700; color: #fbbf24; }
+.job-desc { font-size: 0.73em; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+
+/* ── Stack legend ────────────────────────────────────────────────────────────── */
+.legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 12px;
+  padding: 14px 20px; margin-bottom: 28px;
+}
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.78em; color: #94a3b8; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ Options Dashboard</div>
+  <nav class="nav">
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/sql">🗄️ DB Browser</a>
+    <a href="/architecture" class="active">🏗️ Architecture</a>
+    <a href="/logout" style="color:#fca5a5">↩ Logout</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <div class="page-title">🏗️ App Architecture</div>
+  <div class="page-sub">Full system map — frontend, backend, modules, external APIs, background jobs and database</div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>Flask / Core</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Market Data</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>AI / Anthropic</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Scheduler</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Auth / Session</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#14b8a6"></div>Telegram</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div>SQLite DB</div>
+  </div>
+
+  <!-- ── LAYER 1: User ─────────────────────────────────────────────────────── -->
+  <div class="section-label">Browser / Client</div>
+  <div class="arch-row center">
+    <div class="card purple" style="max-width:520px;width:100%">
+      <div class="card-title">🖥️ Frontend — dashboard.html <span class="badge purple">Vanilla JS</span></div>
+      <div class="card-sub">Single-page app served by Flask. No bundler — pure HTML/CSS/JS.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot purple"></div>Index ticker (LTP, OHLC, prev-close) — auto-refreshes every 5s</div>
+        <div class="item"><div class="item-dot purple"></div>Option chain table with ITM highlight + 🛒 Buy button</div>
+        <div class="item"><div class="item-dot blue"></div>Claude AI chain analysis — per-strike &amp; full chain summary</div>
+        <div class="item"><div class="item-dot purple"></div>S/R Overview panel — nearest support/resistance for all 4 indices</div>
+        <div class="item"><div class="item-dot amber"></div>Monitor config cards — S/R Proximity, Market Update, Breach Monitor</div>
+        <div class="item"><div class="item-dot slate"></div>Lightweight Charts candlestick chart with S/R overlays</div>
+        <div class="item"><div class="item-dot purple"></div>Inline alert logs (S/R, Market Update, Breach) per card</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-down">↕</div>
+
+  <!-- ── LAYER 2: Flask app ─────────────────────────────────────────────────── -->
+  <div class="section-label">Flask Application — app.py</div>
+  <div class="arch-row">
+
+    <div class="card red" style="flex:1;min-width:200px">
+      <div class="card-title">🔐 Auth <span class="badge red">OAuth</span></div>
+      <div class="card-sub">PIN gate + 5paisa OAuth2 flow. Session persisted to <code>.5paisa_session.json</code> so server restarts stay logged in.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot red"></div><code>GET /</code> PIN form</div>
+        <div class="item"><div class="item-dot red"></div><code>POST /verify-pin</code></div>
+        <div class="item"><div class="item-dot red"></div><code>GET /callback</code> OAuth</div>
+        <div class="item"><div class="item-dot red"></div><code>GET /logout</code></div>
+      </div>
+    </div>
+
+    <div class="card green" style="flex:2;min-width:260px">
+      <div class="card-title">📈 Market API Routes <span class="badge green">GET</span></div>
+      <div class="card-sub">Live feed + historical data from 5paisa. All routes require auth.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot green"></div><code>/api/index-ltp</code> — LTP + prev-close (chart scrip)</div>
+        <div class="item"><div class="item-dot green"></div><code>/api/today-ohlc</code> — Open / High / Low for today</div>
+        <div class="item"><div class="item-dot green"></div><code>/api/option-chain</code> — Full chain for index + expiry</div>
+        <div class="item"><div class="item-dot green"></div><code>/api/expiry</code> — Available expiry dates</div>
+        <div class="item"><div class="item-dot green"></div><code>/api/chart-data</code> — OHLCV candles for chart</div>
+        <div class="item"><div class="item-dot green"></div><code>/api/place-order</code> — Intraday limit buy order</div>
+      </div>
+    </div>
+
+    <div class="card blue" style="flex:2;min-width:260px">
+      <div class="card-title">🤖 AI Analysis Routes <span class="badge blue">Claude</span></div>
+      <div class="card-sub">Calls Anthropic Claude API. Uses <code>claude-haiku-4-5</code> for fast responses.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot blue"></div><code>/api/analyze-chain</code> — Full chain market summary (PCR, max-pain, bias)</div>
+        <div class="item"><div class="item-dot blue"></div><code>/api/analyze</code> — Per-strike CE/PE historical analysis</div>
+        <div class="item"><div class="item-dot blue"></div><code>/api/analyze-sr</code> — 1-year daily candles → S/R levels as JSON</div>
+        <div class="item"><div class="item-dot blue"></div>Auto-saves every analysis result to <code>chain_analysis</code> DB table</div>
+      </div>
+    </div>
+
+    <div class="card slate" style="flex:1;min-width:200px">
+      <div class="card-title">💾 DB / Config Routes <span class="badge slate">CRUD</span></div>
+      <div class="card-sub">Settings, saved S/R, alert logs.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot slate"></div><code>/api/monitor/config</code> GET + POST</div>
+        <div class="item"><div class="item-dot slate"></div><code>/api/market-update/config</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>/api/breach-monitor/config</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>/api/sr-levels-summary</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>/api/breach-alerts</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>/api/sr-alerts</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>/sql</code> &amp; <code>/architecture</code></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="arrow-down">↕</div>
+
+  <!-- ── LAYER 3: Modules ───────────────────────────────────────────────────── -->
+  <div class="section-label">Python Modules — modules/</div>
+  <div class="arch-row five">
+
+    <div class="card green">
+      <div class="card-title">📊 market.py <span class="badge green">Data</span></div>
+      <div class="card-sub">All market data fetching from 5paisa SDK.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot green"></div><code>get_index_ltp()</code> — live feed + prev-close</div>
+        <div class="item"><div class="item-dot green"></div><code>_fetch_prev_day_close()</code> — walks last 12 days, skips today</div>
+        <div class="item"><div class="item-dot green"></div><code>get_today_ohlc()</code> — intraday chart</div>
+        <div class="item"><div class="item-dot green"></div><code>get_option_chain_data()</code> — all strikes</div>
+        <div class="item"><div class="item-dot green"></div><code>get_chart_data()</code> — multi-day candles</div>
+      </div>
+    </div>
+
+    <div class="card amber">
+      <div class="card-title">⏰ scheduler.py <span class="badge amber">Jobs</span></div>
+      <div class="card-sub">APScheduler background jobs running server-side.</div>
+      <div class="job-card">
+        <div class="job-name">sensex_snapshot</div>
+        <div class="job-desc">Every 1 min — saves chain snapshot silently to DB</div>
+      </div>
+      <div class="job-card">
+        <div class="job-name">sr_monitor</div>
+        <div class="job-desc">Configurable freq — checks LTP vs saved S/R levels, Telegram alert if within threshold%</div>
+      </div>
+      <div class="job-card">
+        <div class="job-name">market_update</div>
+        <div class="job-desc">Configurable freq — sends multi-index LTP/change summary to Telegram</div>
+      </div>
+      <div class="job-card">
+        <div class="job-name">breach_monitor</div>
+        <div class="job-desc">Configurable freq — detects S/R level breaches, saves + Telegram alert</div>
+      </div>
+    </div>
+
+    <div class="card slate">
+      <div class="card-title">🗄️ db.py <span class="badge slate">SQLite</span></div>
+      <div class="card-sub">All SQLite reads/writes. Single <code>dashboard.db</code> file.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot slate"></div><code>save_sr / get_sr_history</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>save_snapshot / get_snapshots</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>save_chain_analysis</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>save_sr_alert / was_recently_alerted</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>save_breach_alert</code></div>
+        <div class="item"><div class="item-dot slate"></div><code>get_setting / set_setting</code></div>
+      </div>
+    </div>
+
+    <div class="card red">
+      <div class="card-title">🔑 auth.py <span class="badge red">Auth</span></div>
+      <div class="card-sub">5paisa session lifecycle.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot red"></div>OAuth callback processing</div>
+        <div class="item"><div class="item-dot red"></div>JWT session persistence to disk</div>
+        <div class="item"><div class="item-dot red"></div><code>try_restore_session()</code> — restores after server restart</div>
+        <div class="item"><div class="item-dot red"></div><code>authenticated_clients</code> dict — in-memory client map</div>
+      </div>
+    </div>
+
+    <div class="card teal">
+      <div class="card-title">📨 telegram.py <span class="badge teal">Notify</span></div>
+      <div class="card-sub">Outbound Telegram Bot notifications.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot teal"></div><code>send_message(text)</code> — posts to configured chat ID via Bot API</div>
+        <div class="item"><div class="item-dot teal"></div>Called by all 3 scheduler jobs for alerts</div>
+        <div class="item"><div class="item-dot teal"></div>Uses <code>TELEGRAM_TOKEN</code> + <code>TELEGRAM_CHAT_ID</code> from <code>.env</code></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="arrow-down">↕</div>
+
+  <!-- ── LAYER 4: External ──────────────────────────────────────────────────── -->
+  <div class="section-label">External Services</div>
+  <div class="arch-row three">
+
+    <div class="card green">
+      <div class="card-title">📡 5paisa API <span class="badge green">Broker</span></div>
+      <div class="card-sub">Official <code>py5paisa</code> SDK. Authenticated per-session with OAuth JWT.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot green"></div><code>fetch_market_feed()</code> — live LTP via WebSocket feed</div>
+        <div class="item"><div class="item-dot green"></div><code>historical_data()</code> — OHLCV candles (1d, 15m, 4h…)</div>
+        <div class="item"><div class="item-dot green"></div><code>get_expiry()</code> — option expiry dates</div>
+        <div class="item"><div class="item-dot green"></div><code>option_chain()</code> — full chain CE+PE data</div>
+        <div class="item"><div class="item-dot green"></div><code>place_order()</code> — limit intraday buy order</div>
+        <div class="item"><div class="item-dot amber"></div>Scrip code split: <code>feed_scrip</code> (live) vs <code>chart_scrip</code> (historical)</div>
+      </div>
+    </div>
+
+    <div class="card blue">
+      <div class="card-title">🤖 Anthropic API <span class="badge blue">AI</span></div>
+      <div class="card-sub">Claude AI for market analysis. API key via <code>ANTHROPIC_API_KEY</code> in <code>.env</code>.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot blue"></div>Model: <code>claude-haiku-4-5</code> (fast &amp; cost-efficient)</div>
+        <div class="item"><div class="item-dot blue"></div>Option chain summary — PCR, max pain, bias, watch levels</div>
+        <div class="item"><div class="item-dot blue"></div>Per-strike CE/PE 15m candle analysis</div>
+        <div class="item"><div class="item-dot blue"></div>S/R level detection from 1-year daily OHLC — returns JSON</div>
+        <div class="item"><div class="item-dot blue"></div>Scheduler jobs use Claude for Telegram market summaries</div>
+      </div>
+    </div>
+
+    <div class="card teal">
+      <div class="card-title">📱 Telegram Bot <span class="badge teal">Alerts</span></div>
+      <div class="card-sub">Push notifications to a Telegram chat. No user interaction — outbound only.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot teal"></div>S/R proximity alert — "NIFTY within 0.25% of resistance 25000"</div>
+        <div class="item"><div class="item-dot teal"></div>Level breach alert — "SENSEX breached support 75000 ↓"</div>
+        <div class="item"><div class="item-dot teal"></div>Market update — multi-index LTP / change / AI summary</div>
+        <div class="item"><div class="item-dot teal"></div>Dedup: <code>was_recently_alerted()</code> blocks repeat alerts within 30 min</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="arrow-down">↕</div>
+
+  <!-- ── LAYER 5: DB ────────────────────────────────────────────────────────── -->
+  <div class="section-label">SQLite Database — dashboard.db</div>
+  <div class="arch-row">
+    <div class="card slate" style="flex:1">
+      <div class="card-title">🗄️ Tables</div>
+      <div class="db-grid">
+        <div class="db-tbl">
+          <div class="db-tbl-name">sr_levels</div>
+          <div class="db-tbl-cols">id · index_id · saved_at · ltp<br>supports · resistances · valid_today · verdict</div>
+        </div>
+        <div class="db-tbl">
+          <div class="db-tbl-name">chain_snapshots</div>
+          <div class="db-tbl-cols">id · index_id · expiry_label · ltp · prev_close<br>change_abs · change_pct · pcr · max_pain · summary · saved_at</div>
+        </div>
+        <div class="db-tbl">
+          <div class="db-tbl-name">chain_analysis</div>
+          <div class="db-tbl-cols">id · index_id · expiry_label · date · time<br>ltp · pcr · max_pain · analysis · saved_at</div>
+        </div>
+        <div class="db-tbl">
+          <div class="db-tbl-name">sr_alerts</div>
+          <div class="db-tbl-cols">id · index_id · level · level_type<br>ltp · distance_pct · alerted_at</div>
+        </div>
+        <div class="db-tbl">
+          <div class="db-tbl-name">breach_alerts</div>
+          <div class="db-tbl-cols">id · index_id · level · level_type<br>prev_ltp · ltp · alerted_at</div>
+        </div>
+        <div class="db-tbl">
+          <div class="db-tbl-name">settings</div>
+          <div class="db-tbl-cols">key · value<br><span style="color:#4b5563;font-size:0.85em">All job config stored here as key-value pairs</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Config / Env ───────────────────────────────────────────────────────── -->
+  <div class="section-label" style="margin-top:16px">Config Files</div>
+  <div class="arch-row four">
+    <div class="card slate">
+      <div class="card-title">📄 .env</div>
+      <div class="card-sub">Secret keys — never committed to Git.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot red"></div><code>SECRET_KEY</code> Flask session secret</div>
+        <div class="item"><div class="item-dot green"></div><code>APP_PIN</code> dashboard PIN</div>
+        <div class="item"><div class="item-dot blue"></div><code>ANTHROPIC_API_KEY</code></div>
+        <div class="item"><div class="item-dot teal"></div><code>TELEGRAM_TOKEN</code> + <code>TELEGRAM_CHAT_ID</code></div>
+        <div class="item"><div class="item-dot green"></div>5paisa credentials (APP_KEY, APP_SECRET…)</div>
+      </div>
+    </div>
+    <div class="card slate">
+      <div class="card-title">📄 indices.json</div>
+      <div class="card-sub">Per-index scrip configuration.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot purple"></div>SENSEX / NIFTY / BANKNIFTY / FINNIFTY</div>
+        <div class="item"><div class="item-dot green"></div><code>feed_scrip</code> — live feed scrip code</div>
+        <div class="item"><div class="item-dot green"></div><code>chart_scrip</code> — historical API scrip code</div>
+        <div class="item"><div class="item-dot amber"></div><code>opt_exch</code> + <code>opt_symbol</code> — options chain key</div>
+      </div>
+    </div>
+    <div class="card slate">
+      <div class="card-title">📄 components.json</div>
+      <div class="card-sub">Index constituent stocks for heatmap.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot green"></div>Scrip codes for each component stock</div>
+        <div class="item"><div class="item-dot green"></div>Used by <code>get_components_ltp()</code></div>
+      </div>
+    </div>
+    <div class="card slate">
+      <div class="card-title">📄 dashboard.db</div>
+      <div class="card-sub">SQLite database file — auto-created on first run.</div>
+      <div class="card-items">
+        <div class="item"><div class="item-dot slate"></div>Initialised by <code>init_db()</code> in <code>db.py</code></div>
+        <div class="item"><div class="item-dot slate"></div>Default settings seeded on first run</div>
+        <div class="item"><div class="item-dot slate"></div>Cleanup jobs purge old alerts after 30 days, snapshots after 7 days</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;padding:14px 18px;background:#1a1830;border:1px solid #2d2b4e;border-radius:10px;font-size:0.75em;color:#4b5563;text-align:center">
+    Flask · Python · SQLite · py5paisa · Anthropic Claude API · APScheduler · Telegram Bot API · Lightweight Charts
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Browser — Options Dashboard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0e17; color: #e2e8f0; min-height: 100vh; }
+
+/* Header */
+header {
+  background: #1a1830; border-bottom: 1px solid #2d2b4e;
+  padding: 0 24px; display: flex; align-items: center;
+  justify-content: space-between; height: 56px;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 1em; font-weight: 700; color: #a78bfa; }
+.nav { display: flex; gap: 6px; }
+.nav a {
+  padding: 6px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600;
+  text-decoration: none; color: #94a3b8; border: 1px solid transparent; transition: all 0.15s;
+}
+.nav a:hover { background: #2d2b4e; color: #e2e8f0; }
+.nav a.active { background: #2d2b4e; color: #a78bfa; border-color: #4c3f8a; }
+
+/* Layout */
+.page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+/* Toolbar */
+.toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 12px;
+  padding: 14px 20px; margin-bottom: 18px;
+}
+.toolbar-title { font-size: 0.88em; font-weight: 700; color: #a78bfa; display: flex; align-items: center; gap: 7px; }
+.sep { width: 1px; height: 24px; background: #2d2b4e; }
+.db-select {
+  padding: 8px 14px; background: #12111f; border: 1px solid #4c3f8a;
+  border-radius: 8px; color: #a78bfa; font-size: 0.88em; font-weight: 700;
+  outline: none; cursor: pointer; min-width: 200px;
+}
+.db-select:focus { border-color: #7c3aed; }
+.count-badge {
+  padding: 4px 10px; border-radius: 20px; font-size: 0.75em; font-weight: 700;
+  background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a;
+}
+.btn {
+  padding: 7px 16px; border-radius: 8px; font-size: 0.82em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent;
+  color: #94a3b8; transition: all 0.15s;
+}
+.btn:hover { border-color: #7c3aed; color: #a78bfa; background: #1e1c45; }
+.btn-danger { border-color: #7f1d1d; color: #fca5a5; background: #450a0a; }
+.btn-danger:hover { background: #7f1d1d; }
+.ml-auto { margin-left: auto; }
+
+/* Search */
+.search-inp {
+  padding: 7px 12px; background: #12111f; border: 1px solid #2d2b4e;
+  border-radius: 8px; color: #e2e8f0; font-size: 0.83em; outline: none; width: 200px;
+}
+.search-inp:focus { border-color: #7c3aed; }
+
+/* Stats bar */
+.stats-bar {
+  display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.stat-chip {
+  padding: 6px 14px; background: #1a1830; border: 1px solid #2d2b4e;
+  border-radius: 8px; font-size: 0.78em; color: #6b7280;
+}
+.stat-chip span { color: #e2e8f0; font-weight: 700; }
+
+/* Table */
+.table-wrap {
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 12px;
+  overflow: hidden;
+}
+.table-scroll { overflow-x: auto; max-height: calc(100vh - 280px); overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+thead { position: sticky; top: 0; z-index: 10; }
+thead th {
+  background: #12111f; padding: 10px 14px; text-align: left;
+  font-size: 0.75em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: #6b7280; border-bottom: 1px solid #2d2b4e;
+  white-space: nowrap;
+}
+thead th.col-id { color: #4c3f8a; width: 52px; }
+tbody tr { border-bottom: 1px solid #1e1c35; transition: background 0.1s; }
+tbody tr:hover { background: #1e1c35; }
+tbody td {
+  padding: 9px 14px; vertical-align: top; color: #cbd5e1;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+tbody td.expand { white-space: normal; word-break: break-word; max-width: 480px; font-size: 0.9em; }
+tbody td.col-id { color: #6b7280; font-size: 0.78em; }
+tbody td.num { color: #a78bfa; font-weight: 700; }
+tbody td.ts { color: #6b7280; font-size: 0.78em; white-space: nowrap; }
+.cell-json {
+  background: #0f0e17; border: 1px solid #2d2b4e; border-radius: 5px;
+  padding: 4px 8px; font-size: 0.78em; color: #94a3b8;
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: inline-block; cursor: pointer; vertical-align: middle;
+}
+.cell-json:hover { border-color: #7c3aed; color: #a78bfa; }
+.del-btn {
+  padding: 3px 10px; border-radius: 5px; font-size: 0.75em; font-weight: 600;
+  cursor: pointer; border: 1px solid #4b5563; background: transparent; color: #6b7280;
+  transition: all 0.15s;
+}
+.del-btn:hover { border-color: #7f1d1d; color: #fca5a5; background: #450a0a; }
+
+/* Empty / loading */
+.state-row td { text-align: center; padding: 48px !important; color: #4b5563; font-size: 0.88em; }
+.spinner {
+  display: inline-block; width: 22px; height: 22px;
+  border: 3px solid #2d2b4e; border-top-color: #7c3aed;
+  border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Pagination */
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-top: 1px solid #2d2b4e; background: #12111f;
+  font-size: 0.8em; color: #6b7280;
+}
+.pg-btns { display: flex; gap: 6px; }
+.pg-btn {
+  padding: 4px 12px; border-radius: 6px; font-size: 0.82em; font-weight: 600;
+  cursor: pointer; border: 1px solid #2d2b4e; background: transparent;
+  color: #94a3b8; transition: all 0.15s;
+}
+.pg-btn:hover:not(:disabled) { border-color: #7c3aed; color: #a78bfa; }
+.pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.pg-btn.active { background: #2d2b4e; color: #a78bfa; border-color: #4c3f8a; }
+
+/* Modal for JSON/long text */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200;
+  display: none; align-items: center; justify-content: center; padding: 24px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #1a1830; border: 1px solid #4c3f8a; border-radius: 14px;
+  max-width: 760px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+}
+.modal-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid #2d2b4e;
+}
+.modal-title { font-size: 0.9em; font-weight: 700; color: #a78bfa; }
+.modal-close {
+  padding: 4px 10px; border-radius: 6px; font-size: 0.82em; font-weight: 700;
+  cursor: pointer; border: 1px solid #4b5563; background: transparent; color: #94a3b8;
+}
+.modal-close:hover { border-color: #7c3aed; color: #a78bfa; }
+.modal-bd { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.modal-pre {
+  background: #0f0e17; border: 1px solid #2d2b4e; border-radius: 8px;
+  padding: 14px; font-size: 0.8em; color: #94a3b8; white-space: pre-wrap;
+  word-break: break-word; line-height: 1.6; font-family: 'Consolas', monospace;
+}
+
+/* Confirm overlay */
+.confirm-bar {
+  display: none; align-items: center; gap: 12px;
+  background: #450a0a; border: 1px solid #7f1d1d; border-radius: 8px;
+  padding: 10px 16px; margin-bottom: 14px;
+}
+.confirm-bar.show { display: flex; }
+.confirm-bar span { font-size: 0.85em; color: #fca5a5; flex: 1; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 300;
+  padding: 10px 18px; border-radius: 9px; font-size: 0.85em; font-weight: 600;
+  border: 1px solid; opacity: 0; transform: translateY(8px);
+  transition: all 0.25s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.ok  { background: rgba(52,211,153,0.15); border-color: #10b981; color: #34d399; }
+.toast.err { background: rgba(248,113,113,0.15); border-color: #f87171; color: #f87171; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ Options Dashboard</div>
+  <nav class="nav">
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/sql" class="active">🗄️ DB Browser</a>
+    <a href="/architecture">🏗️ Architecture</a>
+    <a href="/logout" style="color:#fca5a5">↩ Logout</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-title">🗄️ DB Browser</div>
+    <div class="sep"></div>
+    <select class="db-select" id="tableSelect" onchange="selectTable()">
+      <option value="">— Select table —</option>
+    </select>
+    <span class="count-badge" id="countBadge" style="display:none"></span>
+    <div class="sep" id="sepSearch" style="display:none"></div>
+    <input type="text" class="search-inp" id="searchInp" placeholder="Filter rows…"
+           oninput="applyFilter()" style="display:none">
+    <button class="btn ml-auto" id="btnRefresh" onclick="refresh()" style="display:none">↻ Refresh</button>
+    <button class="btn btn-danger" id="btnClear" onclick="confirmClear()" style="display:none">🗑 Clear Table</button>
+  </div>
+
+  <!-- Confirm clear bar -->
+  <div class="confirm-bar" id="confirmBar">
+    <span>⚠ Delete ALL rows from this table? This cannot be undone.</span>
+    <button class="btn btn-danger" onclick="doClear()">Yes, delete all</button>
+    <button class="btn" onclick="cancelClear()">Cancel</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar" style="display:none">
+    <div class="stat-chip">Table <span id="statTable">—</span></div>
+    <div class="stat-chip">Total rows <span id="statTotal">—</span></div>
+    <div class="stat-chip">Showing <span id="statShowing">—</span></div>
+    <div class="stat-chip">Page <span id="statPage">—</span></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" id="tableWrap" style="display:none">
+    <div class="table-scroll">
+      <table>
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pgBar">
+      <span id="pgInfo"></span>
+      <div class="pg-btns" id="pgBtns"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- JSON viewer modal -->
+<div class="modal-overlay" id="jsonModal">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-title" id="jsonModalTitle">Cell value</span>
+      <button class="modal-close" onclick="closeJsonModal()">✕ Close</button>
+    </div>
+    <div class="modal-bd">
+      <pre class="modal-pre" id="jsonModalPre"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const PAGE_SIZE  = 50;
+let allTables    = [];
+let allRows      = [];   // current table full data
+let filtered     = [];   // after search filter
+let currentTable = '';
+let currentPage  = 1;
+let totalRows    = 0;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function get(url) {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch (e) { return { error: e.message }; }
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function showCell(title, val) {
+  let text = val;
+  try { text = JSON.stringify(JSON.parse(val), null, 2); } catch (_) {}
+  document.getElementById('jsonModalTitle').textContent = title;
+  document.getElementById('jsonModalPre').textContent = text;
+  document.getElementById('jsonModal').classList.add('open');
+}
+function closeJsonModal() {
+  document.getElementById('jsonModal').classList.remove('open');
+}
+document.getElementById('jsonModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('jsonModal')) closeJsonModal();
+});
+
+// ── Load tables ───────────────────────────────────────────────────────────────
+async function loadTables() {
+  const d = await get('/api/db/tables');
+  if (d.error) { toast('Failed to load tables: ' + d.error, 'err'); return; }
+  allTables = d.tables || [];
+  const sel = document.getElementById('tableSelect');
+  sel.innerHTML = '<option value="">— Select table —</option>' +
+    allTables.map(t =>
+      `<option value="${t.name}">${t.name} &nbsp;(${t.count} rows)</option>`
+    ).join('');
+}
+
+// ── Select / load table ───────────────────────────────────────────────────────
+async function selectTable() {
+  const sel = document.getElementById('tableSelect');
+  currentTable = sel.value;
+  currentPage  = 1;
+  document.getElementById('confirmBar').classList.remove('show');
+  document.getElementById('searchInp').value = '';
+
+  if (!currentTable) {
+    document.getElementById('tableWrap').style.display = 'none';
+    document.getElementById('statsBar').style.display = 'none';
+    document.getElementById('countBadge').style.display = 'none';
+    document.getElementById('sepSearch').style.display = 'none';
+    document.getElementById('searchInp').style.display = 'none';
+    document.getElementById('btnRefresh').style.display = 'none';
+    document.getElementById('btnClear').style.display = 'none';
+    return;
+  }
+  await loadTableData();
+}
+
+async function loadTableData() {
+  const tbody = document.getElementById('tableBody');
+  const thead = document.getElementById('tableHead');
+  tbody.innerHTML = `<tr class="state-row"><td colspan="20"><div class="spinner"></div>Loading…</td></tr>`;
+  document.getElementById('tableWrap').style.display = 'block';
+  document.getElementById('statsBar').style.display = 'flex';
+
+  const d = await get(`/api/db/records?table=${encodeURIComponent(currentTable)}&limit=2000`);
+  if (d.error) {
+    tbody.innerHTML = `<tr class="state-row"><td colspan="20">⚠ ${d.error}</td></tr>`;
+    return;
+  }
+
+  allRows  = d.rows || [];
+  filtered = allRows;
+  totalRows = allRows.length;
+  currentPage = 1;
+
+  const cols = d.columns || [];
+
+  // Header
+  thead.innerHTML = `<tr>
+    ${cols.map(c => `<th class="${c === 'id' ? 'col-id' : ''}">${c}</th>`).join('')}
+    <th></th>
+  </tr>`;
+
+  // Stats / controls
+  const tinfo = allTables.find(t => t.name === currentTable);
+  document.getElementById('statTable').textContent    = currentTable;
+  document.getElementById('statTotal').textContent    = tinfo ? tinfo.count : totalRows;
+  document.getElementById('countBadge').textContent   = `${tinfo ? tinfo.count : totalRows} rows`;
+  document.getElementById('countBadge').style.display = 'inline-block';
+  document.getElementById('sepSearch').style.display  = 'block';
+  document.getElementById('searchInp').style.display  = 'block';
+  document.getElementById('btnRefresh').style.display = 'inline-block';
+  // Don't show clear for settings table
+  document.getElementById('btnClear').style.display   =
+    currentTable === 'settings' ? 'none' : 'inline-block';
+
+  renderPage(cols);
+}
+
+function applyFilter() {
+  const q = document.getElementById('searchInp').value.toLowerCase();
+  filtered = q
+    ? allRows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)))
+    : allRows;
+  currentPage = 1;
+  const cols = getColumns();
+  renderPage(cols);
+}
+
+function getColumns() {
+  const th = document.querySelectorAll('#tableHead th');
+  return Array.from(th).slice(0, -1).map(t => t.textContent);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+const TS_COLS  = new Set(['saved_at', 'alerted_at', 'date', 'time']);
+const NUM_COLS = new Set(['id', 'ltp', 'prev_close', 'change_abs', 'change_pct',
+                          'pcr', 'max_pain', 'ce_oi', 'pe_oi', 'level', 'distance_pct',
+                          'prev_ltp', 'expiry_ts', 'LocalOrderID']);
+const JSON_COLS = new Set(['supports', 'resistances', 'valid_today', 'summary', 'analysis',
+                           'verdict', 'value']);
+
+function renderPage(cols) {
+  const tbody = document.getElementById('tableBody');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('statShowing').textContent =
+    filtered.length === allRows.length ? totalRows : `${filtered.length} (filtered)`;
+  document.getElementById('statPage').textContent =
+    `${currentPage} / ${Math.ceil(filtered.length / PAGE_SIZE) || 1}`;
+
+  if (!page.length) {
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${cols.length + 1}">No rows found.</td></tr>`;
+    renderPagination(cols);
+    return;
+  }
+
+  tbody.innerHTML = page.map(row => {
+    const cells = cols.map(col => {
+      const val = row[col];
+      if (val === null || val === undefined) return `<td style="color:#4b5563">null</td>`;
+      if (col === 'id') return `<td class="col-id">${val}</td>`;
+      if (TS_COLS.has(col)) return `<td class="ts">${val}</td>`;
+      if (JSON_COLS.has(col)) {
+        const preview = String(val).slice(0, 60);
+        return `<td><span class="cell-json" onclick="showCell('${col}', ${JSON.stringify(String(val))})">${preview}${val.length > 60 ? '…' : ''}</span></td>`;
+      }
+      if (NUM_COLS.has(col) && val !== '') return `<td class="num">${typeof val === 'number' ? val.toLocaleString('en-IN') : val}</td>`;
+      return `<td>${String(val).slice(0, 120)}</td>`;
+    }).join('');
+    const delBtn = row.id !== undefined
+      ? `<td><button class="del-btn" onclick="deleteRow(${row.id})">✕</button></td>`
+      : `<td></td>`;
+    return `<tr id="row-${row.id ?? ''}">${cells}${delBtn}</tr>`;
+  }).join('');
+
+  renderPagination(cols);
+}
+
+function renderPagination(cols) {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  document.getElementById('pgInfo').textContent =
+    `Showing ${Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–` +
+    `${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length}`;
+
+  const btns = document.getElementById('pgBtns');
+  if (total <= 1) { btns.innerHTML = ''; return; }
+
+  let html = `<button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
+  const pages = pagesToShow(currentPage, total);
+  let prev = null;
+  for (const p of pages) {
+    if (prev !== null && p - prev > 1) html += `<span style="color:#4b5563;padding:0 4px">…</span>`;
+    html += `<button class="pg-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+    prev = p;
+  }
+  html += `<button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === total ? 'disabled' : ''}>Next ›</button>`;
+  btns.innerHTML = html;
+}
+
+function pagesToShow(cur, total) {
+  const s = new Set([1, total]);
+  for (let p = Math.max(1, cur - 2); p <= Math.min(total, cur + 2); p++) s.add(p);
+  return [...s].sort((a, b) => a - b);
+}
+
+function goPage(p) {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  if (p < 1 || p > total) return;
+  currentPage = p;
+  renderPage(getColumns());
+  document.querySelector('.table-scroll')?.scrollTo(0, 0);
+}
+
+// ── Delete row ────────────────────────────────────────────────────────────────
+async function deleteRow(id) {
+  const el = document.getElementById(`row-${id}`);
+  if (!el) return;
+  el.style.opacity = '0.4';
+  const r = await fetch(`/api/db/records?table=${encodeURIComponent(currentTable)}&id=${id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.success) {
+    el.style.transition = 'all 0.25s';
+    el.style.maxHeight = '0'; el.style.overflow = 'hidden'; el.style.padding = '0';
+    setTimeout(() => {
+      allRows  = allRows.filter(row => row.id !== id);
+      filtered = filtered.filter(row => row.id !== id);
+      totalRows--;
+      // Update count badge
+      const tbl = allTables.find(t => t.name === currentTable);
+      if (tbl) tbl.count = Math.max(0, tbl.count - 1);
+      document.getElementById('countBadge').textContent = `${allRows.length} rows`;
+      document.getElementById('statTotal').textContent  = allRows.length;
+      renderPage(getColumns());
+    }, 260);
+    toast('Row deleted');
+  } else {
+    el.style.opacity = '1';
+    toast('Delete failed: ' + (d.error || '?'), 'err');
+  }
+}
+
+// ── Clear table ───────────────────────────────────────────────────────────────
+function confirmClear() {
+  document.getElementById('confirmBar').classList.add('show');
+}
+function cancelClear() {
+  document.getElementById('confirmBar').classList.remove('show');
+}
+async function doClear() {
+  document.getElementById('confirmBar').classList.remove('show');
+  const r = await fetch(`/api/db/truncate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table: currentTable }),
+  });
+  const d = await r.json();
+  if (d.success) {
+    allRows = []; filtered = []; totalRows = 0;
+    const tbl = allTables.find(t => t.name === currentTable);
+    if (tbl) tbl.count = 0;
+    document.getElementById('countBadge').textContent = '0 rows';
+    document.getElementById('statTotal').textContent  = '0';
+    renderPage(getColumns());
+    toast('Table cleared');
+  } else {
+    toast('Clear failed: ' + (d.error || '?'), 'err');
+  }
+}
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+async function refresh() {
+  await loadTableData();
+  await loadTables();   // refresh counts in dropdown
+  toast('Refreshed');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadTables();
+</script>
+</body>
+</html>

@@ -169,6 +169,20 @@ def dashboard():
     return render_template('dashboard.html')
 
 
+@app.route('/sql')
+def sql_browser():
+    if not require_auth():
+        return redirect('/')
+    return render_template('sql.html')
+
+
+@app.route('/architecture')
+def architecture():
+    if not require_auth():
+        return redirect('/')
+    return render_template('architecture.html')
+
+
 # ── API ────────────────────────────────────────────────────────────────────────
 
 @app.route('/api/holdings')
@@ -1124,6 +1138,104 @@ def api_scheduler_toggle():
         else:
             _scheduler.pause_job('sensex_snapshot')
             return jsonify({'running': False})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── DB Browser API ─────────────────────────────────────────────────────────────
+
+_ALLOWED_TABLES = {
+    'sr_levels', 'chain_snapshots', 'chain_analysis',
+    'sr_alerts', 'breach_alerts', 'settings',
+}
+
+def _db_conn():
+    import sqlite3
+    _DB_PATH = os.path.join(os.path.dirname(__file__), 'dashboard.db')
+    c = sqlite3.connect(_DB_PATH)
+    c.row_factory = sqlite3.Row
+    return c
+
+
+@app.route('/api/db/tables')
+def api_db_tables():
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        with _db_conn() as c:
+            rows = c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ).fetchall()
+            result = []
+            for r in rows:
+                name = r['name']
+                cnt  = c.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
+                result.append({'name': name, 'count': cnt})
+        return jsonify({'tables': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/db/records')
+def api_db_records():
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    table = request.args.get('table', '').strip()
+    if table not in _ALLOWED_TABLES:
+        return jsonify({'error': f'Table "{table}" not allowed'}), 400
+    limit  = min(int(request.args.get('limit',  2000)), 5000)
+    offset = int(request.args.get('offset', 0))
+    try:
+        with _db_conn() as c:
+            rows = c.execute(
+                f'SELECT * FROM "{table}" ORDER BY rowid DESC LIMIT ? OFFSET ?',
+                (limit, offset)
+            ).fetchall()
+            if not rows:
+                return jsonify({'columns': [], 'rows': [], 'total': 0})
+            columns = list(rows[0].keys())
+            data    = [dict(r) for r in rows]
+        return jsonify({'columns': columns, 'rows': data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/db/records', methods=['DELETE'])
+def api_db_delete_record():
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    table = request.args.get('table', '').strip()
+    rid   = request.args.get('id', '')
+    if table not in _ALLOWED_TABLES:
+        return jsonify({'error': f'Table "{table}" not allowed'}), 400
+    if not rid:
+        return jsonify({'error': 'id is required'}), 400
+    if table == 'settings':
+        return jsonify({'error': 'Cannot delete settings rows — edit the value instead'}), 400
+    try:
+        with _db_conn() as c:
+            c.execute(f'DELETE FROM "{table}" WHERE id = ?', (rid,))
+            c.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/db/truncate', methods=['POST'])
+def api_db_truncate():
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    body  = request.get_json() or {}
+    table = body.get('table', '').strip()
+    if table not in _ALLOWED_TABLES:
+        return jsonify({'error': f'Table "{table}" not allowed'}), 400
+    if table == 'settings':
+        return jsonify({'error': 'Cannot truncate settings table'}), 400
+    try:
+        with _db_conn() as c:
+            c.execute(f'DELETE FROM "{table}"')
+            c.commit()
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
