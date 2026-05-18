@@ -56,10 +56,11 @@ def _fetch_hist_close(client, exch, scrip_code, days=10):
     return []
 
 
-def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
+def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
     """
     Generic index LTP with proper prev-close and change calculation.
     Falls back to expiry API LTP if market feed scrip code returns 0.
+    chart_scrip: separate scrip code for historical data (NIFTY=999920000 vs feed 999920).
     """
     # ── 1. Try live market feed ───────────────────────────────────────────────
     ltp = 0
@@ -89,8 +90,9 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None):
             pass
 
     # ── 3. Always get historical closes for prev_close ────────────────────────
-    # Fetch enough days to always find the last two working days
-    closes = _fetch_hist_close(client, exch, scrip_code, days=20)
+    # Use chart_scrip for historical (e.g. NIFTY needs 999920000 not 999920)
+    h_scrip = chart_scrip if chart_scrip else scrip_code
+    closes = _fetch_hist_close(client, exch, h_scrip, days=20)
 
     if market_open:
         # Market is open today — last hist candle = yesterday (last working day close)

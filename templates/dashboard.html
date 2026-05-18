@@ -430,6 +430,50 @@ header {
 .mc-log-dist { color: #fbbf24; font-size: 0.88em; }
 .mc-log-empty { padding: 10px 18px; font-size: 0.78em; color: #4b5563; }
 
+/* S/R Overview panel */
+.sr-ov-wrap {
+  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
+  overflow: hidden; margin-bottom: 14px;
+}
+.sr-ov-hd {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; background: #12111f; border-bottom: 1px solid #2d2b4e;
+}
+.sr-ov-title { font-weight: 700; font-size: 0.88em; color: #e2e8f0; flex: 1; }
+.sr-ov-toggle {
+  padding: 3px 12px; border-radius: 10px; font-size: 0.75em; font-weight: 700;
+  cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa;
+  transition: background 0.2s;
+}
+.sr-ov-toggle:hover, .sr-ov-toggle.active { background: #4c3f8a; color: #fff; }
+.sr-ov-refresh { padding:3px 9px; border-radius:7px; font-size:0.75em; font-weight:600;
+  cursor:pointer; border:1px solid #2d2b4e; background:transparent; color:#6b7280; }
+.sr-ov-refresh:hover { border-color:#7c3aed; color:#a78bfa; }
+.sr-ov-cards {
+  display: flex; gap: 10px; padding: 12px 14px; flex-wrap: wrap;
+}
+.sr-ov-card {
+  flex: 1; min-width: 150px; max-width: 260px;
+  background: #12111f; border: 1px solid #2d2b4e; border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 5px;
+}
+.sr-ov-card-hd {
+  display: flex; align-items: baseline; gap: 7px; margin-bottom: 3px;
+}
+.sr-ov-card-name { font-weight: 700; font-size: 0.82em; color: #a78bfa; }
+.sr-ov-card-ltp  { font-size: 0.78em; color: #6b7280; }
+.sr-ov-card-age  { font-size: 0.68em; color: #374151; margin-left: auto; }
+.sr-ov-level {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78em; padding: 2px 0;
+}
+.sr-ov-level.res { color: #f87171; }
+.sr-ov-level.sup { color: #34d399; }
+.sr-ov-level.res2 { color: #9ca3af; font-size: 0.72em; }
+.sr-ov-level.sup2 { color: #9ca3af; font-size: 0.72em; }
+.sr-ov-dist { margin-left: auto; color: #fbbf24; font-size: 0.85em; white-space: nowrap; }
+.sr-ov-empty { padding: 14px 18px; font-size: 0.82em; color: #4b5563; }
+.sr-ov-no-data { color: #374151; font-size: 0.75em; padding: 6px 0; }
 
 </style>
 </head>
@@ -535,6 +579,18 @@ header {
         </div>
       </div>
       <div class="ai-body" id="aiBody"></div>
+    </div>
+  </div>
+
+  <!-- S/R Overview -->
+  <div class="sr-ov-wrap">
+    <div class="sr-ov-hd">
+      <span class="sr-ov-title">📊 Key S/R Levels</span>
+      <button class="sr-ov-toggle" id="srOvToggle" onclick="toggleSrExpand()">Show All</button>
+      <button class="sr-ov-refresh" onclick="loadSrOverview()">↻</button>
+    </div>
+    <div class="sr-ov-cards" id="srOvCards">
+      <div class="sr-ov-empty">Loading…</div>
     </div>
   </div>
 
@@ -963,6 +1019,107 @@ async function saveBreachMonitorConfig() {
   } else {
     hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
   }
+}
+
+// ── S/R Overview Panel ────────────────────────────────────────────────────────
+let _srOvData     = [];
+let _srOvExpanded = false;
+
+async function loadSrOverview() {
+  const container = document.getElementById('srOvCards');
+  const d = await get('/api/sr-levels-summary');
+  if (d.error || !d.indices) {
+    container.innerHTML = '<div class="sr-ov-empty">Could not load S/R data.</div>';
+    return;
+  }
+  _srOvData = d.indices;
+  renderSrOverview();
+}
+
+function renderSrOverview() {
+  const container = document.getElementById('srOvCards');
+  if (!_srOvData.length) {
+    container.innerHTML = '<div class="sr-ov-empty">No S/R data saved yet. Use Chart → Analyze S/R to save levels.</div>';
+    return;
+  }
+
+  container.innerHTML = _srOvData.map(idx => {
+    const ltp  = idx.ltp || 0;
+    const sups = (idx.supports    || []).map(s => parseFloat(s.level || s)).filter(v => v > 0).sort((a,b) => b-a);
+    const ress = (idx.resistances || []).map(r => parseFloat(r.level || r)).filter(v => v > 0).sort((a,b) => a-b);
+    const age  = idx.saved_at ? idx.saved_at.substring(0,16) : '';
+
+    if (!sups.length && !ress.length) {
+      return `<div class="sr-ov-card">
+        <div class="sr-ov-card-hd">
+          <span class="sr-ov-card-name">${idx.label}</span>
+        </div>
+        <div class="sr-ov-no-data">No levels saved</div>
+      </div>`;
+    }
+
+    // Nearest resistance above LTP, nearest support below LTP
+    const aboveRes = ltp > 0 ? ress.filter(r => r > ltp) : ress;
+    const belowSup = ltp > 0 ? sups.filter(s => s < ltp) : sups;
+    const nearRes  = aboveRes.length ? aboveRes[0]  : (ress.length ? ress[0]  : null);
+    const nearSup  = belowSup.length ? belowSup[0]  : (sups.length ? sups[0]  : null);
+
+    // In expanded mode, show all levels; in compact, show top 1 each
+    let lines = '';
+
+    if (_srOvExpanded) {
+      // All resistances descending
+      ress.forEach((r, i) => {
+        const dist = ltp > 0 ? ((r - ltp) / ltp * 100).toFixed(2) : '—';
+        const cls  = i === 0 && aboveRes.includes(r) ? 'res' : 'res2';
+        lines += `<div class="sr-ov-level ${cls}">
+          <span>🚧 ₹${fmt2(r)}</span>
+          ${ltp > 0 ? `<span class="sr-ov-dist">${dist > 0 ? '+' : ''}${dist}%</span>` : ''}
+        </div>`;
+      });
+      // All supports descending
+      sups.forEach((s, i) => {
+        const dist = ltp > 0 ? ((s - ltp) / ltp * 100).toFixed(2) : '—';
+        const cls  = i === 0 && belowSup.includes(s) ? 'sup' : 'sup2';
+        lines += `<div class="sr-ov-level ${cls}">
+          <span>🛡️ ₹${fmt2(s)}</span>
+          ${ltp > 0 ? `<span class="sr-ov-dist">${dist}%</span>` : ''}
+        </div>`;
+      });
+    } else {
+      if (nearRes !== null) {
+        const dist = ltp > 0 ? ((nearRes - ltp) / ltp * 100).toFixed(2) : '—';
+        lines += `<div class="sr-ov-level res">
+          <span>🚧 ₹${fmt2(nearRes)}</span>
+          ${ltp > 0 ? `<span class="sr-ov-dist">+${dist}%</span>` : ''}
+        </div>`;
+      }
+      if (nearSup !== null) {
+        const dist = ltp > 0 ? ((nearSup - ltp) / ltp * 100).toFixed(2) : '—';
+        lines += `<div class="sr-ov-level sup">
+          <span>🛡️ ₹${fmt2(nearSup)}</span>
+          ${ltp > 0 ? `<span class="sr-ov-dist">${dist}%</span>` : ''}
+        </div>`;
+      }
+    }
+
+    return `<div class="sr-ov-card">
+      <div class="sr-ov-card-hd">
+        <span class="sr-ov-card-name">${idx.label}</span>
+        ${ltp > 0 ? `<span class="sr-ov-card-ltp">₹${fmt2(ltp)}</span>` : ''}
+        <span class="sr-ov-card-age">${age}</span>
+      </div>
+      ${lines || '<div class="sr-ov-no-data">No levels</div>'}
+    </div>`;
+  }).join('');
+}
+
+function toggleSrExpand() {
+  _srOvExpanded = !_srOvExpanded;
+  const btn = document.getElementById('srOvToggle');
+  btn.textContent = _srOvExpanded ? 'Show Top 1' : 'Show All';
+  btn.classList.toggle('active', _srOvExpanded);
+  renderSrOverview();
 }
 
 // ── Inline Alert Logs ─────────────────────────────────────────────────────────
@@ -1491,6 +1648,7 @@ document.getElementById('chartModal').addEventListener('click', e => {
 loadIndices().then(() => {
   loadLtp();
   loadOHLC();
+  loadSrOverview();
   loadMonitorConfig();
   loadMarketUpdateConfig();
   loadBreachMonitorConfig();

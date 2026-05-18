@@ -247,8 +247,9 @@ def run_market_update():
             index_id = idx['id']
             label    = idx.get('label', index_id)
 
-            # Fetch LTP + prev_close + change
-            ltp_data   = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'))
+            # Fetch LTP + prev_close + change (chart_scrip for correct historical)
+            ltp_data   = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'),
+                                       chart_scrip=idx.get('chart_scrip', idx['feed_scrip']))
             ltp        = ltp_data.get('ltp', 0)
             prev_close = ltp_data.get('prev_close', 0)
             change     = ltp_data.get('change', 0)
@@ -348,7 +349,8 @@ def run_breach_monitor():
             index_id = idx['id']
             label    = idx.get('label', index_id)
 
-            ltp_data = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'))
+            ltp_data = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'),
+                                     chart_scrip=idx.get('chart_scrip', idx['feed_scrip']))
             ltp      = ltp_data.get('ltp', 0)
             if ltp == 0:
                 continue

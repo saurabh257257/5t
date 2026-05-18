@@ -238,7 +238,10 @@ def api_index_ltp():
     if idx not in INDEX_MAP:
         return jsonify({"error": f"Unknown index: {idx}"}), 400
     cfg = INDEX_MAP[idx]
-    return jsonify(get_index_ltp(client, cfg['feed_exch'], cfg['feed_scrip'], cfg['opt_symbol']))
+    return jsonify(get_index_ltp(
+        client, cfg['feed_exch'], cfg['feed_scrip'], cfg.get('opt_symbol'),
+        chart_scrip=cfg.get('chart_scrip', cfg['feed_scrip'])
+    ))
 
 
 @app.route('/api/option-chain')
@@ -516,7 +519,12 @@ def api_today_ohlc():
     if idx not in INDEX_MAP:
         return jsonify({'error': f'Unknown index: {idx}'}), 400
     cfg = INDEX_MAP[idx]
-    return jsonify(get_today_ohlc(client, cfg['feed_exch'], cfg['feed_scrip']))
+    # Must use chart_scrip (e.g. 999920000) not feed_scrip (999920) for historical data
+    return jsonify(get_today_ohlc(
+        client,
+        cfg.get('chart_exch', cfg['feed_exch']),
+        cfg.get('chart_scrip', cfg['feed_scrip'])
+    ))
 
 
 @app.route('/api/chart-data')
@@ -633,6 +641,27 @@ def api_save_sr():
         return jsonify({'success': True, 'id': rid})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sr-levels-summary')
+def api_sr_levels_summary():
+    """Return latest saved S/R levels for ALL indices in one call."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    result = []
+    for idx in INDICES:
+        history = get_sr_history(idx['id'], limit=1)
+        latest  = history[0] if history else None
+        result.append({
+            'id':          idx['id'],
+            'label':       idx.get('label', idx['id']),
+            'supports':    latest['supports']    if latest else [],
+            'resistances': latest['resistances'] if latest else [],
+            'ltp':         latest['ltp']         if latest else 0,
+            'saved_at':    latest['saved_at']    if latest else '',
+        })
+    return jsonify({'indices': result})
 
 
 @app.route('/api/sr-history')
