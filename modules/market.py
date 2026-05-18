@@ -59,22 +59,22 @@ def _fetch_hist_close(client, exch, scrip_code, days=10):
 def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
     """
     Generic index LTP with proper prev-close and change calculation.
-    Falls back to expiry API LTP if market feed scrip code returns 0.
-    chart_scrip: separate scrip code for historical data (NIFTY=999920000 vs feed 999920).
+    prev_close priority: (1) CloseRate/PreviousClose from live feed,
+    (2) last historical daily close (chart_scrip used for NIFTY etc).
     """
     # ── 1. Try live market feed ───────────────────────────────────────────────
-    ltp = 0
-    open_ = high = low = 0
+    ltp = prev_close_feed = open_ = high = low = 0
     market_open = _market_open_now()   # time-based, not feed-based
     try:
         req = [{"Exch": exch, "ExchangeType": "C", "ScripCode": int(scrip_code)}]
         result = client.fetch_market_feed(req)
         if result:
             item = result[0] if isinstance(result, list) else result
-            ltp   = float(item.get("LastRate") or item.get("LTP") or 0)
-            open_ = float(item.get("OpenRate")  or item.get("Open") or 0)
-            high  = float(item.get("High")       or item.get("HighRate") or 0)
-            low   = float(item.get("Low")        or item.get("LowRate")  or 0)
+            ltp             = float(item.get("LastRate")      or item.get("LTP")           or 0)
+            prev_close_feed = float(item.get("PreviousClose") or item.get("CloseRate")     or 0)
+            open_           = float(item.get("OpenRate")      or item.get("Open")          or 0)
+            high            = float(item.get("High")          or item.get("HighRate")      or 0)
+            low             = float(item.get("Low")           or item.get("LowRate")       or 0)
     except Exception:
         pass
 
@@ -89,20 +89,24 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
         except Exception:
             pass
 
-    # ── 3. Always get historical closes for prev_close ────────────────────────
-    # Use chart_scrip for historical (e.g. NIFTY needs 999920000 not 999920)
-    h_scrip = chart_scrip if chart_scrip else scrip_code
-    closes = _fetch_hist_close(client, exch, h_scrip, days=20)
-
-    if market_open:
-        # Market is open today — last hist candle = yesterday (last working day close)
-        prev_close = closes[-1] if closes else 0
+    # ── 3. prev_close — use feed value if available, else historical ──────────
+    # Feed's CloseRate/PreviousClose is the exchange-reported previous-day close.
+    # When feed returns it, it's always correct regardless of market state.
+    if prev_close_feed > 0:
+        prev_close = prev_close_feed
     else:
-        # Market closed / holiday — last hist candle = last working day close
+        # Fallback: historical daily closes (chart_scrip e.g. 999920000 for NIFTY)
+        h_scrip = chart_scrip if chart_scrip else scrip_code
+        closes  = _fetch_hist_close(client, exch, h_scrip, days=25)
         if closes:
             if ltp == 0:
-                ltp = closes[-1]          # show last working day close as price
-            prev_close = closes[-2] if len(closes) >= 2 else closes[-1]
+                ltp = closes[-1]            # use last close as price when feed is empty
+            # When market is open: last hist candle = yesterday = prev_close
+            # When market is closed: last hist candle = today/last-trading-day,
+            #   so prev_close = the one before it
+            prev_close = closes[-1] if market_open else (
+                closes[-2] if len(closes) >= 2 else closes[-1]
+            )
         else:
             prev_close = 0
 

@@ -1196,7 +1196,7 @@ async function loadLtp() {
   document.getElementById('sxChange').innerHTML = marketOpen
     ? `<span style="color:${color}">${d.change>=0?'▲':'▼'} ${sign}${absCh} (${sign}${pctCh}%)</span>`
     : `<span style="color:#6b7280;font-size:0.82em">vs prev&nbsp;<span style="color:${color};font-weight:700">${sign}${absCh} (${sign}${pctCh}%)</span></span>`;
-  document.getElementById('sxClose').textContent = d.prev_close > 0 ? fmt2(d.prev_close) : fmt2(ltp);
+  document.getElementById('sxClose').textContent = d.prev_close > 0 ? fmt2(d.prev_close) : '—';
   document.getElementById('sxTime').textContent  = nowStr();
   const mkt = document.getElementById('mktStatus');
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
