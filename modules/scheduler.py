@@ -33,7 +33,9 @@ def run_sensex_snapshot():
     Fetch SENSEX nearest-expiry option chain, generate AI summary, save to DB.
     Called every 1 minute by APScheduler. Uses saved JWT — no browser needed.
     """
+    print('[SCHEDULER] run_sensex_snapshot called', flush=True)
     if not _is_market_hours():
+        print('[SCHEDULER] Outside market hours, skipping', flush=True)
         return
 
     try:
