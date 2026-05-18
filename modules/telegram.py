@@ -7,11 +7,14 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 
-load_dotenv()
+# Load .env from the app root directory (works regardless of cwd)
+_ENV_PATH = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(_ENV_PATH)
 
 _IST       = timezone(timedelta(hours=5, minutes=30))
 _BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 _CHAT_ID   = os.getenv('TELEGRAM_CHAT_ID', '')
+print(f'[TELEGRAM] Configured: BOT={bool(_BOT_TOKEN)} CHAT={bool(_CHAT_ID)}')
 
 
 def send_message(text: str, parse_mode: str = 'HTML') -> bool:
