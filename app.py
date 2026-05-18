@@ -945,30 +945,47 @@ def api_place_order():
     try:
         exch_type = 'D'   # Derivatives
         result = client.place_order(
-            OrderType  = 'B',            # Buy
-            Exchange   = exch,
+            OrderType    = 'B',
+            Exchange     = exch,
             ExchangeType = exch_type,
-            ScripCode  = scrip_code,
-            Qty        = qty,
-            Price      = 0,              # Market order
-            IsIntraday = True,
+            ScripCode    = scrip_code,
+            Qty          = qty,
+            Price        = 0,
+            IsIntraday   = True,
             StopLossPrice = 0,
-            IsIOCOrder = False,
+            IsIOCOrder   = False,
         )
-        # py5paisa returns a dict; check for order id
-        if isinstance(result, dict):
-            order_id = (result.get('BrokerOrderId') or
-                        result.get('OrderId') or
-                        result.get('order_id') or
-                        result.get('RemoteOrderID') or '')
-            message  = result.get('Message') or result.get('message') or ''
-            status   = result.get('Status', result.get('status', ''))
-            if order_id or str(status).lower() in ('0', 'success', 'true', '1'):
-                return jsonify({'success': True, 'order_id': str(order_id), 'message': message, 'raw': result})
-            else:
-                return jsonify({'success': False, 'error': message or str(result)})
-        return jsonify({'success': True, 'raw': str(result)})
+        # Always log raw response for debugging
+        print(f'[ORDER] raw response: {result!r}')
+
+        if not isinstance(result, dict):
+            # Some versions return a list or string — treat as unknown
+            return jsonify({'success': False, 'error': 'Unexpected response format', 'raw': str(result)})
+
+        # py5paisa: Status=0 means success, non-zero means error
+        status   = result.get('Status', result.get('status', -1))
+        message  = result.get('Message') or result.get('message') or ''
+        order_id = (result.get('BrokerOrderId') or
+                    result.get('OrderId') or
+                    result.get('RemoteOrderID') or
+                    result.get('order_id') or '')
+
+        # Convert to int for reliable comparison (API returns int 0 on success)
+        try:
+            status_int = int(status)
+        except (TypeError, ValueError):
+            status_int = -1
+
+        if status_int == 0 and order_id:
+            return jsonify({'success': True, 'order_id': str(order_id),
+                            'message': message, 'raw': result})
+        else:
+            # Include raw so frontend can show what actually came back
+            error_msg = message or f'Status={status}'
+            return jsonify({'success': False, 'error': error_msg, 'raw': result})
+
     except Exception as e:
+        print(f'[ORDER] exception: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

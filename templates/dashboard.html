@@ -1857,12 +1857,14 @@ async function confirmBuy() {
       document.getElementById('buyResult').innerHTML =
         `<div style="margin-top:12px;padding:10px 14px;background:rgba(52,211,153,0.1);border:1px solid #10b981;border-radius:8px;color:#34d399;font-size:0.85em">
           ✅ Order placed! Order ID: <strong>${d.order_id || '—'}</strong>
+          ${d.message ? `<div style="color:#94a3b8;margin-top:4px;font-size:0.9em">${d.message}</div>` : ''}
         </div>`;
       btn.textContent = '✓ Order Placed';
     } else {
+      const rawStr = d.raw ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:0.85em;color:#6b7280">Raw response</summary><pre style="margin-top:4px;font-size:0.75em;color:#94a3b8;white-space:pre-wrap;word-break:break-all">${JSON.stringify(d.raw, null, 2)}</pre></details>` : '';
       document.getElementById('buyResult').innerHTML =
         `<div style="margin-top:12px;padding:10px 14px;background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:8px;color:#f87171;font-size:0.85em">
-          ❌ ${d.error || 'Order failed'}
+          ❌ ${d.error || 'Order failed'}${rawStr}
         </div>`;
       btn.disabled = false;
       btn.textContent = '✓ Place Buy Order';
