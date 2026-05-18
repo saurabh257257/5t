@@ -89,21 +89,13 @@ DROPLET_IP = os.getenv("DROPLET_IP", "142.93.222.101")
 
 
 def require_auth():
-    # 1. Fast path — client already in memory
+    # Only check the active browser session — no auto-restore.
+    # Auto-restore happens only in verify_pin() so the PIN always gates access.
     cid = session.get('client_id')
     if cid:
         client = authenticated_clients.get(cid)
         if client:
             return client
-
-    # 2. Slow path — server restarted OR browser cookie gone
-    #    Try to restore from the saved JWT file on disk
-    restored_cid = try_restore_session()
-    if restored_cid:
-        session.permanent = True          # cookie survives browser close
-        session['client_id'] = restored_cid
-        return authenticated_clients.get(restored_cid)
-
     return None
 
 
@@ -153,9 +145,8 @@ def callback():
 
 @app.route('/logout')
 def logout():
-    cid = session.pop('client_id', None)
-    if cid:
-        authenticated_clients.pop(cid, None)
+    # Lock only — clear the browser session but keep the server-side client
+    # and the JWT file on disk so the next PIN entry restores instantly.
     session.clear()
     return redirect('/')
 
