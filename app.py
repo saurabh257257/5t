@@ -931,6 +931,47 @@ def api_breach_monitor_config_set():
                     'indices': indices, 'market_hours': market_hours})
 
 
+@app.route('/api/place-order', methods=['POST'])
+def api_place_order():
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    body       = request.get_json() or {}
+    scrip_code = int(body.get('scrip_code', 0))
+    exch       = body.get('exch', 'N')          # 'N' for NSE, 'B' for BSE
+    qty        = int(body.get('qty', 0))
+    if not scrip_code or qty <= 0:
+        return jsonify({'error': 'scrip_code and qty are required'}), 400
+    try:
+        exch_type = 'D'   # Derivatives
+        result = client.place_order(
+            OrderType  = 'B',            # Buy
+            Exchange   = exch,
+            ExchangeType = exch_type,
+            ScripCode  = scrip_code,
+            Qty        = qty,
+            Price      = 0,              # Market order
+            IsIntraday = True,
+            StopLossPrice = 0,
+            IsIOCOrder = False,
+        )
+        # py5paisa returns a dict; check for order id
+        if isinstance(result, dict):
+            order_id = (result.get('BrokerOrderId') or
+                        result.get('OrderId') or
+                        result.get('order_id') or
+                        result.get('RemoteOrderID') or '')
+            message  = result.get('Message') or result.get('message') or ''
+            status   = result.get('Status', result.get('status', ''))
+            if order_id or str(status).lower() in ('0', 'success', 'true', '1'):
+                return jsonify({'success': True, 'order_id': str(order_id), 'message': message, 'raw': result})
+            else:
+                return jsonify({'success': False, 'error': message or str(result)})
+        return jsonify({'success': True, 'raw': str(result)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/snapshots')
 def api_snapshots():
     client = require_auth()

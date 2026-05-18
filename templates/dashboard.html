@@ -130,6 +130,39 @@ header {
 .pe-cell:hover { background: rgba(248,113,113,0.1) !important; }
 .sx-table tr.sel-ce td.ce-td { background: rgba(52,211,153,0.13) !important; }
 .sx-table tr.sel-pe td.pe-td { background: rgba(248,113,113,0.13) !important; }
+/* ITM highlight rows */
+.sx-table tr.itm-ce td.ce-td { background: rgba(16,185,129,0.14) !important; }
+.sx-table tr.itm-pe td.pe-td { background: rgba(251,113,133,0.14) !important; }
+.sx-table tr.itm-ce td.str-td { border-left: 3px solid #10b981; }
+.sx-table tr.itm-pe td.str-td { border-right: 3px solid #fb7185; }
+/* Buy button inside chain cells */
+.btn-buy-opt {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 7px; padding: 2px 7px; border-radius: 5px;
+  font-size: 0.72em; font-weight: 700; cursor: pointer;
+  border: 1px solid #065f46; background: rgba(5,150,105,0.18);
+  color: #34d399; transition: background 0.15s; vertical-align: middle;
+}
+.btn-buy-opt:hover { background: rgba(5,150,105,0.35); }
+/* Buy modal */
+.buy-modal-box { max-width: 380px; }
+.buy-detail { background: #12111f; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.buy-detail-row { display: flex; justify-content: space-between; font-size: 0.85em; padding: 3px 0; }
+.buy-detail-label { color: #6b7280; }
+.buy-detail-val   { color: #e2e8f0; font-weight: 700; }
+.buy-detail-val.ce { color: #34d399; }
+.buy-detail-val.pe { color: #fb7185; }
+.buy-inp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.buy-inp-lbl { font-size: 0.82em; color: #6b7280; white-space: nowrap; }
+.buy-qty-inp { width: 80px; padding: 7px 10px; background: #12111f; border: 1px solid #4c3f8a;
+  border-radius: 7px; color: #e2e8f0; font-size: 0.9em; font-weight: 700; outline: none; }
+.buy-confirm-btn {
+  width: 100%; padding: 10px; border: none; border-radius: 9px; font-size: 0.9em; font-weight: 700;
+  cursor: pointer; background: #059669; color: white; transition: background 0.2s;
+}
+.buy-confirm-btn:hover { background: #047857; }
+.buy-confirm-btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+.buy-result { font-size: 0.82em; margin-top: 10px; padding: 8px 12px; border-radius: 7px; }
 .chg-pos { color: #34d399; font-weight: 600; }
 .chg-neg { color: #f87171; font-weight: 600; }
 .ce-ltp  { font-weight: 700; color: #a3e635; }
@@ -521,6 +554,12 @@ header {
       <option value="">Loading expiries…</option>
     </select>
     <button class="btn-load" onclick="loadChain()">Load Chain</button>
+    <div class="ctrl-sep"></div>
+    <label>ITM</label>
+    <input type="number" id="itmInput" class="mc-inp" placeholder="e.g. 1000"
+           min="0" step="50" style="width:90px"
+           oninput="applyITMHighlight()" onchange="saveITMSetting()">
+    <span style="color:#6b7280;font-size:0.78em">pts</span>
     <span class="status-txt" id="statusTxt"></span>
   </div>
 
@@ -749,6 +788,45 @@ header {
   </div>
 
 </div><!-- /.page -->
+
+<!-- ═══════════════════ BUY MODAL ════════════════════════════════════════════ -->
+<div class="modal-overlay" id="buyModal" style="display:none">
+  <div class="modal-box buy-modal-box">
+    <div class="modal-hd">
+      <span class="modal-title" id="buyModalTitle">🛒 Buy Option</span>
+      <button class="modal-close" onclick="closeBuyModal()">✕</button>
+    </div>
+    <div class="modal-bd">
+      <div class="buy-detail">
+        <div class="buy-detail-row">
+          <span class="buy-detail-label">Index</span>
+          <span class="buy-detail-val" id="buyIndex">—</span>
+        </div>
+        <div class="buy-detail-row">
+          <span class="buy-detail-label">Strike / Type</span>
+          <span class="buy-detail-val" id="buyStrikeType">—</span>
+        </div>
+        <div class="buy-detail-row">
+          <span class="buy-detail-label">LTP (approx.)</span>
+          <span class="buy-detail-val" id="buyLtpVal">—</span>
+        </div>
+        <div class="buy-detail-row">
+          <span class="buy-detail-label">Order Type</span>
+          <span class="buy-detail-val" style="color:#fbbf24">Market (Intraday)</span>
+        </div>
+      </div>
+      <div class="buy-inp-row">
+        <span class="buy-inp-lbl">Lots</span>
+        <input type="number" class="buy-qty-inp" id="buyLots" value="1" min="1" max="50">
+        <span style="font-size:0.78em;color:#6b7280" id="buyQtyHint"></span>
+      </div>
+      <button class="buy-confirm-btn" id="buyConfirmBtn" onclick="confirmBuy()">
+        ✓ Place Buy Order
+      </button>
+      <div id="buyResult"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════ CHART MODAL ═══════════════════════════════════════════ -->
 <div class="modal-overlay" id="chartModal">
@@ -1249,47 +1327,54 @@ async function loadExpiries() {
 // ── Option Chain ──────────────────────────────────────────────────────────────
 let chainData = [], currentExpiryTs = 0, currentExpiryLabel = '';
 
-async function loadChain() {
-  const sel   = document.getElementById('expirySelect');
-  const ts    = sel.value;
-  const label = sel.options[sel.selectedIndex]?.text || '';
-  if (!ts) return;
-
-  currentExpiryTs    = ts;
-  currentExpiryLabel = label;
-
-  document.getElementById('statusTxt').textContent = 'Loading…';
-  document.getElementById('chainBody').innerHTML =
-    '<div class="state-box"><div class="spinner" style="width:30px;height:30px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px"></div>Loading option chain…</div>';
-  document.getElementById('chainSummaryCard').style.display = 'none';
-  closeAiPanel();
-
-  const d = await get(`/api/option-chain?index=${currentIndex}&expiry_ts=${ts}`);
-  document.getElementById('statusTxt').textContent = '';
-
-  if (d.error || !d.option_chain?.length) {
-    document.getElementById('chainBody').innerHTML =
-      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${d.error || 'No data'}</div>`;
-    return;
-  }
-
-  chainData = d.option_chain;
-  const ltpVal = lastLtp || 0;
-  const strikes = d.option_chain.map(r => r.strike);
+// ── Chain render helper (call after data fetch OR on ITM change) ──────────────
+function renderChain(data, labelOverride) {
+  if (!data || !data.length) return;
+  const label   = labelOverride || currentExpiryLabel || '';
+  const ltpVal  = lastLtp || 0;
+  const strikes = data.map(r => r.strike);
   const atm = ltpVal > 0 ? strikes.reduce((a,b) => Math.abs(b-ltpVal) < Math.abs(a-ltpVal) ? b : a, strikes[0]) : null;
 
-  const rows = d.option_chain.map(r => {
-    const isAtm = atm !== null && r.strike === atm;
+  const itmPts = parseFloat(document.getElementById('itmInput').value) || 0;
+  const itmCeStrike = itmPts > 0 && ltpVal > 0
+    ? strikes.reduce((a,b) => Math.abs(b-(ltpVal-itmPts)) < Math.abs(a-(ltpVal-itmPts)) ? b : a, strikes[0])
+    : null;
+  const itmPeStrike = itmPts > 0 && ltpVal > 0
+    ? strikes.reduce((a,b) => Math.abs(b-(ltpVal+itmPts)) < Math.abs(a-(ltpVal+itmPts)) ? b : a, strikes[0])
+    : null;
+
+  const idxCfg  = INDICES.find(i => i.id === currentIndex) || {};
+  const optExch = idxCfg.opt_exch || 'N';
+  const lotSize = { SENSEX: 20, NIFTY: 75, BANKNIFTY: 30, FINNIFTY: 40 }[currentIndex] || 50;
+
+  const rows = data.map(r => {
+    const isAtm   = atm !== null && r.strike === atm;
+    const isItmCe = itmCeStrike !== null && r.strike === itmCeStrike;
+    const isItmPe = itmPeStrike !== null && r.strike === itmPeStrike;
     const cs = r.ce_scrip || 0, ps = r.pe_scrip || 0;
     const ce = cs ? `onclick="pick(this,'ce',${r.strike},${cs},${ps})"` : '';
     const pe = ps ? `onclick="pick(this,'pe',${r.strike},${cs},${ps})"` : '';
-    return `<tr class="${isAtm?'atm':''}" data-strike="${r.strike}">
+
+    const ceBuyBtn = (isItmCe && cs)
+      ? `<button class="btn-buy-opt" onclick="event.stopPropagation();openBuyModal(${cs},'CE',${r.strike},${r.ce_ltp},'${optExch}',${lotSize})">🛒 Buy</button>`
+      : '';
+    const peBuyBtn = (isItmPe && ps)
+      ? `<button class="btn-buy-opt" style="border-color:#9d174d;color:#fb7185;background:rgba(251,113,133,0.15)" onclick="event.stopPropagation();openBuyModal(${ps},'PE',${r.strike},${r.pe_ltp},'${optExch}',${lotSize})">🛒 Buy</button>`
+      : '';
+
+    const rowCls = [isAtm?'atm':'', isItmCe?'itm-ce':'', isItmPe?'itm-pe':''].filter(Boolean).join(' ');
+    const strBadge = isAtm
+      ? '&nbsp;<span style="font-size:0.6em;color:#7c3aed">ATM</span>'
+      : (isItmCe ? '&nbsp;<span style="font-size:0.58em;color:#10b981">ITM CE</span>'
+        : (isItmPe ? '&nbsp;<span style="font-size:0.58em;color:#fb7185">ITM PE</span>' : ''));
+
+    return `<tr class="${rowCls}" data-strike="${r.strike}">
       <td class="ce-td ce-cell" ${ce}>${fmtChg(r.ce_chg_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_oi)}</td>
       <td class="ce-td ce-cell" ${ce}>${fmtN(r.ce_vol)}</td>
-      <td class="ce-td ce-cell ce-ltp" ${ce}>${r.ce_ltp > 0 ? fmt2(r.ce_ltp) : '—'}</td>
-      <td class="str-td">${r.strike}${isAtm ? '&nbsp;<span style="font-size:0.6em;color:#7c3aed">ATM</span>' : ''}</td>
-      <td class="pe-td pe-cell pe-ltp" ${pe}>${r.pe_ltp > 0 ? fmt2(r.pe_ltp) : '—'}</td>
+      <td class="ce-td ce-cell ce-ltp" ${ce}>${r.ce_ltp > 0 ? fmt2(r.ce_ltp) : '—'}${ceBuyBtn}</td>
+      <td class="str-td">${r.strike}${strBadge}</td>
+      <td class="pe-td pe-cell pe-ltp" ${pe}>${peBuyBtn}${r.pe_ltp > 0 ? fmt2(r.pe_ltp) : '—'}</td>
       <td class="pe-td pe-cell" ${pe}>${fmtN(r.pe_vol)}</td>
       <td class="pe-td pe-cell" ${pe}>${fmtN(r.pe_oi)}</td>
       <td class="pe-td pe-cell" ${pe}>${fmtChg(r.pe_chg_oi)}</td>
@@ -1315,8 +1400,38 @@ async function loadChain() {
       </table>
     </div>`;
 
-  document.getElementById('statusTxt').textContent =
-    `${d.option_chain.length} strikes · ${label} · Click CE/PE for strike analysis`;
+  if (label) {
+    document.getElementById('statusTxt').textContent =
+      `${data.length} strikes · ${label} · Click CE/PE for strike analysis`;
+  }
+}
+
+async function loadChain() {
+  const sel   = document.getElementById('expirySelect');
+  const ts    = sel.value;
+  const label = sel.options[sel.selectedIndex]?.text || '';
+  if (!ts) return;
+
+  currentExpiryTs    = ts;
+  currentExpiryLabel = label;
+
+  document.getElementById('statusTxt').textContent = 'Loading…';
+  document.getElementById('chainBody').innerHTML =
+    '<div class="state-box"><div class="spinner" style="width:30px;height:30px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px"></div>Loading option chain…</div>';
+  document.getElementById('chainSummaryCard').style.display = 'none';
+  closeAiPanel();
+
+  const d = await get(`/api/option-chain?index=${currentIndex}&expiry_ts=${ts}`);
+  document.getElementById('statusTxt').textContent = '';
+
+  if (d.error || !d.option_chain?.length) {
+    document.getElementById('chainBody').innerHTML =
+      `<div class="state-box"><div class="state-icon">&#x26A0;</div>${d.error || 'No data'}</div>`;
+    return;
+  }
+
+  chainData = d.option_chain;
+  renderChain(chainData, label);
 
   setTimeout(() => {
     document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior:'smooth', block:'center' });
@@ -1665,8 +1780,115 @@ document.getElementById('chartModal').addEventListener('click', e => {
 });
 
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ITM HIGHLIGHT + BUY
+// ══════════════════════════════════════════════════════════════════════════════
+
+// State for the buy modal
+let _buyScripCode = 0, _buyLotSize = 1, _buyExch = 'N';
+
+function applyITMHighlight() {
+  if (!chainData || !chainData.length) return;
+  renderChain(chainData);
+  // Scroll ITM CE row into view if present, else ATM
+  setTimeout(() => {
+    const itm = document.querySelector('#chainBody tr.itm-ce') ||
+                document.querySelector('#chainBody tr.itm-pe') ||
+                document.querySelector('#chainBody tr.atm');
+    itm?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+function saveITMSetting() {
+  const val = document.getElementById('itmInput').value;
+  localStorage.setItem('itmPoints', val);
+}
+
+function openBuyModal(scrip, side, strike, ltpVal, exch, lotSize) {
+  _buyScripCode = scrip;
+  _buyLotSize   = lotSize || 1;
+  _buyExch      = exch || 'N';
+
+  document.getElementById('buyModalTitle').textContent =
+    `🛒 Buy ${currentIndex} ${strike} ${side}`;
+  document.getElementById('buyIndex').textContent      = currentIndex;
+  document.getElementById('buyStrikeType').textContent = `${strike} ${side}`;
+  document.getElementById('buyLtpVal').textContent     = `₹${fmt2(ltpVal)}`;
+  document.getElementById('buyLots').value             = '1';
+  document.getElementById('buyQtyHint').textContent    = `× ${lotSize} = ${lotSize} qty`;
+  document.getElementById('buyResult').innerHTML       = '';
+  document.getElementById('buyConfirmBtn').disabled    = false;
+  document.getElementById('buyConfirmBtn').textContent = '✓ Place Buy Order';
+
+  // Update qty hint when lots change
+  document.getElementById('buyLots').oninput = function() {
+    const lots = parseInt(this.value) || 1;
+    document.getElementById('buyQtyHint').textContent = `× ${lotSize} = ${lots * lotSize} qty`;
+  };
+
+  document.getElementById('buyModal').style.display = 'flex';
+}
+
+function closeBuyModal() {
+  document.getElementById('buyModal').style.display = 'none';
+}
+
+async function confirmBuy() {
+  const btn  = document.getElementById('buyConfirmBtn');
+  const lots = parseInt(document.getElementById('buyLots').value) || 1;
+  const qty  = lots * _buyLotSize;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Placing order…';
+  document.getElementById('buyResult').innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/place-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scrip_code: _buyScripCode,
+        exch:       _buyExch,
+        qty:        qty,
+      }),
+    });
+    const d = await resp.json();
+    if (d.success) {
+      document.getElementById('buyResult').innerHTML =
+        `<div style="margin-top:12px;padding:10px 14px;background:rgba(52,211,153,0.1);border:1px solid #10b981;border-radius:8px;color:#34d399;font-size:0.85em">
+          ✅ Order placed! Order ID: <strong>${d.order_id || '—'}</strong>
+        </div>`;
+      btn.textContent = '✓ Order Placed';
+    } else {
+      document.getElementById('buyResult').innerHTML =
+        `<div style="margin-top:12px;padding:10px 14px;background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:8px;color:#f87171;font-size:0.85em">
+          ❌ ${d.error || 'Order failed'}
+        </div>`;
+      btn.disabled = false;
+      btn.textContent = '✓ Place Buy Order';
+    }
+  } catch (e) {
+    document.getElementById('buyResult').innerHTML =
+      `<div style="margin-top:12px;padding:10px 14px;background:rgba(248,113,113,0.1);border:1px solid #f87171;border-radius:8px;color:#f87171;font-size:0.85em">
+        ❌ Network error: ${e.message}
+      </div>`;
+    btn.disabled = false;
+    btn.textContent = '✓ Place Buy Order';
+  }
+}
+
+// Close buy modal when clicking overlay
+document.getElementById('buyModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('buyModal')) closeBuyModal();
+});
+
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadIndices().then(() => {
+  // Restore ITM setting from localStorage
+  const savedItm = localStorage.getItem('itmPoints');
+  if (savedItm) document.getElementById('itmInput').value = savedItm;
+
   loadLtp();
   loadOHLC();
   loadSrOverview();
