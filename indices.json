@@ -7,7 +7,7 @@
     "opt_exch": "B",
     "opt_symbol": "SENSEX",
     "chart_exch": "B",
-    "chart_scrip": 1
+    "chart_scrip": 999901
   },
   {
     "id": "NIFTY",
@@ -15,7 +15,9 @@
     "feed_exch": "N",
     "feed_scrip": 999920,
     "opt_exch": "N",
-    "opt_symbol": "NIFTY"
+    "opt_symbol": "NIFTY",
+    "chart_exch": "N",
+    "chart_scrip": 999920000
   },
   {
     "id": "BANKNIFTY",
@@ -23,7 +25,9 @@
     "feed_exch": "N",
     "feed_scrip": 999921,
     "opt_exch": "N",
-    "opt_symbol": "BANKNIFTY"
+    "opt_symbol": "BANKNIFTY",
+    "chart_exch": "N",
+    "chart_scrip": 999920005
   },
   {
     "id": "FINNIFTY",
@@ -31,6 +35,8 @@
     "feed_exch": "N",
     "feed_scrip": 999922,
     "opt_exch": "N",
-    "opt_symbol": "FINNIFTY"
+    "opt_symbol": "FINNIFTY",
+    "chart_exch": "N",
+    "chart_scrip": 999920041
   }
 ]
