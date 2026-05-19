@@ -14,7 +14,8 @@ from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapsho
                         save_sr_alert, get_sr_alerts, get_setting, set_setting,
                         get_breach_alerts,
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
-                        delete_market_summary, get_today_market_summary)
+                        delete_market_summary, get_today_market_summary,
+                        save_watchlist, get_watchlist, cancel_watchlist)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -75,6 +76,11 @@ try:
         _scheduler.add_job(run_breach_monitor, 'interval', minutes=_bm_freq,
                            id='breach_monitor', max_instances=1, misfire_grace_time=60)
         print(f'[SCHEDULER] Breach Monitor started — every {_bm_freq} min')
+    # Trade Watchlist watcher — checks pending conditions every 2 min during market hours
+    from modules.scheduler import run_trade_watcher
+    _scheduler.add_job(run_trade_watcher, 'interval', minutes=2,
+                       id='trade_watcher', max_instances=1, misfire_grace_time=60)
+    print('[SCHEDULER] Trade Watcher started — every 2 min')
     _scheduler.start()
     print('[SCHEDULER] Started — SENSEX snapshots every 1 min during market hours')
 except Exception as _e:
@@ -499,28 +505,32 @@ Respond ONLY with this JSON (no markdown, no text outside JSON):
     "strike": 0,
     "type": "CE or PE",
     "premium": 0.0,
-    "entry_trigger": "exact index price level to watch before entering, e.g. 'Enter if NIFTY breaks below 23550 on 15-min close' or 'Enter at open if NIFTY gaps below 23600'",
-    "entry_timing": "best time window, e.g. '9:20–9:45 AM after opening range forms' or 'after 11 AM if support holds'",
+    "trigger_price": 0,
+    "trigger_condition": "above",
+    "entry_trigger": "one line: what to watch at the trigger_price level",
+    "entry_timing": "best time window, e.g. '9:20-9:45 AM after opening range forms'",
     "sl": 0.0,
     "target": 0.0,
-    "reason": "one sentence why this specific strike — OI wall, S/R level, risk/reward"
+    "reason": "one sentence why this strike"
   }}
 }}
 
 TRADE RULES:
 - Pick ONE trade only (CE if bullish, PE if bearish)
-- entry_trigger: a specific index price level/condition — NOT vague, e.g. "Enter if {idx} sustains above 24050" or "Enter on break below 23500 with volume"
-- entry_timing: time of day guidance based on market open behaviour, OI patterns, expiry day dynamics
-- sl = premium × 0.70 (30% loss = stop)
-- target = premium + 3 × (premium - sl)   ← exactly 1:3 R:R
+- trigger_price: EXACT integer index price to watch (e.g. 24050)
+- trigger_condition: "above" = enter when {idx} >= trigger_price (use for CE); "below" = enter when {idx} <= trigger_price (use for PE)
+- entry_trigger: brief human-readable summary of the trigger
+- entry_timing: time of day guidance
+- sl = premium x 0.70 (30% loss = stop)
+- target = premium + 3 x (premium - sl)  exactly 1:3 R:R
 - Round sl and target to nearest 0.5
-- Choose strike with best OI support + near ATM for liquidity"""
+- Choose strike near ATM with strong OI backing"""
 
     try:
         ac = _anthropic.Anthropic()
         resp = ac.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=700,
+            max_tokens=900,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = resp.content[0].text.strip()
@@ -568,6 +578,41 @@ TRADE RULES:
         except Exception as _se:
             print(f'[DB] chain analysis save error: {_se}')
 
+        # Auto-save to trade watchlist — replace any existing pending entry for this index
+        watchlist_id = None
+        try:
+            t_save = structured.get('trade', {})
+            t_strike     = int(t_save.get('strike', 0))
+            t_type       = (t_save.get('type') or '').upper()        # CE / PE
+            t_premium    = float(t_save.get('premium', 0))
+            t_trigger    = float(t_save.get('trigger_price', 0))
+            t_condition  = (t_save.get('trigger_condition') or 'above').lower()
+            t_sl         = float(t_save.get('sl', 0))
+            t_target     = float(t_save.get('target', 0))
+            if t_strike and t_type and t_trigger:
+                # Find scrip_code from option chain
+                scrip_key  = 'ce_scrip' if t_type == 'CE' else 'pe_scrip'
+                t_scrip    = 0
+                for row_r in rows:
+                    if int(row_r['strike']) == t_strike:
+                        t_scrip = int(row_r.get(scrip_key, 0))
+                        # Also use chain LTP if premium is 0
+                        if t_premium == 0:
+                            ltp_key = 'ce_ltp' if t_type == 'CE' else 'pe_ltp'
+                            t_premium = float(row_r.get(ltp_key, 0))
+                        break
+                watchlist_id = save_watchlist(
+                    index_id=idx, strike=t_strike, option_type=t_type,
+                    scrip_code=t_scrip, premium=t_premium,
+                    trigger_price=t_trigger, trigger_condition=t_condition,
+                    sl=t_sl, target=t_target, qty=1,
+                    notes=f"Auto from analysis @ {ltp}",
+                )
+                print(f'[WATCHLIST] {idx} saved id={watchlist_id} '
+                      f'{t_strike}{t_type} trigger={t_condition} {t_trigger}')
+        except Exception as _we:
+            print(f'[WATCHLIST] save error: {_we}')
+
         return jsonify({
             "structured":   structured,
             "summary":      analysis_text,
@@ -582,6 +627,7 @@ TRADE RULES:
             "sr_used":      sr_meta,           # None if no S/R saved
             "prev_used":    bool(prev_context), # True if previous analysis was included
             "prev_meta":    prev_meta,          # dict with date/time/ltp/direction/trade or None
+            "watchlist_id": watchlist_id,       # id of the auto-saved watchlist entry or None
         })
     except json.JSONDecodeError as e:
         print(f'[MS] JSON parse error: {e} | raw: {raw[:200]}')
@@ -625,6 +671,24 @@ def api_market_summary_today():
         'prev_used':    False,
         'prev_meta':    None,
     })
+
+
+@app.route('/api/watchlist')
+def api_watchlist_get():
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx    = request.args.get('index', '').upper() or None
+    status = request.args.get('status', '')        or None
+    limit  = int(request.args.get('limit', 20))
+    return jsonify({'watchlist': get_watchlist(index_id=idx, status=status, limit=limit)})
+
+
+@app.route('/api/watchlist/<int:wid>', methods=['DELETE'])
+def api_watchlist_cancel(wid):
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    cancelled = cancel_watchlist(wid)
+    return jsonify({'success': True, 'cancelled': cancelled})
 
 
 @app.route('/api/market-summary/history')
@@ -1333,7 +1397,7 @@ def api_scheduler_toggle():
 
 _ALLOWED_TABLES = {
     'sr_levels', 'chain_snapshots', 'chain_analysis',
-    'sr_alerts', 'breach_alerts', 'settings', 'market_summary',
+    'sr_alerts', 'breach_alerts', 'settings', 'market_summary', 'trade_watchlist',
 }
 
 def _db_conn():

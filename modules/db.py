@@ -109,6 +109,27 @@ def init_db():
                 value TEXT NOT NULL
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS trade_watchlist (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id          TEXT    NOT NULL,
+                strike            INTEGER NOT NULL,
+                option_type       TEXT    NOT NULL,
+                scrip_code        INTEGER DEFAULT 0,
+                premium           REAL    DEFAULT 0,
+                trigger_price     REAL    NOT NULL,
+                trigger_condition TEXT    NOT NULL,
+                sl                REAL    DEFAULT 0,
+                target            REAL    DEFAULT 0,
+                qty               INTEGER DEFAULT 1,
+                status            TEXT    DEFAULT 'pending',
+                created_at        TEXT    NOT NULL,
+                executed_at       TEXT,
+                execution_price   REAL,
+                order_id          TEXT,
+                notes             TEXT
+            )
+        ''')
         # Seed default settings
         defaults = [
             ('sr_monitor_enabled',      'true'),
@@ -389,3 +410,82 @@ def cleanup_old_snapshots(days=7):
         cutoff = (datetime.now(_IST) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
         c.execute('DELETE FROM chain_snapshots WHERE saved_at < ?', (cutoff,))
         c.commit()
+
+
+# ── Trade Watchlist ────────────────────────────────────────────────────────────
+
+def save_watchlist(index_id, strike, option_type, scrip_code, premium,
+                   trigger_price, trigger_condition, sl, target, qty=1, notes=''):
+    """Cancel any pending item for this index, then save a new watchlist entry."""
+    now = datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')
+    with _conn() as c:
+        c.execute(
+            "UPDATE trade_watchlist SET status='cancelled' WHERE index_id=? AND status='pending'",
+            (index_id,)
+        )
+        cur = c.execute('''
+            INSERT INTO trade_watchlist
+            (index_id, strike, option_type, scrip_code, premium,
+             trigger_price, trigger_condition, sl, target, qty, status, created_at, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        ''', (index_id, int(strike), option_type, int(scrip_code), float(premium),
+              float(trigger_price), trigger_condition, float(sl), float(target),
+              int(qty), now, notes))
+        c.commit()
+        return cur.lastrowid
+
+
+def get_watchlist(index_id=None, status=None, limit=20):
+    with _conn() as c:
+        conds, params = [], []
+        if index_id:
+            conds.append('index_id=?'); params.append(index_id)
+        if status:
+            conds.append('status=?'); params.append(status)
+        where = ('WHERE ' + ' AND '.join(conds)) if conds else ''
+        rows = c.execute(
+            f'SELECT * FROM trade_watchlist {where} ORDER BY created_at DESC LIMIT ?',
+            params + [limit]
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_pending_watchlist():
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM trade_watchlist WHERE status='pending' ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def update_watchlist_executed(wid, execution_price, order_id):
+    now = datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')
+    with _conn() as c:
+        c.execute(
+            '''UPDATE trade_watchlist
+               SET status='executed', executed_at=?, execution_price=?, order_id=?
+               WHERE id=?''',
+            (now, execution_price, str(order_id), wid)
+        )
+        c.commit()
+
+
+def update_watchlist_failed(wid, notes):
+    with _conn() as c:
+        c.execute(
+            "UPDATE trade_watchlist SET status='failed', notes=? WHERE id=?",
+            (str(notes)[:400], wid)
+        )
+        c.commit()
+
+
+def cancel_watchlist(wid):
+    with _conn() as c:
+        c.execute(
+            "UPDATE trade_watchlist SET status='cancelled' WHERE id=? AND status='pending'",
+            (wid,)
+        )
+        c.commit()
+        return c.execute('SELECT changes()').fetchone()[0]
+
+

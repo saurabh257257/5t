@@ -663,6 +663,20 @@ header {
     </div>
   </div>
 
+  <!-- Trade Watchlist Card -->
+  <div class="chain-summary" id="watchlistCard" style="display:none;margin-top:12px">
+    <div class="cs-header">
+      <div class="cs-header-left">
+        <span class="cs-title">📌 Trade Watchlist</span>
+        <span class="cs-badge" id="watchlistBadge" style="background:#1e1b4b;color:#a78bfa">0 pending</span>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <button class="cs-refresh" onclick="loadWatchlist()">↻</button>
+      </div>
+    </div>
+    <div id="watchlistBody" style="padding:0 18px 14px"></div>
+  </div>
+
   <!-- Option Chain + AI Strike Panel -->
   <div class="chain-ai-wrap">
     <div class="chain-card">
@@ -999,6 +1013,7 @@ function switchIndex() {
   document.getElementById('mktStatus').className = 'closed-dot';
   document.getElementById('mktStatus').textContent = '—';
   document.getElementById('chainSummaryCard').style.display = 'none';
+  document.getElementById('watchlistCard').style.display = 'none';
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="state-icon">&#x1F4CA;</div>Select an expiry and click Load Chain</div>';
   document.getElementById('statusTxt').textContent = '';
@@ -1557,6 +1572,27 @@ function renderMarketSummary(d) {
         : `<span style="margin-left:auto;font-size:0.65em;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:#34d399;padding:3px 10px;border-radius:12px;white-space:nowrap">🔄 Fresh analysis</span>`}
     </div>
 
+    <!-- Key S/R Levels bar -->
+    ${sr && (sr.supports.length || sr.resistances.length) ? (() => {
+      const curLtp = d.ltp || lastLtp;
+      const belowSups = sr.supports.filter(v => v < curLtp);
+      const aboveRes  = sr.resistances.filter(v => v > curLtp);
+      const topSup = belowSups.length ? Math.max(...belowSups) : (sr.supports[0] || null);
+      const topRes = aboveRes.length  ? Math.min(...aboveRes)  : (sr.resistances[0] || null);
+      const supDist = topSup ? ((curLtp - topSup) / topSup * 100).toFixed(2) : null;
+      const resDist = topRes ? ((topRes - curLtp) / topRes * 100).toFixed(2) : null;
+      return `<div style="display:flex;gap:0;border-radius:8px;overflow:hidden;font-size:0.78em;font-weight:600">
+        ${topSup ? `<div style="flex:1;padding:7px 12px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.25);color:#34d399">
+          🛡 Support <span style="font-size:1.1em">${topSup.toLocaleString()}</span>
+          <span style="font-weight:400;color:#6b7280;font-size:0.85em"> · ${supDist}% below</span>
+        </div>` : ''}
+        ${topRes ? `<div style="flex:1;padding:7px 12px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:#f87171;${topSup ? 'border-left:none' : ''}">
+          🚧 Resistance <span style="font-size:1.1em">${topRes.toLocaleString()}</span>
+          <span style="font-weight:400;color:#6b7280;font-size:0.85em"> · ${resDist}% above</span>
+        </div>` : ''}
+      </div>`;
+    })() : ''}
+
     <!-- Context -->
     <div>
       <div class="ms-section-label">📋 Background</div>
@@ -1683,6 +1719,9 @@ async function loadChainSummary() {
   document.getElementById('csPrevTimeVal').textContent =
     `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
     `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  // Refresh watchlist to show newly created entry
+  loadWatchlist();
 }
 
 // ── Try load today's cached summary first; fall back to fresh Claude call ─────
@@ -1726,12 +1765,83 @@ async function tryLoadTodaySummary() {
       // Update prev timestamp label
       document.getElementById('csPrevTime').style.display = 'inline';
       document.getElementById('csPrevTimeVal').textContent = `${cached.date} ${cached.time}`;
+
+      // Show watchlist alongside cached summary
+      loadWatchlist();
       return; // done — no Claude call needed
     }
   } catch (_) { /* network issue — fall through to full analysis */ }
 
   // No today summary cached → run fresh Claude analysis
   await loadChainSummary();
+}
+
+// ── Trade Watchlist ───────────────────────────────────────────────────────────
+async function loadWatchlist() {
+  const card = document.getElementById('watchlistCard');
+  const body = document.getElementById('watchlistBody');
+  const badge = document.getElementById('watchlistBadge');
+
+  try {
+    const d = await get(`/api/watchlist?limit=10`);
+    const items = d.watchlist || [];
+    card.style.display = 'block';
+
+    const pending   = items.filter(i => i.status === 'pending');
+    const rest      = items.filter(i => i.status !== 'pending');
+    badge.textContent = `${pending.length} pending`;
+
+    if (!items.length) {
+      body.innerHTML = '<div style="color:#4b5563;font-size:0.83em;padding:10px 0">No watchlist entries yet — run Market Summary to auto-create one.</div>';
+      return;
+    }
+
+    const statusCls = s => s === 'pending' ? '#fbbf24' : s === 'executed' ? '#34d399' : s === 'failed' ? '#f87171' : '#6b7280';
+    const statusIcon = s => s === 'pending' ? '⏳' : s === 'executed' ? '✅' : s === 'failed' ? '❌' : '🚫';
+
+    const rows = [...pending, ...rest].map(it => {
+      const condTxt = it.trigger_condition === 'above'
+        ? `Enter when <strong>${it.index_id} ≥ ${Number(it.trigger_price).toLocaleString()}</strong>`
+        : `Enter when <strong>${it.index_id} ≤ ${Number(it.trigger_price).toLocaleString()}</strong>`;
+      const cancelBtn = it.status === 'pending'
+        ? `<button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 8px;font-size:0.75em;cursor:pointer">✕ Cancel</button>`
+        : '';
+      const execInfo = it.status === 'executed'
+        ? `<span style="font-size:0.72em;color:#34d399"> · Order ${it.order_id} @ ₹${it.execution_price} (${it.executed_at?.slice(11,16)})</span>`
+        : it.status === 'failed'
+        ? `<span style="font-size:0.72em;color:#f87171"> · ${(it.notes||'').slice(0,60)}</span>`
+        : '';
+      return `
+      <div style="border:1px solid #1e1b4b;border-radius:8px;padding:10px 13px;margin:8px 0;background:#0d0d1a">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <div>
+            <span style="color:${statusCls(it.status)};font-size:0.8em;font-weight:700">${statusIcon(it.status)} ${it.status.toUpperCase()}</span>
+            <span style="color:#e2e8f0;font-weight:700;margin-left:10px">${it.index_id} · BUY ${it.strike} ${it.option_type}</span>
+            <span style="color:#94a3b8;font-size:0.82em"> @ ₹${it.premium}</span>
+            ${execInfo}
+          </div>
+          ${cancelBtn}
+        </div>
+        <div style="font-size:0.78em;color:#94a3b8;margin-bottom:4px">${condTxt}</div>
+        <div style="display:flex;gap:16px;font-size:0.75em;color:#6b7280">
+          <span>SL ₹${it.sl}</span>
+          <span>Target ₹${it.target}</span>
+          <span>Qty ${it.qty}</span>
+          <span>${it.created_at?.slice(0,16)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    body.innerHTML = rows;
+  } catch (e) {
+    console.error('loadWatchlist error', e);
+  }
+}
+
+async function cancelWatchlist(wid) {
+  if (!confirm('Cancel this watchlist entry?')) return;
+  await fetch(`/api/watchlist/${wid}`, { method: 'DELETE' });
+  loadWatchlist();
 }
 
 // ── Strike AI Panel ───────────────────────────────────────────────────────────

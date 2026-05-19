@@ -13,7 +13,8 @@ from modules.market import get_expiry_dates, get_option_chain_data, get_index_lt
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, save_sr_alert, was_recently_alerted,
                         get_setting, set_setting, cleanup_old_alerts,
-                        save_breach_alert, cleanup_old_breach_alerts)
+                        save_breach_alert, cleanup_old_breach_alerts,
+                        get_pending_watchlist, update_watchlist_executed, update_watchlist_failed)
 from modules.telegram import send_sr_alert, send_message
 
 # Module-level dict to track previous LTP per index for breach detection
@@ -430,3 +431,120 @@ def run_breach_monitor():
             print(f'[BREACH_MONITOR] Error for {idx.get("id","?")}: {e}')
 
     cleanup_old_breach_alerts(days=30)
+
+
+# ── Trade Watchlist Watcher ────────────────────────────────────────────────────
+
+def run_trade_watcher():
+    """
+    Every 2 minutes during market hours: check pending watchlist items.
+    If an index crosses its trigger_price, place a limit order automatically.
+    """
+    if not _is_market_hours():
+        return
+
+    pending = get_pending_watchlist()
+    if not pending:
+        return
+
+    print(f'[TRADE_WATCHER] checking {len(pending)} pending item(s)', flush=True)
+
+    client = _restore_client()
+    if not client:
+        print('[TRADE_WATCHER] No saved session — skipping')
+        return
+
+    # Load index config map
+    try:
+        _idx_file = os.path.join(os.path.dirname(__file__), '..', 'indices.json')
+        with open(_idx_file) as f:
+            idx_map = {i['id']: i for i in json.load(f)}
+    except Exception:
+        idx_map = {
+            'SENSEX':    {'feed_exch': 'B', 'feed_scrip': 999901},
+            'NIFTY':     {'feed_exch': 'N', 'feed_scrip': 999920},
+            'BANKNIFTY': {'feed_exch': 'N', 'feed_scrip': 999921},
+            'FINNIFTY':  {'feed_exch': 'N', 'feed_scrip': 999922},
+        }
+
+    for item in pending:
+        index_id = item['index_id']
+        try:
+            cfg = idx_map.get(index_id)
+            if not cfg:
+                print(f'[TRADE_WATCHER] unknown index {index_id}')
+                continue
+
+            # Get current LTP
+            ltp_data = get_index_ltp(client, cfg['feed_exch'], cfg['feed_scrip'], index_id)
+            ltp = ltp_data.get('ltp', 0)
+            if ltp == 0:
+                continue
+
+            trigger_price = float(item['trigger_price'])
+            condition     = (item['trigger_condition'] or 'above').lower()
+            triggered     = (condition == 'above' and ltp >= trigger_price) or \
+                            (condition == 'below' and ltp <= trigger_price)
+
+            print(f'[TRADE_WATCHER] {index_id} LTP={ltp} | cond={condition} {trigger_price} | triggered={triggered}')
+
+            if not triggered:
+                continue
+
+            # ── Condition met — place limit order ────────────────────────────
+            scrip_code = int(item['scrip_code'] or 0)
+            if not scrip_code:
+                update_watchlist_failed(item['id'], 'No scrip_code — cannot place order')
+                send_message(f'⚠️ <b>Watchlist {index_id}</b>: trigger hit but scrip_code missing')
+                continue
+
+            premium = float(item['premium'] or 0)
+            price   = round(premium * 1.02, 2) if premium > 0 else 0
+            exch    = 'B' if index_id == 'SENSEX' else 'N'
+
+            result = client.place_order(
+                OrderType='B', Exchange=exch, ExchangeType='D',
+                ScripCode=scrip_code, Qty=int(item['qty'] or 1),
+                Price=price, IsIntraday=True, StopLossPrice=0, IsIOCOrder=False,
+            )
+            print(f'[TRADE_WATCHER] order result: {result!r}')
+
+            if isinstance(result, dict):
+                status_val = result.get('Status', -1)
+                order_id   = (result.get('BrokerOrderId') or
+                              result.get('RemoteOrderID') or
+                              result.get('OrderId') or '')
+            else:
+                status_val, order_id = -1, ''
+
+            try:
+                status_int = int(status_val)
+            except Exception:
+                status_int = -1
+
+            now_s = datetime.now(_IST).strftime('%H:%M')
+            if status_int == 0 and order_id:
+                update_watchlist_executed(item['id'], premium, str(order_id))
+                send_message(
+                    f'✅ <b>Auto-Trade Executed — {index_id}</b>\n\n'
+                    f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f}\n'
+                    f'Order ID: {order_id}\n'
+                    f'Triggered: LTP {ltp:,.0f} ({condition} {trigger_price:,.0f}) @ {now_s}\n'
+                    f'SL ₹{item["sl"]:.2f} | Target ₹{item["target"]:.2f}'
+                )
+                print(f'[TRADE_WATCHER] ✅ {index_id} order placed: {order_id}')
+            else:
+                err_msg = (result.get('Message') or str(result))[:200] if isinstance(result, dict) else str(result)[:200]
+                update_watchlist_failed(item['id'], err_msg)
+                send_message(
+                    f'❌ <b>Auto-Trade FAILED — {index_id}</b>\n'
+                    f'{item["strike"]} {item["option_type"]} | {err_msg[:100]}'
+                )
+                print(f'[TRADE_WATCHER] ❌ order failed: {err_msg}')
+
+        except Exception as e:
+            print(f'[TRADE_WATCHER] Error processing item {item["id"]}: {e}')
+            try:
+                update_watchlist_failed(item['id'], str(e)[:200])
+            except Exception:
+                pass
