@@ -345,9 +345,17 @@ def run_trade_watcher():
                 send_message(f'⚠️ <b>Watchlist {index_id}</b>: trigger hit but scrip_code missing')
                 continue
 
-            premium = float(item['premium'] or 0)
-            price   = round(premium * 1.02, 2) if premium > 0 else 0
-            exch    = 'B' if index_id == 'SENSEX' else 'N'
+            exch = 'B' if index_id == 'SENSEX' else 'N'
+
+            # ── Fetch LIVE option price at trigger moment ─────────────────────
+            live = get_ltp(client, scrip_code, exch, 'D')
+            live_price = float(live.get('ltp', 0))
+            stored_premium = float(item['premium'] or 0)
+            # Use live price; fall back to stored premium if live fetch fails
+            premium = live_price if live_price > 0 else stored_premium
+            price   = round(premium * 1.02, 2) if premium > 0 else 0   # limit 2% above
+
+            print(f'[TRADE_WATCHER] {index_id} option LTP={live_price} stored={stored_premium} order_price={price}')
 
             result = client.place_order(
                 OrderType='B', Exchange=exch, ExchangeType='D',
@@ -374,7 +382,7 @@ def run_trade_watcher():
                 update_watchlist_executed(item['id'], premium, str(order_id))
                 send_message(
                     f'✅ <b>Auto-Trade Executed — {index_id}</b>\n\n'
-                    f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f}\n'
+                    f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f} (live)\n'
                     f'Order ID: {order_id}\n'
                     f'Triggered: LTP {ltp:,.0f} ({condition} {trigger_price:,.0f}) @ {now_s}\n'
                     f'SL ₹{item["sl"]:.2f} | Target ₹{item["target"]:.2f}'

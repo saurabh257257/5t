@@ -15,7 +15,7 @@ from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapsho
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
                         delete_market_summary, get_today_market_summary,
                         save_watchlist, get_watchlist, cancel_watchlist,
-                        update_watchlist_item)
+                        update_watchlist_item, update_watchlist_executed, update_watchlist_failed)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -720,6 +720,58 @@ def api_watchlist_update(wid):
     sl_offset = float(body.get('sl_offset', 150))
     changed   = update_watchlist_item(wid, qty, sl_offset)
     return jsonify({'success': True, 'changed': changed})
+
+
+@app.route('/api/watchlist/<int:wid>/execute', methods=['POST'])
+def api_watchlist_execute(wid):
+    """Manually execute a pending watchlist entry at current live option price."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    # Fetch the item
+    items = [i for i in get_watchlist(status='pending') if i['id'] == wid]
+    if not items:
+        return jsonify({'error': 'Item not found or not pending'}), 404
+    item       = items[0]
+    index_id   = item['index_id']
+    scrip_code = int(item['scrip_code'] or 0)
+    if not scrip_code:
+        return jsonify({'error': 'No scrip_code — cannot place order'}), 400
+    exch = 'B' if index_id == 'SENSEX' else 'N'
+    # Fetch live option price
+    live = get_ltp(client, scrip_code, exch, 'D')
+    live_price     = float(live.get('ltp', 0))
+    stored_premium = float(item['premium'] or 0)
+    premium        = live_price if live_price > 0 else stored_premium
+    price          = round(premium * 1.02, 2) if premium > 0 else 0
+    try:
+        result = client.place_order(
+            OrderType='B', Exchange=exch, ExchangeType='D',
+            ScripCode=scrip_code, Qty=int(item['qty'] or 1),
+            Price=price, IsIntraday=True, StopLossPrice=0, IsIOCOrder=False,
+        )
+        if isinstance(result, dict):
+            status_int = int(result.get('Status', -1) or -1)
+            order_id   = str(result.get('BrokerOrderId') or result.get('RemoteOrderID') or result.get('OrderId') or '')
+        else:
+            status_int, order_id = -1, ''
+        if status_int == 0 and order_id:
+            update_watchlist_executed(wid, premium, order_id)
+            from modules.telegram import send_message
+            from datetime import datetime as _dt2
+            now_s = _dt2.now(__import__('datetime').timezone(__import__('datetime').timedelta(hours=5, minutes=30))).strftime('%H:%M')
+            send_message(
+                f'✅ <b>Manual Trade Executed — {index_id}</b>\n\n'
+                f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f} (live)\n'
+                f'Order ID: {order_id} @ {now_s}'
+            )
+            return jsonify({'success': True, 'order_id': order_id, 'premium': premium})
+        else:
+            err = (result.get('Message') or str(result))[:200] if isinstance(result, dict) else str(result)[:200]
+            update_watchlist_failed(wid, err)
+            return jsonify({'error': err}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/market-summary/history')

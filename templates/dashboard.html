@@ -1232,7 +1232,7 @@ function renderChain(data, labelOverride) {
 
   const idxCfg  = INDICES.find(i => i.id === currentIndex) || {};
   const optExch = idxCfg.opt_exch || 'N';
-  const lotSize = { SENSEX: 20, NIFTY: 75, BANKNIFTY: 30, FINNIFTY: 40 }[currentIndex] || 50;
+  const lotSize = _LOT_SIZES[currentIndex] || 1;
 
   const rows = data.map(r => {
     const isAtm   = atm !== null && r.strike === atm;
@@ -1581,7 +1581,7 @@ async function tryLoadTodaySummary() {
 }
 
 // ── Trade Watchlist ───────────────────────────────────────────────────────────
-const _LOT_SIZES = { SENSEX:10, NIFTY:25, BANKNIFTY:15, FINNIFTY:40 };
+const _LOT_SIZES = { SENSEX:20, NIFTY:65, BANKNIFTY:30, FINNIFTY:30 };
 
 async function loadWatchlist() {
   const card  = document.getElementById('watchlistCard');
@@ -1622,7 +1622,10 @@ async function loadWatchlist() {
               <span style="color:#e2e8f0;font-weight:700;margin-left:10px">${it.index_id} · BUY ${it.strike} ${it.option_type}</span>
               <span style="color:#94a3b8;font-size:0.82em"> @ ₹${it.premium}</span>
             </div>
-            <button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 8px;font-size:0.75em;cursor:pointer;white-space:nowrap">✕ Cancel</button>
+            <div style="display:flex;gap:6px">
+              <button onclick="executeWatchlistNow(${it.id},this)" style="background:#064e3b;border:1px solid #059669;color:#34d399;border-radius:5px;padding:2px 9px;font-size:0.75em;cursor:pointer;white-space:nowrap">▶ Execute Now</button>
+              <button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 8px;font-size:0.75em;cursor:pointer;white-space:nowrap">✕ Cancel</button>
+            </div>
           </div>
           <div style="font-size:0.78em;color:#94a3b8;margin-bottom:8px">Enter when ${cond} · ${it.created_at?.slice(0,16)}</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1743,6 +1746,30 @@ async function cancelWatchlist(wid) {
   if (!confirm('Cancel this watchlist entry?')) return;
   await fetch(`/api/watchlist/${wid}`, { method: 'DELETE' });
   loadWatchlist();
+}
+
+async function executeWatchlistNow(wid, btn) {
+  if (!confirm('Execute this trade NOW at live market price?')) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Placing…';
+  try {
+    const r = await fetch(`/api/watchlist/${wid}/execute`, { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      btn.textContent = '✅ Done';
+      btn.style.background = '#065f46';
+      setTimeout(() => loadWatchlist(), 1200);
+    } else {
+      btn.textContent = '❌ Failed';
+      btn.style.borderColor = '#f87171';
+      btn.style.color = '#f87171';
+      alert('Order failed: ' + (d.error || JSON.stringify(d)));
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    btn.disabled = false;
+  }
 }
 
 // Auto-refresh active P&L every 30 seconds
