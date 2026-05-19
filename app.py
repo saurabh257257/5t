@@ -738,6 +738,8 @@ def api_watchlist_execute(wid):
     if not scrip_code:
         return jsonify({'error': 'No scrip_code — cannot place order'}), 400
     exch = 'B' if index_id == 'SENSEX' else 'N'
+    _LOT_SIZES = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
+    actual_qty = int(item['qty'] or 1) * _LOT_SIZES.get(index_id, 1)
     # Fetch live option price
     live = get_ltp(client, scrip_code, exch, 'D')
     live_price     = float(live.get('ltp', 0))
@@ -747,7 +749,7 @@ def api_watchlist_execute(wid):
     try:
         result = client.place_order(
             OrderType='B', Exchange=exch, ExchangeType='D',
-            ScripCode=scrip_code, Qty=int(item['qty'] or 1),
+            ScripCode=scrip_code, Qty=actual_qty,
             Price=price, IsIntraday=True, StopLossPrice=0, IsIOCOrder=False,
         )
         if isinstance(result, dict):

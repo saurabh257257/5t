@@ -18,6 +18,12 @@ from modules.telegram import send_message
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 
+_LOT_SIZES = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
+
+def _lot_qty(index_id, lots):
+    """Convert lots → actual qty using index lot size."""
+    return int(lots) * _LOT_SIZES.get(index_id, 1)
+
 
 def _is_market_hours():
     """True if current IST time is within NSE/BSE trading hours, Mon–Fri."""
@@ -357,9 +363,10 @@ def run_trade_watcher():
 
             print(f'[TRADE_WATCHER] {index_id} option LTP={live_price} stored={stored_premium} order_price={price}')
 
+            actual_qty = _lot_qty(index_id, item['qty'] or 1)
             result = client.place_order(
                 OrderType='B', Exchange=exch, ExchangeType='D',
-                ScripCode=scrip_code, Qty=int(item['qty'] or 1),
+                ScripCode=scrip_code, Qty=actual_qty,
                 Price=price, IsIntraday=True, StopLossPrice=0, IsIOCOrder=False,
             )
             print(f'[TRADE_WATCHER] order result: {result!r}')
@@ -427,7 +434,7 @@ def run_trade_watcher():
                 sl_offset = float(pos.get('sl_offset') or 150)
                 sl_price  = max(entry - sl_offset, 0.5)
                 target_pr = entry + (3 * sl_offset)          # 1:3 R:R based on sl_offset
-                qty       = int(pos.get('qty') or 1)
+                qty       = _lot_qty(pos['index_id'], pos.get('qty') or 1)
                 now_s     = datetime.now(_IST).strftime('%H:%M')
 
                 if cur_ltp <= sl_price:
