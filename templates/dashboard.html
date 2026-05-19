@@ -887,6 +887,7 @@ async function get(url) {
 let INDICES = [];
 let currentIndex = '';
 let lastLtp = 0, lastPrevClose = 0;
+let lastOpen = 0, lastHigh = 0, lastLow = 0;  // persist OHL across polls
 
 async function loadIndices() {
   INDICES = await get('/api/indices');
@@ -903,7 +904,7 @@ function switchIndex() {
   currentIndex = sel.value;
   const cfg = INDICES.find(i => i.id === currentIndex);
   document.getElementById('idxLabel').textContent = cfg ? cfg.label : currentIndex;
-  lastLtp = 0; lastPrevClose = 0;
+  lastLtp = 0; lastPrevClose = 0; lastOpen = 0; lastHigh = 0; lastLow = 0;
   ['sxLtp','sxChange','sxOpen','sxHigh','sxLow','sxClose'].forEach(id => {
     document.getElementById(id).textContent = '—';
   });
@@ -1161,10 +1162,14 @@ async function loadLtp() {
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
   mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
 
-  // Populate O/H/L from market feed immediately (live feed always has these)
-  if ((d.open  || 0) > 0) document.getElementById('sxOpen').textContent = fmt2(d.open);
-  if ((d.high  || 0) > 0) document.getElementById('sxHigh').textContent = fmt2(d.high);
-  if ((d.low   || 0) > 0) document.getElementById('sxLow').textContent  = fmt2(d.low);
+  // Update OHL cache from market feed (non-zero wins; zero keeps last known value)
+  if ((d.open || 0) > 0) lastOpen = d.open;
+  if ((d.high || 0) > 0) lastHigh = d.high;
+  if ((d.low  || 0) > 0) lastLow  = d.low;
+  // Always render — shows stale values when market is closed rather than dashes
+  if (lastOpen > 0) document.getElementById('sxOpen').textContent = fmt2(lastOpen);
+  if (lastHigh > 0) document.getElementById('sxHigh').textContent = fmt2(lastHigh);
+  if (lastLow  > 0) document.getElementById('sxLow').textContent  = fmt2(lastLow);
 }
 
 // ── Today's Open / High / Low (separate from LTP poll) ───────────────────────
@@ -1172,20 +1177,13 @@ async function loadOHLC() {
   if (!currentIndex) return;
   const od = await get(`/api/today-ohlc?index=${currentIndex}`);
   if (!od.error && od.open > 0) {
-    // Precise intraday OHLC from historical data
-    document.getElementById('sxOpen').textContent = fmt2(od.open);
-    document.getElementById('sxHigh').textContent = fmt2(od.high);
-    document.getElementById('sxLow').textContent  = fmt2(od.low);
-    return;
+    // Precise intraday/daily OHLC from historical data — update cache + render
+    lastOpen = od.open; lastHigh = od.high; lastLow = od.low;
+    document.getElementById('sxOpen').textContent = fmt2(lastOpen);
+    document.getElementById('sxHigh').textContent = fmt2(lastHigh);
+    document.getElementById('sxLow').textContent  = fmt2(lastLow);
   }
-  // Fallback: use O/H/L from market feed (index-ltp already called in loadLtp,
-  // but we fetch again here in case OHLC is loaded independently / on index switch)
-  const fd = await get(`/api/index-ltp?index=${currentIndex}`);
-  if (!fd.error) {
-    if ((fd.open || 0) > 0) document.getElementById('sxOpen').textContent = fmt2(fd.open);
-    if ((fd.high || 0) > 0) document.getElementById('sxHigh').textContent = fmt2(fd.high);
-    if ((fd.low  || 0) > 0) document.getElementById('sxLow').textContent  = fmt2(fd.low);
-  }
+  // If od failed, loadLtp's cache already holds whatever it last got — no override needed
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────

@@ -114,17 +114,6 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
         except Exception:
             pass
 
-    # ── 2b. If market feed gave no OHL (e.g. closed), pull from historical ─────
-    if open_ == 0:
-        try:
-            h_ohlc = get_today_ohlc(client, exch, chart_scrip if chart_scrip else scrip_code)
-            if not h_ohlc.get('error'):
-                open_ = h_ohlc.get('open', 0)
-                high  = h_ohlc.get('high', 0)
-                low   = h_ohlc.get('low', 0)
-        except Exception:
-            pass
-
     # ── 3. prev_close — most recent historical close that is NOT today ────────
     # Feed's PreviousClose/CloseRate can return today's value; historical is reliable.
     h_scrip    = chart_scrip if chart_scrip else scrip_code
