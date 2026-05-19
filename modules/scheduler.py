@@ -9,10 +9,11 @@ import anthropic as _anthropic
 from datetime import datetime, timezone, timedelta
 
 from modules.auth import _restore_client
-from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp, get_today_ohlc
+from modules.market import get_expiry_dates, get_option_chain_data, get_index_ltp, get_today_ohlc, get_ltp
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, get_setting, set_setting,
-                        get_pending_watchlist, update_watchlist_executed, update_watchlist_failed)
+                        get_pending_watchlist, update_watchlist_executed, update_watchlist_failed,
+                        get_watchlist, update_watchlist_exit)
 from modules.telegram import send_message
 
 _IST = timezone(timedelta(hours=5, minutes=30))
@@ -394,3 +395,73 @@ def run_trade_watcher():
                 update_watchlist_failed(item['id'], str(e)[:200])
             except Exception:
                 pass
+
+    # ── Monitor active positions for SL / target exit ─────────────────────────
+    try:
+        active = [w for w in get_watchlist(status='executed')
+                  if w.get('exit_price') is None and w.get('exit_at') is None
+                  and int(w.get('scrip_code') or 0) > 0]
+        if not active:
+            return
+
+        print(f'[TRADE_WATCHER] monitoring {len(active)} active position(s)')
+
+        for pos in active:
+            try:
+                scrip_code = int(pos['scrip_code'])
+                exch       = 'B' if pos['index_id'] == 'SENSEX' else 'N'
+                ltp_data   = get_ltp(client, scrip_code, exch, 'D')
+                cur_ltp    = float(ltp_data.get('ltp', 0))
+                if cur_ltp == 0:
+                    continue
+
+                entry     = float(pos['execution_price'] or pos['premium'])
+                sl_offset = float(pos.get('sl_offset') or 150)
+                sl_price  = max(entry - sl_offset, 0.5)
+                target_pr = entry + (3 * sl_offset)          # 1:3 R:R based on sl_offset
+                qty       = int(pos.get('qty') or 1)
+                now_s     = datetime.now(_IST).strftime('%H:%M')
+
+                if cur_ltp <= sl_price:
+                    reason = 'sl_hit'
+                elif cur_ltp >= target_pr:
+                    reason = 'target_hit'
+                else:
+                    pnl = (cur_ltp - entry) * qty
+                    print(f'[TRADE_WATCHER] {pos["index_id"]} {pos["strike"]}{pos["option_type"]} '
+                          f'entry={entry} cur={cur_ltp} SL={sl_price:.1f} Tgt={target_pr:.1f} '
+                          f'P&L={pnl:+.0f}')
+                    continue
+
+                # Place sell order to exit
+                price  = round(cur_ltp * 0.98, 2)   # sell limit 2% below LTP
+                result = client.place_order(
+                    OrderType='S', Exchange=exch, ExchangeType='D',
+                    ScripCode=scrip_code, Qty=qty,
+                    Price=price, IsIntraday=True, StopLossPrice=0, IsIOCOrder=False,
+                )
+                print(f'[TRADE_WATCHER] exit order: {result!r}')
+
+                exit_order_id = ''
+                if isinstance(result, dict):
+                    st = int(result.get('Status', -1) or -1)
+                    exit_order_id = str(result.get('BrokerOrderId') or result.get('RemoteOrderID') or '')
+                    if st != 0:
+                        print(f'[TRADE_WATCHER] ⚠️ exit order may have failed: {result}')
+
+                update_watchlist_exit(pos['id'], cur_ltp, reason)
+                emoji  = '🛑' if reason == 'sl_hit' else '🎯'
+                pnl    = (cur_ltp - entry) * qty
+                send_message(
+                    f'{emoji} <b>{"SL Hit" if reason == "sl_hit" else "Target Hit"} — {pos["index_id"]}</b>\n\n'
+                    f'{pos["strike"]} {pos["option_type"]} · Exit @ ₹{cur_ltp:.2f}\n'
+                    f'Entry ₹{entry:.2f} | {"SL" if reason == "sl_hit" else "Target"} triggered @ {now_s}\n'
+                    f'P&L: ₹{pnl:+.0f} ({qty} lot{"s" if qty > 1 else ""})'
+                    + (f'\nOrder: {exit_order_id}' if exit_order_id else '')
+                )
+                print(f'[TRADE_WATCHER] {emoji} {reason} for {pos["index_id"]} {pos["strike"]}{pos["option_type"]}')
+
+            except Exception as ae:
+                print(f'[TRADE_WATCHER] active pos error id={pos["id"]}: {ae}')
+    except Exception as me:
+        print(f'[TRADE_WATCHER] active monitor error: {me}')

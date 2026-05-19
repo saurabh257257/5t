@@ -100,14 +100,36 @@ def init_db():
                 sl                REAL    DEFAULT 0,
                 target            REAL    DEFAULT 0,
                 qty               INTEGER DEFAULT 1,
+                sl_offset         REAL    DEFAULT 150,
                 status            TEXT    DEFAULT 'pending',
                 created_at        TEXT    NOT NULL,
                 executed_at       TEXT,
                 execution_price   REAL,
                 order_id          TEXT,
-                notes             TEXT
+                notes             TEXT,
+                exit_price        REAL,
+                exit_at           TEXT,
+                exit_reason       TEXT
             )
         ''')
+        # Migrate existing trade_watchlist rows (ignore if columns already exist)
+        for _col, _def in [('sl_offset','150'), ('exit_price','NULL'),
+                           ('exit_at','NULL'), ('exit_reason','NULL')]:
+            try:
+                if _def == 'NULL':
+                    c.execute(f'ALTER TABLE trade_watchlist ADD COLUMN {_col} REAL')
+                else:
+                    c.execute(f'ALTER TABLE trade_watchlist ADD COLUMN {_col} REAL DEFAULT {_def}')
+            except Exception:
+                pass
+        try:
+            c.execute('ALTER TABLE trade_watchlist ADD COLUMN exit_at TEXT')
+        except Exception:
+            pass
+        try:
+            c.execute('ALTER TABLE trade_watchlist ADD COLUMN exit_reason TEXT')
+        except Exception:
+            pass
         # Seed default settings
         defaults = [
             ('market_update_enabled',      'false'),
@@ -310,7 +332,8 @@ def cleanup_old_snapshots(days=7):
 # ── Trade Watchlist ────────────────────────────────────────────────────────────
 
 def save_watchlist(index_id, strike, option_type, scrip_code, premium,
-                   trigger_price, trigger_condition, sl, target, qty=1, notes=''):
+                   trigger_price, trigger_condition, sl, target, qty=1,
+                   sl_offset=150, notes=''):
     """Cancel any pending item for this index, then save a new watchlist entry."""
     now = datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')
     with _conn() as c:
@@ -321,11 +344,11 @@ def save_watchlist(index_id, strike, option_type, scrip_code, premium,
         cur = c.execute('''
             INSERT INTO trade_watchlist
             (index_id, strike, option_type, scrip_code, premium,
-             trigger_price, trigger_condition, sl, target, qty, status, created_at, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+             trigger_price, trigger_condition, sl, target, qty, sl_offset, status, created_at, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
         ''', (index_id, int(strike), option_type, int(scrip_code), float(premium),
               float(trigger_price), trigger_condition, float(sl), float(target),
-              int(qty), now, notes))
+              int(qty), float(sl_offset), now, notes))
         c.commit()
         return cur.lastrowid
 
@@ -382,5 +405,29 @@ def cancel_watchlist(wid):
         )
         c.commit()
         return c.execute('SELECT changes()').fetchone()[0]
+
+
+def update_watchlist_item(wid, qty, sl_offset):
+    """Update qty and sl_offset on a pending watchlist entry."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE trade_watchlist SET qty=?, sl_offset=? WHERE id=? AND status='pending'",
+            (int(qty), float(sl_offset), wid)
+        )
+        c.commit()
+        return c.execute('SELECT changes()').fetchone()[0]
+
+
+def update_watchlist_exit(wid, exit_price, exit_reason):
+    """Mark an executed position as exited (sl_hit or target_hit)."""
+    now = datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')
+    with _conn() as c:
+        c.execute(
+            '''UPDATE trade_watchlist
+               SET status=?, exit_price=?, exit_at=?, exit_reason=?
+               WHERE id=?''',
+            (exit_reason, float(exit_price), now, exit_reason, wid)
+        )
+        c.commit()
 
 

@@ -14,7 +14,8 @@ from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapsho
                         get_setting, set_setting,
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
                         delete_market_summary, get_today_market_summary,
-                        save_watchlist, get_watchlist, cancel_watchlist)
+                        save_watchlist, get_watchlist, cancel_watchlist,
+                        update_watchlist_item)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -590,7 +591,7 @@ TRADE RULES:
                     index_id=idx, strike=t_strike, option_type=t_type,
                     scrip_code=t_scrip, premium=t_premium,
                     trigger_price=t_trigger, trigger_condition=t_condition,
-                    sl=t_sl, target=t_target, qty=1,
+                    sl=t_sl, target=t_target, qty=1, sl_offset=150,
                     notes=f"Auto from analysis @ {ltp}",
                 )
                 print(f'[WATCHLIST] {idx} saved id={watchlist_id} '
@@ -674,6 +675,18 @@ def api_watchlist_cancel(wid):
         return jsonify({'error': 'Not authenticated'}), 401
     cancelled = cancel_watchlist(wid)
     return jsonify({'success': True, 'cancelled': cancelled})
+
+
+@app.route('/api/watchlist/<int:wid>', methods=['PATCH'])
+def api_watchlist_update(wid):
+    """Update qty and sl_offset on a pending watchlist entry."""
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    body      = request.get_json() or {}
+    qty       = int(body.get('qty', 1))
+    sl_offset = float(body.get('sl_offset', 150))
+    changed   = update_watchlist_item(wid, qty, sl_offset)
+    return jsonify({'success': True, 'changed': changed})
 
 
 @app.route('/api/market-summary/history')

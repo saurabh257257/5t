@@ -1555,65 +1555,162 @@ async function tryLoadTodaySummary() {
 }
 
 // ── Trade Watchlist ───────────────────────────────────────────────────────────
+const _LOT_SIZES = { SENSEX:10, NIFTY:25, BANKNIFTY:15, FINNIFTY:40 };
+
 async function loadWatchlist() {
-  const card = document.getElementById('watchlistCard');
-  const body = document.getElementById('watchlistBody');
+  const card  = document.getElementById('watchlistCard');
+  const body  = document.getElementById('watchlistBody');
   const badge = document.getElementById('watchlistBadge');
 
   try {
-    const d = await get(`/api/watchlist?limit=10`);
+    const d = await get('/api/watchlist?limit=20');
     const items = d.watchlist || [];
     card.style.display = 'block';
 
-    const pending   = items.filter(i => i.status === 'pending');
-    const rest      = items.filter(i => i.status !== 'pending');
-    badge.textContent = `${pending.length} pending`;
+    const pending = items.filter(i => i.status === 'pending');
+    const active  = items.filter(i => i.status === 'executed' && !i.exit_at);
+    const history = items.filter(i => !['pending','executed'].includes(i.status) || i.exit_at);
+
+    badge.textContent = `${pending.length} watching · ${active.length} active`;
 
     if (!items.length) {
       body.innerHTML = '<div style="color:#4b5563;font-size:0.83em;padding:10px 0">No watchlist entries yet — run Market Summary to auto-create one.</div>';
       return;
     }
 
-    const statusCls = s => s === 'pending' ? '#fbbf24' : s === 'executed' ? '#34d399' : s === 'failed' ? '#f87171' : '#6b7280';
-    const statusIcon = s => s === 'pending' ? '⏳' : s === 'executed' ? '✅' : s === 'failed' ? '❌' : '🚫';
-
-    const rows = [...pending, ...rest].map(it => {
-      const condTxt = it.trigger_condition === 'above'
-        ? `Enter when <strong>${it.index_id} ≥ ${Number(it.trigger_price).toLocaleString()}</strong>`
-        : `Enter when <strong>${it.index_id} ≤ ${Number(it.trigger_price).toLocaleString()}</strong>`;
-      const cancelBtn = it.status === 'pending'
-        ? `<button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 8px;font-size:0.75em;cursor:pointer">✕ Cancel</button>`
-        : '';
-      const execInfo = it.status === 'executed'
-        ? `<span style="font-size:0.72em;color:#34d399"> · Order ${it.order_id} @ ₹${it.execution_price} (${it.executed_at?.slice(11,16)})</span>`
-        : it.status === 'failed'
-        ? `<span style="font-size:0.72em;color:#f87171"> · ${(it.notes||'').slice(0,60)}</span>`
-        : '';
-      return `
-      <div style="border:1px solid #1e1b4b;border-radius:8px;padding:10px 13px;margin:8px 0;background:#0d0d1a">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-          <div>
-            <span style="color:${statusCls(it.status)};font-size:0.8em;font-weight:700">${statusIcon(it.status)} ${it.status.toUpperCase()}</span>
-            <span style="color:#e2e8f0;font-weight:700;margin-left:10px">${it.index_id} · BUY ${it.strike} ${it.option_type}</span>
-            <span style="color:#94a3b8;font-size:0.82em"> @ ₹${it.premium}</span>
-            ${execInfo}
+    // ── Pending section ───────────────────────────────────────────────────────
+    const pendingHtml = pending.length ? `
+      <div style="font-size:0.7em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin:10px 0 6px">⏳ Watching</div>
+      ${pending.map(it => {
+        const cond  = it.trigger_condition === 'above'
+          ? `<strong>${it.index_id} ≥ ${Number(it.trigger_price).toLocaleString()}</strong>`
+          : `<strong>${it.index_id} ≤ ${Number(it.trigger_price).toLocaleString()}</strong>`;
+        const slOff = it.sl_offset || 150;
+        const slPx  = Math.max((it.premium || 0) - slOff, 0.5).toFixed(1);
+        const tgtPx = ((it.premium || 0) + 3 * slOff).toFixed(1);
+        return `
+        <div style="border:1px solid #2d2b4e;border-radius:8px;padding:10px 13px;margin:0 0 8px;background:#0d0d1a">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div>
+              <span style="color:#fbbf24;font-size:0.8em;font-weight:700">⏳ WATCHING</span>
+              <span style="color:#e2e8f0;font-weight:700;margin-left:10px">${it.index_id} · BUY ${it.strike} ${it.option_type}</span>
+              <span style="color:#94a3b8;font-size:0.82em"> @ ₹${it.premium}</span>
+            </div>
+            <button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 8px;font-size:0.75em;cursor:pointer;white-space:nowrap">✕ Cancel</button>
           </div>
-          ${cancelBtn}
-        </div>
-        <div style="font-size:0.78em;color:#94a3b8;margin-bottom:4px">${condTxt}</div>
-        <div style="display:flex;gap:16px;font-size:0.75em;color:#6b7280">
-          <span>SL ₹${it.sl}</span>
-          <span>Target ₹${it.target}</span>
-          <span>Qty ${it.qty}</span>
-          <span>${it.created_at?.slice(0,16)}</span>
-        </div>
-      </div>`;
-    }).join('');
+          <div style="font-size:0.78em;color:#94a3b8;margin-bottom:8px">Enter when ${cond} · ${it.created_at?.slice(0,16)}</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:0.72em;color:#6b7280">Lots</label>
+            <input id="qty_${it.id}" type="number" min="1" max="50" value="${it.qty||1}"
+              style="width:52px;padding:3px 6px;background:#1e1b4b;border:1px solid #374151;color:#e2e8f0;border-radius:5px;font-size:0.8em">
+            <label style="font-size:0.72em;color:#6b7280">SL offset (₹)</label>
+            <input id="sloff_${it.id}" type="number" min="10" max="1000" value="${slOff}"
+              style="width:62px;padding:3px 6px;background:#1e1b4b;border:1px solid #374151;color:#e2e8f0;border-radius:5px;font-size:0.8em">
+            <button onclick="saveWatchlistItem(${it.id})"
+              style="padding:3px 10px;background:#4c1d95;border:none;color:#e2e8f0;border-radius:5px;font-size:0.75em;cursor:pointer">Save</button>
+            <span style="font-size:0.72em;color:#6b7280;margin-left:4px">SL ~₹${slPx} · Tgt ~₹${tgtPx}</span>
+          </div>
+        </div>`;
+      }).join('')}` : '';
 
-    body.innerHTML = rows;
+    // ── Active positions section (fetch live prices) ───────────────────────────
+    let activeHtml = '';
+    if (active.length) {
+      const livePrices = {};
+      await Promise.all(active.map(async pos => {
+        if (!pos.scrip_code) return;
+        try {
+          const exch = pos.index_id === 'SENSEX' ? 'B' : 'N';
+          const r = await get(`/api/ltp?scripcode=${pos.scrip_code}&exch=${exch}&exch_type=D`);
+          livePrices[pos.id] = r.ltp || 0;
+        } catch (_) {}
+      }));
+
+      activeHtml = `
+        <div style="font-size:0.7em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#34d399;margin:12px 0 6px">🟢 Active Trades</div>
+        ${active.map(pos => {
+          const entry   = parseFloat(pos.execution_price || pos.premium || 0);
+          const slOff   = parseFloat(pos.sl_offset || 150);
+          const slPx    = Math.max(entry - slOff, 0.5);
+          const tgtPx   = entry + (3 * slOff);
+          const lotSz   = _LOT_SIZES[pos.index_id] || 1;
+          const qty     = parseInt(pos.qty || 1);
+          const cur     = livePrices[pos.id] || 0;
+          const pnlUnit = cur ? (cur - entry) : null;
+          const pnlTot  = pnlUnit !== null ? pnlUnit * qty * lotSz : null;
+          const pnlCls  = pnlTot === null ? '#6b7280' : pnlTot >= 0 ? '#34d399' : '#f87171';
+          const pnlTxt  = pnlTot === null ? '—' : `₹${pnlTot >= 0 ? '+' : ''}${pnlTot.toFixed(0)} (${pnlUnit >= 0 ? '+' : ''}₹${pnlUnit.toFixed(1)}/unit)`;
+          const curTxt  = cur ? `₹${cur.toFixed(1)}` : 'fetching…';
+          const slPct   = entry ? ((entry - slPx) / entry * 100).toFixed(1) : 0;
+          const tgtPct  = entry ? ((tgtPx - entry) / entry * 100).toFixed(1) : 0;
+
+          // Progress bar: 0% = SL, 50% = entry, 100% = target
+          const range    = tgtPx - slPx;
+          const progress = range > 0 && cur ? Math.max(0, Math.min(100, (cur - slPx) / range * 100)) : 50;
+          const barClr   = pnlTot !== null && pnlTot >= 0 ? '#34d399' : '#f87171';
+
+          return `
+          <div style="border:1px solid #1a3a2a;border-radius:8px;padding:10px 13px;margin:0 0 8px;background:#0a150f">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div>
+                <span style="color:#34d399;font-size:0.8em;font-weight:700">🟢 ACTIVE</span>
+                <span style="color:#e2e8f0;font-weight:700;margin-left:10px">${pos.index_id} · BUY ${pos.strike} ${pos.option_type}</span>
+              </div>
+              <span style="color:${pnlCls};font-weight:700;font-size:0.9em">${pnlTxt}</span>
+            </div>
+            <div style="display:flex;gap:20px;font-size:0.78em;margin-bottom:8px">
+              <div><span style="color:#6b7280">Entry</span> <span style="color:#e2e8f0">₹${entry.toFixed(1)}</span></div>
+              <div><span style="color:#6b7280">Now</span> <span style="color:#fbbf24;font-weight:700">${curTxt}</span></div>
+              <div><span style="color:#f87171">SL</span> <span style="color:#f87171">₹${slPx.toFixed(1)}</span> <span style="color:#4b5563">(-${slPct}%)</span></div>
+              <div><span style="color:#34d399">Target</span> <span style="color:#34d399">₹${tgtPx.toFixed(1)}</span> <span style="color:#4b5563">(+${tgtPct}%)</span></div>
+              <div><span style="color:#6b7280">${qty} lot${qty>1?'s':''} × ${lotSz}</span></div>
+            </div>
+            <div style="height:5px;background:#1e1b4b;border-radius:3px;overflow:hidden">
+              <div style="width:${progress.toFixed(1)}%;height:100%;background:${barClr};transition:width 0.4s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.65em;color:#374151;margin-top:2px">
+              <span>SL ₹${slPx.toFixed(0)}</span><span>Entry ₹${entry.toFixed(0)}</span><span>Tgt ₹${tgtPx.toFixed(0)}</span>
+            </div>
+          </div>`;
+        }).join('')}`;
+    }
+
+    // ── History section ───────────────────────────────────────────────────────
+    const historyHtml = history.length ? `
+      <div style="font-size:0.7em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin:12px 0 6px">📋 History</div>
+      ${history.slice(0,5).map(it => {
+        const entry  = parseFloat(it.execution_price || it.premium || 0);
+        const exit   = parseFloat(it.exit_price || 0);
+        const pnl    = exit && entry ? ((exit - entry) * (it.qty||1)).toFixed(0) : null;
+        const pnlTxt = pnl !== null ? ` · P&L ₹${pnl>=0?'+':''}${pnl}` : '';
+        const sIcon  = it.status==='sl_hit' ? '🛑 SL Hit' : it.status==='target_hit' ? '🎯 Target' : it.status==='cancelled' ? '🚫 Cancelled' : it.status==='failed' ? '❌ Failed' : '✅ Executed';
+        const sClr   = it.status==='sl_hit'?'#f87171':it.status==='target_hit'?'#34d399':it.status==='cancelled'?'#6b7280':'#f87171';
+        return `<div style="display:flex;gap:10px;font-size:0.75em;padding:5px 0;border-bottom:1px solid #1e1b4b;color:#6b7280">
+          <span style="color:${sClr}">${sIcon}</span>
+          <span style="color:#94a3b8">${it.index_id} ${it.strike} ${it.option_type}</span>
+          ${entry ? `<span>entry ₹${entry.toFixed(1)}</span>` : ''}
+          ${exit  ? `<span style="color:${parseFloat(pnl||0)>=0?'#34d399':'#f87171'}">exit ₹${exit.toFixed(1)}${pnlTxt}</span>` : ''}
+          <span style="margin-left:auto">${(it.exit_at||it.executed_at||it.created_at||'').slice(0,16)}</span>
+        </div>`;
+      }).join('')}` : '';
+
+    body.innerHTML = pendingHtml + activeHtml + historyHtml ||
+      '<div style="color:#4b5563;font-size:0.83em;padding:10px 0">No entries yet.</div>';
+
   } catch (e) {
     console.error('loadWatchlist error', e);
   }
+}
+
+async function saveWatchlistItem(wid) {
+  const qty     = parseInt(document.getElementById(`qty_${wid}`).value) || 1;
+  const sl_offset = parseFloat(document.getElementById(`sloff_${wid}`).value) || 150;
+  await fetch(`/api/watchlist/${wid}`, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({qty, sl_offset}),
+  });
+  loadWatchlist();
 }
 
 async function cancelWatchlist(wid) {
@@ -1621,6 +1718,12 @@ async function cancelWatchlist(wid) {
   await fetch(`/api/watchlist/${wid}`, { method: 'DELETE' });
   loadWatchlist();
 }
+
+// Auto-refresh active P&L every 30 seconds
+setInterval(() => {
+  const card = document.getElementById('watchlistCard');
+  if (card && card.style.display !== 'none') loadWatchlist();
+}, 30000);
 
 // ── Strike AI Panel ───────────────────────────────────────────────────────────
 let currentStrike = null, currentCeScrip = null, currentPeScrip = null;
