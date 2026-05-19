@@ -18,11 +18,34 @@ from modules.telegram import send_message
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 
-_LOT_SIZES = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
+_LOT_SIZES  = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
+_SL_OFFSETS = {'SENSEX': 150, 'NIFTY': 45, 'BANKNIFTY': 45, 'FINNIFTY': 45}
 
 def _lot_qty(index_id, lots):
     """Convert lots → actual qty using index lot size."""
     return int(lots) * _LOT_SIZES.get(index_id, 1)
+
+
+def _place_sl_order(client, index_id, scrip_code, exch, entry_price, actual_qty):
+    """
+    Place a stop-loss sell order immediately after a buy is confirmed.
+    SL offset: SENSEX=150 pts, others=45 pts (per-option-premium points).
+    """
+    sl_offset  = _SL_OFFSETS.get(index_id, 150)
+    sl_trigger = round(max(entry_price - sl_offset, 0.5), 2)
+    sl_limit   = round(max(sl_trigger - 2, 0.5), 2)   # limit price 2 below trigger
+    try:
+        result = client.place_order(
+            OrderType='S', Exchange=exch, ExchangeType='D',
+            ScripCode=scrip_code, Qty=actual_qty,
+            Price=sl_limit, StopLossPrice=sl_trigger,
+            IsIntraday=True, IsIOCOrder=False,
+        )
+        print(f'[SL_ORDER] {index_id} trigger={sl_trigger} limit={sl_limit} qty={actual_qty} → {result!r}')
+        return result, sl_trigger
+    except Exception as e:
+        print(f'[SL_ORDER] Failed to place SL order: {e}')
+        return None, sl_trigger
 
 
 def _is_market_hours():
@@ -387,12 +410,16 @@ def run_trade_watcher():
             now_s = datetime.now(_IST).strftime('%H:%M')
             if status_int == 0 and order_id:
                 update_watchlist_executed(item['id'], premium, str(order_id))
+                # Place SL order immediately after buy confirmation
+                sl_result, sl_trigger = _place_sl_order(
+                    client, index_id, scrip_code, exch, premium, actual_qty)
+                sl_note = f'\n🛡️ SL Order @ ₹{sl_trigger:.1f}' if sl_result else '\n⚠️ SL order failed'
                 send_message(
                     f'✅ <b>Auto-Trade Executed — {index_id}</b>\n\n'
                     f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f} (live)\n'
                     f'Order ID: {order_id}\n'
-                    f'Triggered: LTP {ltp:,.0f} ({condition} {trigger_price:,.0f}) @ {now_s}\n'
-                    f'SL ₹{item["sl"]:.2f} | Target ₹{item["target"]:.2f}'
+                    f'Triggered: LTP {ltp:,.0f} ({condition} {trigger_price:,.0f}) @ {now_s}'
+                    f'{sl_note}'
                 )
                 print(f'[TRADE_WATCHER] ✅ {index_id} order placed: {order_id}')
             else:

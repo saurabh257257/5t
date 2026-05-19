@@ -759,15 +759,22 @@ def api_watchlist_execute(wid):
             status_int, order_id = -1, ''
         if status_int == 0 and order_id:
             update_watchlist_executed(wid, premium, order_id)
+            # Place SL order immediately after buy confirmation
+            from modules.scheduler import _place_sl_order
+            sl_result, sl_trigger = _place_sl_order(
+                client, index_id, scrip_code, exch, premium, actual_qty)
             from modules.telegram import send_message
-            from datetime import datetime as _dt2
-            now_s = _dt2.now(__import__('datetime').timezone(__import__('datetime').timedelta(hours=5, minutes=30))).strftime('%H:%M')
+            from datetime import datetime as _dt2, timezone as _tz2, timedelta as _td2
+            now_s = _dt2.now(_tz2(_td2(hours=5, minutes=30))).strftime('%H:%M')
+            sl_note = f'\n🛡️ SL Order @ ₹{sl_trigger:.1f}' if sl_result else '\n⚠️ SL order failed'
             send_message(
                 f'✅ <b>Manual Trade Executed — {index_id}</b>\n\n'
                 f'BUY {item["strike"]} {item["option_type"]} @ ₹{premium:.2f} (live)\n'
                 f'Order ID: {order_id} @ {now_s}'
+                f'{sl_note}'
             )
-            return jsonify({'success': True, 'order_id': order_id, 'premium': premium})
+            return jsonify({'success': True, 'order_id': order_id, 'premium': premium,
+                            'sl_trigger': sl_trigger})
         else:
             err = (result.get('Message') or str(result))[:200] if isinstance(result, dict) else str(result)[:200]
             update_watchlist_failed(wid, err)
