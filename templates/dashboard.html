@@ -103,6 +103,73 @@ header {
 .cs-loading-txt { font-size: 0.78em; color: #6b7280; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Market Summary structured layout ─────────────────────────────────────── */
+.ms-wrap { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.ms-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: 10px; background: #12111f;
+  border-left: 4px solid #7c3aed;
+}
+.ms-header.bull { border-color: #10b981; }
+.ms-header.bear { border-color: #f87171; }
+.ms-header.neu  { border-color: #fbbf24; }
+.ms-index { font-size: 1em; font-weight: 800; color: #e2e8f0; }
+.ms-ltp   { font-size: 0.9em; color: #94a3b8; }
+.ms-dir   { font-size: 0.82em; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+.ms-dir.bull { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid #10b981; }
+.ms-dir.bear { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid #f87171; }
+.ms-dir.neu  { background: rgba(251,191,36,0.15);  color: #fbbf24; border: 1px solid #fbbf24; }
+.ms-expiry { font-size: 0.75em; color: #6b7280; margin-left: auto; }
+
+.ms-section-label {
+  font-size: 0.68em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #4b5563; margin-bottom: 4px;
+}
+.ms-context {
+  background: #12111f; border: 1px solid #2d2b4e; border-radius: 8px;
+  padding: 10px 14px; font-size: 0.82em; color: #94a3b8; line-height: 1.6;
+}
+.ms-signals { display: flex; flex-direction: column; gap: 5px; }
+.ms-signal {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 0.82em; color: #cbd5e1; line-height: 1.4;
+}
+.ms-signal-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #4c3f8a;
+  flex-shrink: 0; margin-top: 5px;
+}
+
+.ms-trade {
+  border-radius: 10px; padding: 14px 16px;
+  border: 1px solid; position: relative; overflow: hidden;
+}
+.ms-trade.ce { border-color: #10b981; background: rgba(16,185,129,0.07); }
+.ms-trade.pe { border-color: #f87171; background: rgba(248,113,113,0.07); }
+.ms-trade-title {
+  font-size: 0.72em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #6b7280; margin-bottom: 8px;
+}
+.ms-trade-main {
+  font-size: 1.05em; font-weight: 800; color: #e2e8f0; margin-bottom: 10px;
+}
+.ms-trade.ce .ms-trade-main { color: #34d399; }
+.ms-trade.pe .ms-trade-main { color: #f87171; }
+.ms-trade-levels {
+  display: flex; gap: 0; border: 1px solid #2d2b4e; border-radius: 8px;
+  overflow: hidden; margin-bottom: 10px;
+}
+.ms-level {
+  flex: 1; text-align: center; padding: 7px 6px; border-right: 1px solid #2d2b4e;
+}
+.ms-level:last-child { border-right: none; }
+.ms-level-label { font-size: 0.65em; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.ms-level-val { font-size: 0.92em; font-weight: 800; }
+.ms-level-val.entry { color: #e2e8f0; }
+.ms-level-val.sl     { color: #f87171; }
+.ms-level-val.tgt    { color: #34d399; }
+.ms-level-val.rr     { color: #a78bfa; }
+.ms-trade-reason { font-size: 0.78em; color: #6b7280; line-height: 1.5; }
+
 /* Chain + AI side by side */
 .chain-ai-wrap { display: flex; gap: 14px; align-items: flex-start; }
 .chain-ai-wrap .chain-card { flex: 1; min-width: 0; }
@@ -1443,6 +1510,86 @@ async function loadChain() {
 }
 
 // ── Chain Summary (above option chain) ───────────────────────────────────────
+// ── Market Summary renderer ───────────────────────────────────────────────────
+function renderMarketSummary(d) {
+  const s   = d.structured || {};
+  const cfg = INDICES.find(i => i.id === currentIndex) || {};
+  const dir = (s.direction || 'neutral').toLowerCase();
+  const dirCls  = dir === 'bullish' ? 'bull' : dir === 'bearish' ? 'bear' : 'neu';
+  const dirIcon = dir === 'bullish' ? '▲ Bullish' : dir === 'bearish' ? '▼ Bearish' : '◆ Neutral';
+  const t   = s.trade || {};
+  const tradeCls = (t.type || '').toUpperCase() === 'CE' ? 'ce' : 'pe';
+
+  // risk = entry - sl; target = entry + 3 × risk
+  const entry  = parseFloat(t.premium) || 0;
+  const sl     = parseFloat(t.sl)      || 0;
+  const target = parseFloat(t.target)  || 0;
+  const risk   = entry - sl;
+  const reward = target - entry;
+
+  const signals = (s.signals || []).map(sig =>
+    `<div class="ms-signal">
+      <div class="ms-signal-dot"></div>
+      <span>${sig.replace(/^[•\-\*]\s*/, '')}</span>
+    </div>`
+  ).join('');
+
+  return `
+  <div class="ms-wrap">
+
+    <!-- Header -->
+    <div class="ms-header ${dirCls}">
+      <span class="ms-index">${cfg.label || currentIndex}</span>
+      <span class="ms-ltp">₹${fmt2(d.ltp || lastLtp)}</span>
+      <span class="ms-dir ${dirCls}">${dirIcon}</span>
+      <span class="ms-expiry">${d.expiry_label || currentExpiryLabel}</span>
+    </div>
+
+    <!-- Context -->
+    <div>
+      <div class="ms-section-label">📋 Background</div>
+      <div class="ms-context">${s.context || '—'}</div>
+    </div>
+
+    <!-- Signals -->
+    <div>
+      <div class="ms-section-label">⚡ What's happening</div>
+      <div class="ms-signals">${signals}</div>
+    </div>
+
+    <!-- Trade -->
+    <div>
+      <div class="ms-section-label">🎯 One Trade Today</div>
+      <div class="ms-trade ${tradeCls}">
+        <div class="ms-trade-title">BUY · 1:3 Risk/Reward · Intraday</div>
+        <div class="ms-trade-main">
+          ${t.strike} ${t.type} @ ₹${entry.toFixed(2)}
+        </div>
+        <div class="ms-trade-levels">
+          <div class="ms-level">
+            <div class="ms-level-label">Entry</div>
+            <div class="ms-level-val entry">₹${entry.toFixed(2)}</div>
+          </div>
+          <div class="ms-level">
+            <div class="ms-level-label">Stop Loss</div>
+            <div class="ms-level-val sl">₹${sl.toFixed(2)}</div>
+          </div>
+          <div class="ms-level">
+            <div class="ms-level-label">Target</div>
+            <div class="ms-level-val tgt">₹${target.toFixed(2)}</div>
+          </div>
+          <div class="ms-level">
+            <div class="ms-level-label">Risk : Reward</div>
+            <div class="ms-level-val rr">₹${risk.toFixed(1)} : ₹${reward.toFixed(1)}</div>
+          </div>
+        </div>
+        <div class="ms-trade-reason">${t.reason || ''}</div>
+      </div>
+    </div>
+
+  </div>`;
+}
+
 async function loadChainSummary() {
   if (!currentExpiryTs || !currentIndex) return;
 
@@ -1452,7 +1599,7 @@ async function loadChainSummary() {
 
   card.style.display = 'block';
   document.getElementById('csSummaryTitle').textContent =
-    `${cfg?.label || currentIndex} · ${currentExpiryLabel} · Market Summary`;
+    `${cfg?.label || currentIndex} · Market Summary`;
 
   // Show previous analysis timestamp if available
   try {
@@ -1464,10 +1611,10 @@ async function loadChainSummary() {
     }
   } catch (_) {}
 
-  // Reset stats
+  // Reset stats bar
   ['csPcr','csMaxPain','csCeOi','csPeOi','csPriceChg'].forEach(id =>
     document.getElementById(id).textContent = '—');
-  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude is analyzing with S/R + chain data…</div></div>';
+  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude analyzing S/R + chain + previous context…</div></div>';
 
   const d = await get(
     `/api/analyze-chain?index=${currentIndex}&expiry_ts=${currentExpiryTs}` +
@@ -1484,21 +1631,22 @@ async function loadChainSummary() {
   const pcrEl = document.getElementById('csPcr');
   pcrEl.textContent = pcr.toFixed(2);
   pcrEl.className = 'cs-stat-val ' + (pcr > 1.2 ? 'bull' : pcr < 0.8 ? 'bear' : 'neu');
-
   document.getElementById('csMaxPain').textContent  = fmtN(d.max_pain);
   document.getElementById('csCeOi').textContent     = fmtCr(d.total_ce_oi);
   document.getElementById('csPeOi').textContent     = fmtCr(d.total_pe_oi);
-
   const chgEl = document.getElementById('csPriceChg');
   const chg   = d.change_pct || 0;
-  chgEl.textContent  = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
-  chgEl.className    = 'cs-stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
+  chgEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+  chgEl.className   = 'cs-stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
 
-  body.innerHTML = renderAnalysis(d.summary);
+  // Render structured layout if available, else fall back to text
+  body.innerHTML = d.structured
+    ? renderMarketSummary(d)
+    : renderAnalysis(d.summary);
 
-  // Update prev timestamp after fresh save
+  // Update prev timestamp
   const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
+  const pad = n => String(n).padStart(2,'0');
   document.getElementById('csPrevTime').style.display = 'inline';
   document.getElementById('csPrevTimeVal').textContent =
     `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +

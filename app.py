@@ -435,41 +435,78 @@ def api_analyze_chain():
     except Exception as _e:
         print(f'[MS] prev fetch error: {_e}')
 
-    prompt = f"""You are an expert Indian options trader. Give a crisp, actionable market summary for {idx}.
+    prompt = f"""You are an expert Indian options trader. Analyze {idx} and respond ONLY in valid JSON — no text outside the JSON.
 
-═══ LIVE DATA ═══
-Index: {idx}  |  LTP: {ltp}  |  Prev Close: {prev_close}  |  Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
-Expiry: {expiry_lbl}  |  PCR: {pcr}  |  Max Pain: {int(max_pain)}
-Top CE OI walls (resistance): {', '.join(str(int(r['strike'])) for r in top_ce)}
-Top PE OI walls (support):    {', '.join(str(int(r['strike'])) for r in top_pe)}
+INPUT DATA
+Index: {idx} | LTP: {ltp} | Prev Close: {prev_close} | Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
+Expiry: {expiry_lbl} | PCR: {pcr} | Max Pain: {int(max_pain)}
+Top CE OI walls: {', '.join(f"{int(r['strike'])}(OI:{r['ce_oi']},LTP:₹{r['ce_ltp']})" for r in top_ce)}
+Top PE OI walls: {', '.join(f"{int(r['strike'])}(OI:{r['pe_oi']},LTP:₹{r['pe_ltp']})" for r in top_pe)}
 
-═══ KEY S/R LEVELS (Technical Analysis) ═══
+S/R LEVELS (Technical):
 {sr_text}
 
-═══ OPTION CHAIN (20 strikes near LTP) ═══
+OPTION CHAIN (20 strikes near LTP):
 {chain_txt}
-{prev_context}Provide analysis in exactly these 8 sections:
-1. **Market Bias** — bullish/bearish/neutral with one clear reason
-2. **Key Support** — strongest support (OI wall + S/R confluence) with exact level
-3. **Key Resistance** — strongest resistance (OI wall + S/R confluence) with exact level
-4. **PCR Signal** — what PCR {pcr} implies about current market positioning
-5. **Max Pain** — max pain at {int(max_pain)} vs LTP {ltp}, expiry impact
-6. **Best Call (CE)** — most valuable CE to trade: exact strike, current premium ₹, why (OI, level, risk/reward)
-7. **Best Put (PE)** — most valuable PE to trade: exact strike, current premium ₹, why (OI, level, risk/reward)
-8. **Watch Out** — one key risk, unusual OI shift, or red flag right now
+{prev_context}
+Respond ONLY with this JSON (no markdown, no text outside JSON):
+{{
+  "direction": "bullish|bearish|neutral",
+  "context": "2-3 sentences: what data (PCR, max pain gap, OI walls, S/R, prev bias) drove the conclusion",
+  "signals": [
+    "signal 1 — one line, specific level/number",
+    "signal 2",
+    "signal 3",
+    "signal 4",
+    "signal 5"
+  ],
+  "trade": {{
+    "action": "BUY",
+    "strike": 0,
+    "type": "CE or PE",
+    "premium": 0.0,
+    "sl": 0.0,
+    "target": 0.0,
+    "reason": "one sentence why this specific strike — OI wall, S/R level, risk/reward"
+  }}
+}}
 
-Max 280 words. Be specific with exact strikes and ₹ premiums."""
+TRADE RULES:
+- Pick ONE trade only (CE if bullish, PE if bearish)
+- sl = premium × 0.70 (30% loss = stop)
+- target = premium + 3 × (premium - sl)   ← this gives exactly 1:3 R:R
+- Round sl and target to nearest 0.5
+- Choose strike with best OI support + near ATM for liquidity"""
 
     try:
         ac = _anthropic.Anthropic()
         resp = ac.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=900,
+            max_tokens=700,
             messages=[{"role": "user", "content": prompt}]
         )
-        analysis_text = resp.content[0].text
+        raw = resp.content[0].text.strip()
 
-        # Save to market_summary table (per-index segment)
+        # Strip markdown code fences if present
+        if raw.startswith('```'):
+            raw = raw.split('```')[1]
+            if raw.startswith('json'): raw = raw[4:]
+        raw = raw.strip()
+
+        structured = json.loads(raw)
+
+        # Build a plain-text version for DB storage
+        t = structured.get('trade', {})
+        analysis_text = (
+            f"Direction: {structured.get('direction','').upper()}\n\n"
+            f"Context: {structured.get('context','')}\n\n"
+            f"Signals:\n" +
+            '\n'.join(f"• {s}" for s in structured.get('signals', [])) +
+            f"\n\nTrade: BUY {t.get('strike')} {t.get('type')} @ ₹{t.get('premium')} | "
+            f"SL ₹{t.get('sl')} | Target ₹{t.get('target')} | 1:3 R:R\n{t.get('reason','')}"
+        )
+
+        # Save to market_summary
         try:
             save_market_summary(
                 index_id=idx, expiry_label=expiry_lbl,
@@ -479,7 +516,7 @@ Max 280 words. Be specific with exact strikes and ₹ premiums."""
         except Exception as _se:
             print(f'[DB] market summary save error: {_se}')
 
-        # Also keep legacy chain_analysis save
+        # Legacy chain_analysis save
         try:
             save_chain_analysis(
                 index_id=idx, expiry_label=expiry_lbl,
@@ -490,13 +527,24 @@ Max 280 words. Be specific with exact strikes and ₹ premiums."""
             print(f'[DB] chain analysis save error: {_se}')
 
         return jsonify({
-            "summary":      analysis_text,
+            "structured":   structured,
+            "summary":      analysis_text,    # kept for history tab
             "pcr":          pcr,
             "max_pain":     max_pain,
             "total_ce_oi":  total_ce_oi,
             "total_pe_oi":  total_pe_oi,
             "change":       chg_abs,
             "change_pct":   chg_pct,
+            "ltp":          ltp,
+            "expiry_label": expiry_lbl,
+        })
+    except json.JSONDecodeError as e:
+        print(f'[MS] JSON parse error: {e} | raw: {raw[:200]}')
+        # Fallback: return raw text
+        return jsonify({
+            "summary": raw, "pcr": pcr, "max_pain": max_pain,
+            "total_ce_oi": total_ce_oi, "total_pe_oi": total_pe_oi,
+            "change": chg_abs, "change_pct": chg_pct,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
