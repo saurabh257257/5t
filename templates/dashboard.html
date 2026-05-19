@@ -1505,8 +1505,8 @@ async function loadChain() {
     document.querySelector('#chainBody .atm')?.scrollIntoView({ behavior:'smooth', block:'center' });
   }, 120);
 
-  // Auto-trigger chain summary analysis
-  loadChainSummary();
+  // Auto-trigger: use cached today's summary if available; only fetch fresh on ↻ Refresh
+  tryLoadTodaySummary();
 }
 
 // ── Chain Summary (above option chain) ───────────────────────────────────────
@@ -1552,12 +1552,18 @@ function renderMarketSummary(d) {
       <span class="ms-ltp">₹${fmt2(d.ltp || lastLtp)}</span>
       <span class="ms-dir ${dirCls}">${dirIcon}</span>
       <span class="ms-expiry">${d.expiry_label || currentExpiryLabel}</span>
+      ${d._fromCache
+        ? `<span style="margin-left:auto;font-size:0.65em;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.3);color:#a78bfa;padding:3px 10px;border-radius:12px;white-space:nowrap">📚 Cached · ${d._cacheTime}</span>`
+        : `<span style="margin-left:auto;font-size:0.65em;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:#34d399;padding:3px 10px;border-radius:12px;white-space:nowrap">🔄 Fresh analysis</span>`}
     </div>
 
     <!-- Context -->
     <div>
       <div class="ms-section-label">📋 Background</div>
       <div class="ms-context">${s.context || '—'}</div>
+      ${d.prev_meta ? `<div style="margin-top:6px;font-size:0.72em;color:#a78bfa;background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:6px;padding:5px 9px">
+        🗂 Previous analysis used: <strong>${d.prev_meta.direction}</strong> · ${d.prev_meta.trade} · ${d.prev_meta.date} ${d.prev_meta.time} · LTP ${d.prev_meta.ltp}
+      </div>` : ''}
     </div>
 
     <!-- Signals -->
@@ -1677,6 +1683,55 @@ async function loadChainSummary() {
   document.getElementById('csPrevTimeVal').textContent =
     `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
     `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+// ── Try load today's cached summary first; fall back to fresh Claude call ─────
+async function tryLoadTodaySummary() {
+  if (!currentExpiryTs || !currentIndex) return;
+
+  const card = document.getElementById('chainSummaryCard');
+  const body = document.getElementById('csBody');
+  const cfg  = INDICES.find(i => i.id === currentIndex);
+
+  card.style.display = 'block';
+  document.getElementById('csSummaryTitle').textContent =
+    `${cfg?.label || currentIndex} · Market Summary`;
+
+  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div>' +
+    '<div class="cs-loading-txt">Checking today\'s saved summary…</div></div>';
+
+  try {
+    const cached = await get(`/api/market-summary/today?index=${currentIndex}`);
+    if (cached.found) {
+      // Populate stats bar with cached values
+      if (cached.pcr != null) {
+        const pcr = cached.pcr || 0;
+        const pcrEl = document.getElementById('csPcr');
+        pcrEl.textContent = pcr.toFixed(2);
+        pcrEl.className   = 'cs-stat-val ' + (pcr > 1.2 ? 'bull' : pcr < 0.8 ? 'bear' : 'neu');
+        document.getElementById('csMaxPain').textContent = fmtN(cached.max_pain);
+        ['csCeOi','csPeOi','csPriceChg'].forEach(id =>
+          document.getElementById(id).textContent = '—');
+      }
+      // Tag as cached for renderMarketSummary badge
+      cached._fromCache  = true;
+      cached._cacheTime  = `${cached.date} ${cached.time}`;
+      // Restore per-summary LTP for header display
+      if (!cached.ltp) cached.ltp = lastLtp;
+
+      body.innerHTML = cached.structured
+        ? renderMarketSummary(cached)
+        : renderAnalysis(cached.analysis);
+
+      // Update prev timestamp label
+      document.getElementById('csPrevTime').style.display = 'inline';
+      document.getElementById('csPrevTimeVal').textContent = `${cached.date} ${cached.time}`;
+      return; // done — no Claude call needed
+    }
+  } catch (_) { /* network issue — fall through to full analysis */ }
+
+  // No today summary cached → run fresh Claude analysis
+  await loadChainSummary();
 }
 
 // ── Strike AI Panel ───────────────────────────────────────────────────────────

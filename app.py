@@ -14,7 +14,7 @@ from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapsho
                         save_sr_alert, get_sr_alerts, get_setting, set_setting,
                         get_breach_alerts,
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
-                        delete_market_summary)
+                        delete_market_summary, get_today_market_summary)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -436,14 +436,36 @@ def api_analyze_chain():
 
     # ── Previous market summary for context ───────────────────────────────────
     prev_context = ''
+    prev_meta    = None
     try:
         prev = get_latest_market_summary(idx)
         if prev:
+            # Extract direction from stored structured JSON if available
+            prev_dir = '—'
+            prev_trade = '—'
+            if prev.get('structured'):
+                try:
+                    ps = json.loads(prev['structured'])
+                    prev_dir   = ps.get('direction', '—').upper()
+                    pt         = ps.get('trade', {})
+                    prev_trade = f"{pt.get('strike')} {pt.get('type')} @ ₹{pt.get('premium')}"
+                except Exception:
+                    pass
             prev_context = (
                 f"\n═══ PREVIOUS MARKET SUMMARY ({prev['date']} {prev['time']}, LTP {prev['ltp']}) ═══\n"
                 f"{prev['analysis']}\n"
-                f"[Compare with current data — note bias shifts, new OI walls, level changes]\n\n"
+                f"[Compare — note bias shifts, new OI walls, changed levels]\n\n"
             )
+            prev_meta = {
+                'date':      prev['date'],
+                'time':      prev['time'],
+                'ltp':       prev['ltp'],
+                'direction': prev_dir,
+                'trade':     prev_trade,
+            }
+            print(f'[MS] {idx} prev summary: {prev_dir} @ LTP {prev["ltp"]} ({prev["date"]} {prev["time"]})')
+        else:
+            print(f'[MS] {idx} — no previous summary found')
     except Exception as _e:
         print(f'[MS] prev fetch error: {_e}')
 
@@ -525,12 +547,13 @@ TRADE RULES:
             f"{t.get('reason','')}"
         )
 
-        # Save to market_summary
+        # Save to market_summary (with structured JSON for cache replay)
         try:
             save_market_summary(
                 index_id=idx, expiry_label=expiry_lbl,
                 ltp=ltp, pcr=pcr, max_pain=max_pain,
                 analysis=analysis_text,
+                structured=json.dumps(structured),
             )
         except Exception as _se:
             print(f'[DB] market summary save error: {_se}')
@@ -558,6 +581,7 @@ TRADE RULES:
             "expiry_label": expiry_lbl,
             "sr_used":      sr_meta,           # None if no S/R saved
             "prev_used":    bool(prev_context), # True if previous analysis was included
+            "prev_meta":    prev_meta,          # dict with date/time/ltp/direction/trade or None
         })
     except json.JSONDecodeError as e:
         print(f'[MS] JSON parse error: {e} | raw: {raw[:200]}')
@@ -569,6 +593,38 @@ TRADE RULES:
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/market-summary/today')
+def api_market_summary_today():
+    """Return today's most recent market summary for an index (IST date), or found=False."""
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    row = get_today_market_summary(idx)
+    if not row:
+        return jsonify({'found': False})
+    # Parse stored structured JSON so the frontend can render it identically
+    structured = None
+    if row.get('structured'):
+        try:
+            structured = json.loads(row['structured'])
+        except Exception:
+            pass
+    return jsonify({
+        'found':        True,
+        'date':         row['date'],
+        'time':         row['time'],
+        'ltp':          row['ltp'],
+        'pcr':          row['pcr'],
+        'max_pain':     row['max_pain'],
+        'analysis':     row['analysis'],
+        'structured':   structured,
+        'expiry_label': row.get('expiry_label', ''),
+        'sr_used':      None,   # not stored per-summary; shown as N/A for cached
+        'prev_used':    False,
+        'prev_meta':    None,
+    })
 
 
 @app.route('/api/market-summary/history')

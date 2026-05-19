@@ -94,9 +94,15 @@ def init_db():
                 pcr          REAL,
                 max_pain     REAL,
                 analysis     TEXT    NOT NULL,
+                structured   TEXT,
                 saved_at     TEXT    NOT NULL
             )
         ''')
+        # Migrate: add structured column if table already existed without it
+        try:
+            c.execute('ALTER TABLE market_summary ADD COLUMN structured TEXT')
+        except Exception:
+            pass  # column already exists
         c.execute('''
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -211,17 +217,17 @@ def delete_chain_analysis(record_id):
 
 # ── Market Summary (enhanced chain analysis per segment) ──────────────────────
 
-def save_market_summary(index_id, expiry_label, ltp, pcr, max_pain, analysis):
+def save_market_summary(index_id, expiry_label, ltp, pcr, max_pain, analysis, structured=None):
     now = datetime.now(_IST)
     with _conn() as c:
         cur = c.execute('''
             INSERT INTO market_summary
-            (index_id, expiry_label, date, time, ltp, pcr, max_pain, analysis, saved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (index_id, expiry_label, date, time, ltp, pcr, max_pain, analysis, structured, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             index_id, expiry_label,
             now.strftime('%Y-%m-%d'), now.strftime('%H:%M'),
-            ltp, pcr, max_pain, analysis,
+            ltp, pcr, max_pain, analysis, structured,
             now.strftime('%Y-%m-%d %H:%M:%S'),
         ))
         c.commit()
@@ -234,6 +240,17 @@ def get_latest_market_summary(index_id):
         row = c.execute(
             'SELECT * FROM market_summary WHERE index_id=? ORDER BY saved_at DESC LIMIT 1',
             (index_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_today_market_summary(index_id):
+    """Return the most recent summary saved today (IST), or None."""
+    today = datetime.now(_IST).strftime('%Y-%m-%d')
+    with _conn() as c:
+        row = c.execute(
+            'SELECT * FROM market_summary WHERE index_id=? AND date=? ORDER BY saved_at DESC LIMIT 1',
+            (index_id, today)
         ).fetchone()
         return dict(row) if row else None
 
