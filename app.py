@@ -873,31 +873,34 @@ def api_analyze_sr():
     yr_high = max(c['high']  for c in candles if c['high'] > 0)
     yr_low  = min(c['low']   for c in candles if c['low']  > 0)
 
-    prompt = f"""You are an expert technical analyst for Indian markets.
+    prompt = f"""You are a price action trader specialising in index options on Indian markets.
 
 Index: {idx}  |  Current Price: {ltp:.0f}
 52-Week High: {yr_high:.0f}  |  52-Week Low: {yr_low:.0f}
 
-Daily OHLC — last 60 trading days (use 1-year context for patterns):
+Daily OHLC — last 60 trading days:
 {ohlc_txt}
 
-Identify 3-5 key SUPPORT and 3-5 key RESISTANCE levels based on:
-- Major swing highs/lows with multiple touches
-- Round numbers that acted as S/R
-- 52-week high/low
-- Consolidation zones and breakout/breakdown levels
+TASK: Find exactly 2 SUPPORT and 2 RESISTANCE levels where a MOMENTUM MOVE is likely if price reaches that level — i.e. levels where options buyers can catch a fast move.
 
-valid_today = levels within 2% of current price {ltp:.0f}.
+Rules for selecting a level:
+1. Price must have BOUNCED or REVERSED sharply from that level at least 2-3 times in the data (not just touched).
+2. The level must have caused a 1%+ single-day move when tested.
+3. Prefer levels that are also round numbers or 52-week high/low.
+4. DO NOT include levels that price chopped through slowly — only sharp reaction zones.
+5. Pick levels that are CLOSEST to current price {ltp:.0f} so they are tradeable NOW.
+
+valid_today = levels within 3% of current price {ltp:.0f}.
 
 Respond ONLY in valid JSON (no markdown, no explanation outside JSON):
 {{
-  "supports": [{{"level": 0, "strength": "strong", "reason": "..."}}],
-  "resistances": [{{"level": 0, "strength": "strong", "reason": "..."}}],
+  "supports": [{{"level": 0, "reason": "one line: dates + how price reacted (e.g. bounced 2% on May 11, Apr 28)"}}],
+  "resistances": [{{"level": 0, "reason": "one line: dates + how price reacted"}}],
   "valid_today": [{{"level": 0, "type": "support", "note": "..."}}],
-  "verdict": "2-3 sentence technical outlook for today."
+  "verdict": "2 sentences max: which level to watch today and what move to expect on breach/bounce."
 }}
 
-strength values: "strong" (3+ tests), "moderate" (2 tests), "weak" (1 test/confluence)"""
+Return exactly 2 supports and 2 resistances. No moderate levels. Only momentum zones."""
 
     try:
         ac  = _anthropic.Anthropic()
