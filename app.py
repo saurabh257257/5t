@@ -307,6 +307,39 @@ def api_debug_index():
     return jsonify(results)
 
 
+@app.route('/api/debug-ohlc')
+def api_debug_ohlc():
+    """Debug: show raw historical_data columns and values for OHLC troubleshooting."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx = request.args.get('index', 'SENSEX').upper()
+    cfg = INDEX_MAP.get(idx, INDEX_MAP.get('SENSEX'))
+    exch   = cfg.get('chart_exch', cfg['feed_exch'])
+    scrip  = int(cfg.get('chart_scrip', cfg['feed_scrip']))
+    from datetime import date as _d, timedelta as _td
+    today     = _d.today().strftime('%Y-%m-%d')
+    past_week = (_d.today() - _td(days=10)).strftime('%Y-%m-%d')
+    results = {'index': idx, 'exch': exch, 'scrip': scrip}
+    for et in ('C', 'D'):
+        for interval, frm, to in [('15m', today, today), ('1d', past_week, today)]:
+            key = f'{et}_{interval}'
+            try:
+                df = client.historical_data(exch, et, scrip, interval, frm, to)
+                if df is None or len(df) == 0:
+                    results[key] = 'empty'
+                else:
+                    last = df.iloc[-1]
+                    results[key] = {
+                        'rows':    len(df),
+                        'columns': list(df.columns),
+                        'last':    {k: str(v) for k, v in last.items()},
+                    }
+            except Exception as e:
+                results[key] = f'ERR: {str(e)[:120]}'
+    return jsonify(results)
+
+
 @app.route('/api/history')
 def api_history():
     client = require_auth()

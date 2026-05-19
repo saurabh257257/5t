@@ -114,6 +114,17 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
         except Exception:
             pass
 
+    # ── 2b. If market feed gave no OHL (e.g. closed), pull from historical ─────
+    if open_ == 0:
+        try:
+            h_ohlc = get_today_ohlc(client, exch, chart_scrip if chart_scrip else scrip_code)
+            if not h_ohlc.get('error'):
+                open_ = h_ohlc.get('open', 0)
+                high  = h_ohlc.get('high', 0)
+                low   = h_ohlc.get('low', 0)
+        except Exception:
+            pass
+
     # ── 3. prev_close — most recent historical close that is NOT today ────────
     # Feed's PreviousClose/CloseRate can return today's value; historical is reliable.
     h_scrip    = chart_scrip if chart_scrip else scrip_code
@@ -226,6 +237,46 @@ def get_historical_data(client, exch, exch_type, scrip_code, interval="15m", day
         return {"error": str(e)}
 
 
+def _extract_ohlc_row(row):
+    """
+    Extract open/high/low/close from a pandas Series (historical_data row).
+    Tries every known 5paisa column name variant; falls back to positional
+    guessing if the standard names are missing.
+    """
+    def _v(*keys):
+        for k in keys:
+            try:
+                val = row.get(k)
+                if val is not None:
+                    f = float(val)
+                    if f > 0:
+                        return f
+            except Exception:
+                pass
+        return 0.0
+
+    o = _v('Open',  'open',  'OpenRate',  'open_price',  'OPEN')
+    h = _v('High',  'high',  'HighRate',  'high_price',  'HIGH')
+    l = _v('Low',   'low',   'LowRate',   'low_price',   'LOW')
+    c = _v('Close', 'close', 'CloseRate', 'close_price', 'CLOSE')
+
+    # Positional fallback: if standard names missed, guess by column order
+    # typical 5paisa order: Datetime, Open, High, Low, Close, Volume
+    if o == 0:
+        try:
+            cols = list(row.index)
+            num_cols = [c2 for c2 in cols if c2.lower() not in ('datetime','date','time','volume','qty','oi')]
+            if len(num_cols) >= 4:
+                o = float(row[num_cols[0]] or 0)
+                h = float(row[num_cols[1]] or 0)
+                l = float(row[num_cols[2]] or 0)
+                c = c or float(row[num_cols[3]] or 0)
+        except Exception:
+            pass
+
+    return o, h, l, c
+
+
 def get_today_ohlc(client, exch, scrip_code):
     """
     Fetch Open/High/Low for the current (or most recent) trading day.
@@ -235,7 +286,7 @@ def get_today_ohlc(client, exch, scrip_code):
     """
     from datetime import timedelta as _td2
     today     = _date.today().strftime('%Y-%m-%d')
-    past_week = (_date.today() - _td2(days=7)).strftime('%Y-%m-%d')
+    past_week = (_date.today() - _td2(days=10)).strftime('%Y-%m-%d')
 
     # ── 1. Try intraday 15m (market open) ────────────────────────────────────
     for et in ('C', 'D'):
@@ -243,14 +294,14 @@ def get_today_ohlc(client, exch, scrip_code):
             df = client.historical_data(exch, et, int(scrip_code), '15m', today, today)
             if df is None or len(df) == 0:
                 continue
-            opens = [float(r.get('Open') or r.get('open') or 0) for _, r in df.iterrows()]
-            highs = [float(r.get('High') or r.get('high') or 0) for _, r in df.iterrows()]
-            lows  = [float(r.get('Low')  or r.get('low')  or 0) for _, r in df.iterrows()]
-            opens = [v for v in opens if v > 0]
-            highs = [v for v in highs if v > 0]
-            lows  = [v for v in lows  if v > 0]
-            if opens and highs and lows:
-                return {'open': opens[0], 'high': max(highs), 'low': min(lows)}
+            all_o, all_h, all_l = [], [], []
+            for _, row in df.iterrows():
+                o, h, l, _ = _extract_ohlc_row(row)
+                if o > 0: all_o.append(o)
+                if h > 0: all_h.append(h)
+                if l > 0: all_l.append(l)
+            if all_o and all_h and all_l:
+                return {'open': all_o[0], 'high': max(all_h), 'low': min(all_l)}
         except Exception:
             continue
 
@@ -261,9 +312,7 @@ def get_today_ohlc(client, exch, scrip_code):
             if df is None or len(df) == 0:
                 continue
             row = df.iloc[-1]
-            o = float(row.get('Open') or row.get('open') or 0)
-            h = float(row.get('High') or row.get('high') or 0)
-            l = float(row.get('Low')  or row.get('low')  or 0)
+            o, h, l, _ = _extract_ohlc_row(row)
             if o > 0:
                 return {'open': o, 'high': h, 'low': l}
         except Exception:
