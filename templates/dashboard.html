@@ -1599,6 +1599,16 @@ function renderMarketSummary(d) {
             <div class="ms-level-val rr">₹${risk.toFixed(1)} : ₹${reward.toFixed(1)}</div>
           </div>
         </div>
+        ${t.entry_trigger ? `
+        <div style="margin-bottom:6px">
+          <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:3px">⚡ Entry Trigger (when to enter)</div>
+          <div style="font-size:0.82em;color:#fbbf24;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:6px;padding:7px 10px;line-height:1.5">${t.entry_trigger}</div>
+        </div>` : ''}
+        ${t.entry_timing ? `
+        <div style="margin-bottom:8px">
+          <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:3px">🕐 Best Time Window</div>
+          <div style="font-size:0.82em;color:#94a3b8;background:#12111f;border:1px solid #2d2b4e;border-radius:6px;padding:7px 10px;line-height:1.5">${t.entry_timing}</div>
+        </div>` : ''}
         <div class="ms-trade-reason">${t.reason || ''}</div>
       </div>
     </div>

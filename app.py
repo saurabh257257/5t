@@ -477,6 +477,8 @@ Respond ONLY with this JSON (no markdown, no text outside JSON):
     "strike": 0,
     "type": "CE or PE",
     "premium": 0.0,
+    "entry_trigger": "exact index price level to watch before entering, e.g. 'Enter if NIFTY breaks below 23550 on 15-min close' or 'Enter at open if NIFTY gaps below 23600'",
+    "entry_timing": "best time window, e.g. '9:20–9:45 AM after opening range forms' or 'after 11 AM if support holds'",
     "sl": 0.0,
     "target": 0.0,
     "reason": "one sentence why this specific strike — OI wall, S/R level, risk/reward"
@@ -485,8 +487,10 @@ Respond ONLY with this JSON (no markdown, no text outside JSON):
 
 TRADE RULES:
 - Pick ONE trade only (CE if bullish, PE if bearish)
+- entry_trigger: a specific index price level/condition — NOT vague, e.g. "Enter if {idx} sustains above 24050" or "Enter on break below 23500 with volume"
+- entry_timing: time of day guidance based on market open behaviour, OI patterns, expiry day dynamics
 - sl = premium × 0.70 (30% loss = stop)
-- target = premium + 3 × (premium - sl)   ← this gives exactly 1:3 R:R
+- target = premium + 3 × (premium - sl)   ← exactly 1:3 R:R
 - Round sl and target to nearest 0.5
 - Choose strike with best OI support + near ATM for liquidity"""
 
@@ -515,7 +519,10 @@ TRADE RULES:
             f"Signals:\n" +
             '\n'.join(f"• {s}" for s in structured.get('signals', [])) +
             f"\n\nTrade: BUY {t.get('strike')} {t.get('type')} @ ₹{t.get('premium')} | "
-            f"SL ₹{t.get('sl')} | Target ₹{t.get('target')} | 1:3 R:R\n{t.get('reason','')}"
+            f"SL ₹{t.get('sl')} | Target ₹{t.get('target')} | 1:3 R:R\n"
+            f"Trigger: {t.get('entry_trigger','')}\n"
+            f"Timing: {t.get('entry_timing','')}\n"
+            f"{t.get('reason','')}"
         )
 
         # Save to market_summary
