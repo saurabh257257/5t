@@ -409,16 +409,28 @@ def api_analyze_chain():
     chg_abs = round(ltp - prev_close, 2)
 
     # ── S/R context from last saved analysis ──────────────────────────────────
-    sr_text = 'No saved S/R analysis available.'
+    sr_text     = 'No saved S/R analysis available for this index.'
+    sr_meta     = None   # returned to frontend for display
     try:
         sr_history = get_sr_history(idx, limit=1)
         if sr_history:
-            sr = sr_history[0]
-            sup_str = ', '.join(str(s['level']) for s in (sr.get('supports') or [])[:4])
-            res_str = ', '.join(str(r['level']) for r in (sr.get('resistances') or [])[:4])
+            sr      = sr_history[0]
+            sups    = (sr.get('supports')    or [])[:5]
+            ress    = (sr.get('resistances') or [])[:5]
+            sup_str = ', '.join(str(s['level']) for s in sups)
+            res_str = ', '.join(str(r['level']) for r in ress)
             sr_text = (f"Supports: {sup_str or '—'}\n"
                        f"Resistances: {res_str or '—'}\n"
-                       f"(Analysed at LTP {sr['ltp']} on {sr['saved_at']})")
+                       f"(S/R analysed at LTP {sr['ltp']} on {sr['saved_at']})")
+            sr_meta = {
+                'saved_at':    sr['saved_at'],
+                'ltp':         sr['ltp'],
+                'supports':    [s['level'] for s in sups],
+                'resistances': [r['level'] for r in ress],
+            }
+            print(f'[MS] {idx} S/R loaded: sup={sup_str} res={res_str}')
+        else:
+            print(f'[MS] {idx} — no S/R saved yet')
     except Exception as _e:
         print(f'[SR] fetch error: {_e}')
 
@@ -528,7 +540,7 @@ TRADE RULES:
 
         return jsonify({
             "structured":   structured,
-            "summary":      analysis_text,    # kept for history tab
+            "summary":      analysis_text,
             "pcr":          pcr,
             "max_pain":     max_pain,
             "total_ce_oi":  total_ce_oi,
@@ -537,6 +549,8 @@ TRADE RULES:
             "change_pct":   chg_pct,
             "ltp":          ltp,
             "expiry_label": expiry_lbl,
+            "sr_used":      sr_meta,           # None if no S/R saved
+            "prev_used":    bool(prev_context), # True if previous analysis was included
         })
     except json.JSONDecodeError as e:
         print(f'[MS] JSON parse error: {e} | raw: {raw[:200]}')

@@ -1520,6 +1520,15 @@ function renderMarketSummary(d) {
   const t   = s.trade || {};
   const tradeCls = (t.type || '').toUpperCase() === 'CE' ? 'ce' : 'pe';
 
+  // Data-sources pill line
+  const sr = d.sr_used;
+  const srPill = sr
+    ? `<span style="color:#34d399">✓ S/R (${sr.saved_at}): sup ${sr.supports.join(', ')} | res ${sr.resistances.join(', ')}</span>`
+    : `<span style="color:#f87171">✗ No S/R saved for ${currentIndex} — run Chart → Analyze S/R first</span>`;
+  const prevPill = d.prev_used
+    ? `<span style="color:#a78bfa">✓ Previous summary included</span>`
+    : `<span style="color:#6b7280">✗ No previous summary</span>`;
+
   // risk = entry - sl; target = entry + 3 × risk
   const entry  = parseFloat(t.premium) || 0;
   const sl     = parseFloat(t.sl)      || 0;
@@ -1555,6 +1564,13 @@ function renderMarketSummary(d) {
     <div>
       <div class="ms-section-label">⚡ What's happening</div>
       <div class="ms-signals">${signals}</div>
+    </div>
+
+    <!-- Data sources used -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:0.72em;padding:6px 0">
+      ${srPill}
+      <span style="color:#2d2b4e">|</span>
+      ${prevPill}
     </div>
 
     <!-- Trade -->
