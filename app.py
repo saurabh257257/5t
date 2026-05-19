@@ -1424,6 +1424,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"[MASTER] Load failed: {e}")
     threading.Thread(target=_preload, daemon=True).start()
+    _port = int(os.getenv("PORT", 3000))
     print("[START] 5Paisa Dashboard")
-    print("[URL]   http://0.0.0.0:3000")
-    app.run(host='0.0.0.0', port=3000, debug=False)
+    print(f"[URL]   http://0.0.0.0:{_port}")
+    app.run(host='0.0.0.0', port=_port, debug=False)
