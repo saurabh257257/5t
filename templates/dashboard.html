@@ -1145,7 +1145,6 @@ async function loadLtp() {
   if (d.prev_close > 0) lastPrevClose = d.prev_close;
 
   const marketOpen = d.market_open;
-  const up = d.change >= 0;
   const sign  = d.change >= 0 ? '+' : '−';
   const color = d.change >= 0 ? '#34d399' : '#f87171';
   const absCh = Math.abs(d.change).toFixed(2);
@@ -1161,16 +1160,32 @@ async function loadLtp() {
   const mkt = document.getElementById('mktStatus');
   mkt.className   = marketOpen ? 'live-dot' : 'closed-dot';
   mkt.textContent = marketOpen ? 'LIVE' : 'CLOSED';
+
+  // Populate O/H/L from market feed immediately (live feed always has these)
+  if ((d.open  || 0) > 0) document.getElementById('sxOpen').textContent = fmt2(d.open);
+  if ((d.high  || 0) > 0) document.getElementById('sxHigh').textContent = fmt2(d.high);
+  if ((d.low   || 0) > 0) document.getElementById('sxLow').textContent  = fmt2(d.low);
 }
 
 // ── Today's Open / High / Low (separate from LTP poll) ───────────────────────
 async function loadOHLC() {
   if (!currentIndex) return;
   const od = await get(`/api/today-ohlc?index=${currentIndex}`);
-  if (od.error) return;
-  if (od.open > 0) document.getElementById('sxOpen').textContent = fmt2(od.open);
-  if (od.high > 0) document.getElementById('sxHigh').textContent = fmt2(od.high);
-  if (od.low  > 0) document.getElementById('sxLow').textContent  = fmt2(od.low);
+  if (!od.error && od.open > 0) {
+    // Precise intraday OHLC from historical data
+    document.getElementById('sxOpen').textContent = fmt2(od.open);
+    document.getElementById('sxHigh').textContent = fmt2(od.high);
+    document.getElementById('sxLow').textContent  = fmt2(od.low);
+    return;
+  }
+  // Fallback: use O/H/L from market feed (index-ltp already called in loadLtp,
+  // but we fetch again here in case OHLC is loaded independently / on index switch)
+  const fd = await get(`/api/index-ltp?index=${currentIndex}`);
+  if (!fd.error) {
+    if ((fd.open || 0) > 0) document.getElementById('sxOpen').textContent = fmt2(fd.open);
+    if ((fd.high || 0) > 0) document.getElementById('sxHigh').textContent = fmt2(fd.high);
+    if ((fd.low  || 0) > 0) document.getElementById('sxLow').textContent  = fmt2(fd.low);
+  }
 }
 
 // ── Expiries ──────────────────────────────────────────────────────────────────
