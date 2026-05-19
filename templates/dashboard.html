@@ -831,12 +831,15 @@ header {
         <div class="chart-toolbar">
           <button class="btn-analyze-sr" id="btnAnalyzeSr" onclick="analyzeSR()">🤖 Analyze S/R with Claude AI</button>
           <button class="btn-save-sr"    id="btnSaveSr"    onclick="saveSR()" style="display:none">💾 Save Analysis</button>
-          <div style="display:flex;gap:5px;margin-left:auto">
+          <div style="display:flex;gap:5px;margin-left:auto;align-items:center">
             <button class="chart-zoom-btn" onclick="zoomChart('1w')"  title="1 Week">1W</button>
             <button class="chart-zoom-btn" onclick="zoomChart('1m')"  title="1 Month">1M</button>
             <button class="chart-zoom-btn" onclick="zoomChart('3m')"  title="3 Months">3M</button>
             <button class="chart-zoom-btn" onclick="zoomChart('6m')"  title="6 Months">6M</button>
-            <button class="chart-zoom-btn active" onclick="zoomChart('1y')" title="1 Year" id="zoomAll">1Y</button>
+            <button class="chart-zoom-btn active" onclick="zoomChart('1y')" title="1 Year">1Y</button>
+            <div style="width:1px;height:18px;background:#2d2b4e;margin:0 3px"></div>
+            <button class="chart-zoom-btn" onclick="zoomInOut(-1)" title="Zoom In"  style="font-size:1.1em;padding:2px 9px">+</button>
+            <button class="chart-zoom-btn" onclick="zoomInOut(1)"  title="Zoom Out" style="font-size:1.1em;padding:2px 9px">−</button>
           </div>
         </div>
         <div id="chartContainer">
@@ -1931,6 +1934,18 @@ function zoomChart(range) {
       to:   now + 86400,
     });
   }
+}
+
+function zoomInOut(direction) {
+  // direction: -1 = zoom in (narrow range), +1 = zoom out (wider range)
+  if (!chartInstance) return;
+  const ts = chartInstance.timeScale();
+  const vr = ts.getVisibleRange();
+  if (!vr) return;
+  const mid  = (vr.from + vr.to) / 2;
+  const half = (vr.to - vr.from) / 2;
+  const factor = direction > 0 ? 1.4 : 0.6;   // out = 40% wider, in = 40% narrower
+  ts.setVisibleRange({ from: mid - half * factor, to: mid + half * factor });
 }
 
 function drawSRLines(data) {
