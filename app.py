@@ -11,8 +11,7 @@ from modules.market import (get_ltp, get_expiry_dates, get_option_chain_data,
                             get_today_ohlc, get_chart_data, get_components_ltp)
 from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapshots,
                         save_chain_analysis, get_chain_analysis_history, delete_chain_analysis,
-                        save_sr_alert, get_sr_alerts, get_setting, set_setting,
-                        get_breach_alerts,
+                        get_setting, set_setting,
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
                         delete_market_summary, get_today_market_summary,
                         save_watchlist, get_watchlist, cancel_watchlist)
@@ -55,13 +54,6 @@ try:
     _scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
     _scheduler.add_job(run_sensex_snapshot, 'interval', minutes=1, id='sensex_snapshot',
                        max_instances=1, misfire_grace_time=30)
-    # SR proximity monitor
-    from modules.scheduler import run_sr_monitor
-    _sr_freq = int(get_setting('sr_monitor_freq_min', '5'))
-    if get_setting('sr_monitor_enabled', 'true') == 'true':
-        _scheduler.add_job(run_sr_monitor, 'interval', minutes=_sr_freq,
-                           id='sr_monitor', max_instances=1, misfire_grace_time=60)
-        print(f'[SCHEDULER] SR Monitor started — every {_sr_freq} min')
     # Market Update job
     from modules.scheduler import run_market_update
     _mu_freq = int(get_setting('market_update_freq_min', '5'))
@@ -69,13 +61,6 @@ try:
         _scheduler.add_job(run_market_update, 'interval', minutes=_mu_freq,
                            id='market_update', max_instances=1, misfire_grace_time=60)
         print(f'[SCHEDULER] Market Update started — every {_mu_freq} min')
-    # Breach Monitor job
-    from modules.scheduler import run_breach_monitor
-    _bm_freq = int(get_setting('breach_monitor_freq_min', '2'))
-    if get_setting('breach_monitor_enabled', 'false') == 'true':
-        _scheduler.add_job(run_breach_monitor, 'interval', minutes=_bm_freq,
-                           id='breach_monitor', max_instances=1, misfire_grace_time=60)
-        print(f'[SCHEDULER] Breach Monitor started — every {_bm_freq} min')
     # Trade Watchlist watcher — checks pending conditions every 2 min during market hours
     from modules.scheduler import run_trade_watcher
     _scheduler.add_job(run_trade_watcher, 'interval', minutes=2,
@@ -1037,24 +1022,6 @@ def api_delete_chain_analysis(record_id):
     return jsonify({'success': True, 'deleted': deleted})
 
 
-@app.route('/api/sr-alerts')
-def api_sr_alerts():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    limit = int(request.args.get('limit', 30))
-    return jsonify({'alerts': get_sr_alerts(limit)})
-
-
-@app.route('/api/breach-alerts')
-def api_breach_alerts():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    limit = int(request.args.get('limit', 30))
-    return jsonify({'alerts': get_breach_alerts(limit=limit)})
-
-
 @app.route('/api/market-update/last-sent')
 def api_market_update_last_sent():
     client = require_auth()
@@ -1062,54 +1029,6 @@ def api_market_update_last_sent():
         return jsonify({'error': 'Not authenticated'}), 401
     last = get_setting('market_update_last_sent', '')
     return jsonify({'last_sent': last})
-
-
-@app.route('/api/monitor/config', methods=['GET'])
-def api_monitor_config_get():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    return jsonify({
-        'enabled':       get_setting('sr_monitor_enabled', 'true') == 'true',
-        'freq_min':      int(get_setting('sr_monitor_freq_min', '5')),
-        'threshold_pct': float(get_setting('sr_threshold_pct', '0.3')),
-        'indices':       get_setting('sr_monitor_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
-        'market_hours':  get_setting('sr_monitor_market_hours', 'false') == 'true',
-    })
-
-
-@app.route('/api/monitor/config', methods=['POST'])
-def api_monitor_config_set():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    body          = request.get_json() or {}
-    enabled       = bool(body.get('enabled', True))
-    freq_min      = int(body.get('freq_min', 5))
-    threshold_pct = float(body.get('threshold_pct', 0.3))
-    indices       = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
-    market_hours  = bool(body.get('market_hours', False))
-    if freq_min not in (2, 5, 10, 15):
-        return jsonify({'error': 'freq_min must be 2, 5, 10, or 15'}), 400
-    if not (0.05 <= threshold_pct <= 5.0):
-        return jsonify({'error': 'threshold_pct must be 0.05–5.0'}), 400
-    set_setting('sr_monitor_enabled',      'true' if enabled else 'false')
-    set_setting('sr_monitor_freq_min',     str(freq_min))
-    set_setting('sr_threshold_pct',        str(threshold_pct))
-    set_setting('sr_monitor_indices',      str(indices))
-    set_setting('sr_monitor_market_hours', 'true' if market_hours else 'false')
-    try:
-        from modules.scheduler import run_sr_monitor
-        if _scheduler.get_job('sr_monitor'):
-            _scheduler.remove_job('sr_monitor')
-        if enabled:
-            _scheduler.add_job(run_sr_monitor, 'interval', minutes=freq_min,
-                               id='sr_monitor', max_instances=1, misfire_grace_time=60)
-    except Exception as e:
-        return jsonify({'error': f'Scheduler update failed: {e}'}), 500
-    return jsonify({'success': True, 'enabled': enabled,
-                    'freq_min': freq_min, 'threshold_pct': threshold_pct,
-                    'indices': indices, 'market_hours': market_hours})
 
 
 @app.route('/api/market-update/config', methods=['GET'])
@@ -1148,48 +1067,6 @@ def api_market_update_config_set():
         if enabled:
             _scheduler.add_job(run_market_update, 'interval', minutes=freq_min,
                                id='market_update', max_instances=1, misfire_grace_time=60)
-    except Exception as e:
-        return jsonify({'error': f'Scheduler update failed: {e}'}), 500
-    return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min,
-                    'indices': indices, 'market_hours': market_hours})
-
-
-@app.route('/api/breach-monitor/config', methods=['GET'])
-def api_breach_monitor_config_get():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    return jsonify({
-        'enabled':      get_setting('breach_monitor_enabled',      'false') == 'true',
-        'freq_min':     int(get_setting('breach_monitor_freq_min', '2')),
-        'indices':      get_setting('breach_monitor_indices',      'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
-        'market_hours': get_setting('breach_monitor_market_hours', 'false') == 'true',
-    })
-
-
-@app.route('/api/breach-monitor/config', methods=['POST'])
-def api_breach_monitor_config_set():
-    client = require_auth()
-    if not client:
-        return jsonify({'error': 'Not authenticated'}), 401
-    body     = request.get_json() or {}
-    enabled  = bool(body.get('enabled', False))
-    freq_min = int(body.get('freq_min', 2))
-    indices      = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
-    market_hours = bool(body.get('market_hours', False))
-    if freq_min not in (1, 2, 5):
-        return jsonify({'error': 'freq_min must be 1, 2, or 5'}), 400
-    set_setting('breach_monitor_enabled',       'true' if enabled else 'false')
-    set_setting('breach_monitor_freq_min',      str(freq_min))
-    set_setting('breach_monitor_indices',       str(indices))
-    set_setting('breach_monitor_market_hours',  'true' if market_hours else 'false')
-    try:
-        from modules.scheduler import run_breach_monitor
-        if _scheduler.get_job('breach_monitor'):
-            _scheduler.remove_job('breach_monitor')
-        if enabled:
-            _scheduler.add_job(run_breach_monitor, 'interval', minutes=freq_min,
-                               id='breach_monitor', max_instances=1, misfire_grace_time=60)
     except Exception as e:
         return jsonify({'error': f'Scheduler update failed: {e}'}), 500
     return jsonify({'success': True, 'enabled': enabled, 'freq_min': freq_min,

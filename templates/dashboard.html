@@ -715,61 +715,6 @@ header {
     </div>
   </div>
 
-  <!-- S/R Monitor config -->
-  <div class="monitor-card">
-    <div class="mc-hd">
-      <span class="mc-hd-title">⚡ S/R Proximity Monitor</span>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="mc-badge off" id="monitorBadge">loading…</span>
-        <label class="mc-toggle" title="Enable / Disable monitor">
-          <input type="checkbox" id="monitorEnabled" onchange="saveMonitorConfig()">
-          <span class="mc-slider"></span>
-        </label>
-      </div>
-    </div>
-    <div class="mc-body">
-      <div class="mc-row">
-        <span class="mc-lbl">Indices</span>
-        <div class="mc-indices">
-          <label class="mc-idx-chk"><input type="checkbox" id="srMonSENSEX"    value="SENSEX"    checked> SENSEX</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="srMonNIFTY"     value="NIFTY"     checked> NIFTY</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="srMonBANKNIFTY" value="BANKNIFTY" checked> BANK NIFTY</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="srMonFINNIFTY"  value="FINNIFTY"  checked> FIN NIFTY</label>
-        </div>
-      </div>
-      <div class="mc-row">
-        <span class="mc-lbl">Frequency</span>
-        <select class="mc-sel" id="monitorFreq">
-          <option value="2">Every 2 min</option>
-          <option value="5" selected>Every 5 min</option>
-          <option value="10">Every 10 min</option>
-          <option value="15">Every 15 min</option>
-        </select>
-      </div>
-      <div class="mc-row">
-        <span class="mc-lbl">Threshold</span>
-        <input type="number" class="mc-inp" id="monitorThreshold" min="0.05" max="5" step="0.05" value="0.3">
-        <span style="color:#6b7280;font-size:0.82em">%</span>
-      </div>
-      <div class="mc-row">
-        <label class="mc-idx-chk" style="color:#6b7280">
-          <input type="checkbox" id="monitorMarketHours"> Market hours only (9:00–15:30 IST)
-        </label>
-      </div>
-      <button class="mc-save" onclick="saveMonitorConfig()">Save Settings</button>
-      <span class="mc-hint" id="monitorHint"></span>
-    </div>
-    <div class="mc-log-wrap">
-      <div class="mc-log-hd">
-        <span class="mc-log-title">Recent Alerts</span>
-        <button class="mc-log-refresh" onclick="loadSrAlertLog()">↻</button>
-      </div>
-      <div class="mc-log-body" id="srAlertLog">
-        <div class="mc-log-empty">No alerts yet.</div>
-      </div>
-    </div>
-  </div>
-
   <!-- Market Update config -->
   <div class="monitor-card">
     <div class="mc-hd">
@@ -820,54 +765,6 @@ header {
     </div>
   </div>
 
-  <!-- Breach Monitor config -->
-  <div class="monitor-card">
-    <div class="mc-hd">
-      <span class="mc-hd-title">🔔 Breach Monitor</span>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="mc-badge off" id="breachMonitorBadge">loading…</span>
-        <label class="mc-toggle" title="Enable / Disable breach monitor">
-          <input type="checkbox" id="breachMonitorEnabled" onchange="saveBreachMonitorConfig()">
-          <span class="mc-slider"></span>
-        </label>
-      </div>
-    </div>
-    <div class="mc-body">
-      <div class="mc-row">
-        <span class="mc-lbl">Indices</span>
-        <div class="mc-indices">
-          <label class="mc-idx-chk"><input type="checkbox" id="bmSENSEX"    value="SENSEX"    checked> SENSEX</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="bmNIFTY"     value="NIFTY"     checked> NIFTY</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="bmBANKNIFTY" value="BANKNIFTY" checked> BANK NIFTY</label>
-          <label class="mc-idx-chk"><input type="checkbox" id="bmFINNIFTY"  value="FINNIFTY"  checked> FIN NIFTY</label>
-        </div>
-      </div>
-      <div class="mc-row">
-        <span class="mc-lbl">Frequency</span>
-        <select class="mc-sel" id="breachMonitorFreq">
-          <option value="1">Every 1 min</option>
-          <option value="2" selected>Every 2 min</option>
-          <option value="5">Every 5 min</option>
-        </select>
-      </div>
-      <div class="mc-row">
-        <label class="mc-idx-chk" style="color:#6b7280">
-          <input type="checkbox" id="breachMonitorMarketHours"> Market hours only (9:00–15:30 IST)
-        </label>
-      </div>
-      <button class="mc-save" onclick="saveBreachMonitorConfig()">Save Settings</button>
-      <span class="mc-hint" id="breachMonitorHint"></span>
-    </div>
-    <div class="mc-log-wrap">
-      <div class="mc-log-hd">
-        <span class="mc-log-title">Recent Breaches</span>
-        <button class="mc-log-refresh" onclick="loadBreachAlertLog()">↻</button>
-      </div>
-      <div class="mc-log-body" id="breachAlertLog">
-        <div class="mc-log-empty">No breaches detected yet.</div>
-      </div>
-    </div>
-  </div>
 
 </div><!-- /.page -->
 
@@ -1085,46 +982,6 @@ function _getIndexChecks(prefix) {
   return _IDX_ALL.filter(id => document.getElementById(`${prefix}${id}`)?.checked).join(',');
 }
 
-async function loadMonitorConfig() {
-  const d = await get('/api/monitor/config');
-  if (d.error) return;
-  document.getElementById('monitorEnabled').checked      = d.enabled;
-  document.getElementById('monitorFreq').value           = d.freq_min;
-  document.getElementById('monitorThreshold').value      = d.threshold_pct;
-  document.getElementById('monitorMarketHours').checked  = !!d.market_hours;
-  _setIndexChecks('srMon', d.indices);
-  const badge = document.getElementById('monitorBadge');
-  if (d.enabled) {
-    badge.textContent = `ON · every ${d.freq_min} min · ±${d.threshold_pct}%`;
-    badge.className   = 'mc-badge on';
-  } else {
-    badge.textContent = 'OFF';
-    badge.className   = 'mc-badge off';
-  }
-}
-
-async function saveMonitorConfig() {
-  const enabled       = document.getElementById('monitorEnabled').checked;
-  const freq_min      = parseInt(document.getElementById('monitorFreq').value);
-  const threshold_pct = parseFloat(document.getElementById('monitorThreshold').value);
-  const indices       = _getIndexChecks('srMon');
-  const market_hours  = document.getElementById('monitorMarketHours').checked;
-  const hint          = document.getElementById('monitorHint');
-  hint.textContent    = 'Saving…'; hint.style.color = '#6b7280';
-  const r = await fetch('/api/monitor/config', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({enabled, freq_min, threshold_pct, indices, market_hours}),
-  });
-  const d = await r.json();
-  if (d.success) {
-    hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
-    setTimeout(() => { hint.textContent = ''; }, 2200);
-    loadMonitorConfig();
-  } else {
-    hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
-  }
-}
-
 // ── Market Update Config ──────────────────────────────────────────────────────
 async function loadMarketUpdateConfig() {
   const d = await get('/api/market-update/config');
@@ -1159,45 +1016,6 @@ async function saveMarketUpdateConfig() {
     hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
     setTimeout(() => { hint.textContent = ''; }, 2200);
     loadMarketUpdateConfig();
-  } else {
-    hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
-  }
-}
-
-// ── Breach Monitor Config ─────────────────────────────────────────────────────
-async function loadBreachMonitorConfig() {
-  const d = await get('/api/breach-monitor/config');
-  if (d.error) return;
-  document.getElementById('breachMonitorEnabled').checked       = d.enabled;
-  document.getElementById('breachMonitorFreq').value            = d.freq_min;
-  document.getElementById('breachMonitorMarketHours').checked   = !!d.market_hours;
-  _setIndexChecks('bm', d.indices);
-  const badge = document.getElementById('breachMonitorBadge');
-  if (d.enabled) {
-    badge.textContent = `ON · every ${d.freq_min} min`;
-    badge.className   = 'mc-badge on';
-  } else {
-    badge.textContent = 'OFF';
-    badge.className   = 'mc-badge off';
-  }
-}
-
-async function saveBreachMonitorConfig() {
-  const enabled      = document.getElementById('breachMonitorEnabled').checked;
-  const freq_min     = parseInt(document.getElementById('breachMonitorFreq').value);
-  const indices      = _getIndexChecks('bm');
-  const market_hours = document.getElementById('breachMonitorMarketHours').checked;
-  const hint         = document.getElementById('breachMonitorHint');
-  hint.textContent   = 'Saving…'; hint.style.color = '#6b7280';
-  const r = await fetch('/api/breach-monitor/config', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({enabled, freq_min, indices, market_hours}),
-  });
-  const d = await r.json();
-  if (d.success) {
-    hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
-    setTimeout(() => { hint.textContent = ''; }, 2200);
-    loadBreachMonitorConfig();
   } else {
     hint.textContent = '⚠ ' + (d.error||'Failed'); hint.style.color = '#f87171';
   }
@@ -1304,27 +1122,6 @@ function toggleSrExpand() {
   renderSrOverview();
 }
 
-// ── Inline Alert Logs ─────────────────────────────────────────────────────────
-async function loadSrAlertLog() {
-  const el = document.getElementById('srAlertLog');
-  const d  = await get('/api/sr-alerts?limit=40');
-  if (!d.alerts?.length) {
-    el.innerHTML = '<div class="mc-log-empty">No proximity alerts yet.</div>';
-    return;
-  }
-  el.innerHTML = d.alerts.map(a => `
-    <div class="mc-log-row">
-      <span class="mc-log-idx">${a.index_id}</span>
-      <span class="mc-log-time">${(a.alerted_at||'').substring(11,16)}</span>
-      <span class="${a.level_type==='support'?'mc-log-sup':'mc-log-res'}">
-        ${a.level_type==='support'?'🛡️':'🚧'} ₹${fmt2(a.level)}
-      </span>
-      <span class="mc-log-ltp">LTP ₹${fmt2(a.ltp)}</span>
-      <span class="mc-log-dist">${parseFloat(a.distance_pct||0).toFixed(3)}% away</span>
-      <span class="mc-log-time" style="margin-left:auto">${(a.alerted_at||'').substring(0,10)}</span>
-    </div>`).join('');
-}
-
 async function loadMarketUpdateLog() {
   const el = document.getElementById('marketUpdateLog');
   const d  = await get('/api/market-update/last-sent');
@@ -1335,25 +1132,6 @@ async function loadMarketUpdateLog() {
   const t = d.last_sent.substring(11,16);
   const dt = d.last_sent.substring(0,10);
   el.innerHTML = `<div class="mc-log-row"><span class="mc-log-ltp">Last sent:</span><span class="mc-log-sup">${t} IST</span><span class="mc-log-time" style="margin-left:auto">${dt}</span></div>`;
-}
-
-async function loadBreachAlertLog() {
-  const el = document.getElementById('breachAlertLog');
-  const d  = await get('/api/breach-alerts?limit=40');
-  if (!d.alerts?.length) {
-    el.innerHTML = '<div class="mc-log-empty">No breaches detected yet.</div>';
-    return;
-  }
-  el.innerHTML = d.alerts.map(a => `
-    <div class="mc-log-row">
-      <span class="mc-log-idx">${a.index_id}</span>
-      <span class="mc-log-time">${(a.alerted_at||'').substring(11,16)}</span>
-      <span class="${a.level_type==='support'?'mc-log-sup':'mc-log-res'}">
-        ${a.level_type==='support'?'🛡️↓':'🚧↑'} ₹${fmt2(a.level)}
-      </span>
-      <span class="mc-log-ltp">₹${fmt2(a.prev_ltp)} → ₹${fmt2(a.ltp)}</span>
-      <span class="mc-log-time" style="margin-left:auto">${(a.alerted_at||'').substring(0,10)}</span>
-    </div>`).join('');
 }
 
 // ── Live Index Price ──────────────────────────────────────────────────────────
@@ -2257,12 +2035,8 @@ loadIndices().then(() => {
   loadLtp();
   loadOHLC();
   loadSrOverview();
-  loadMonitorConfig();
   loadMarketUpdateConfig();
-  loadBreachMonitorConfig();
-  loadSrAlertLog();
   loadMarketUpdateLog();
-  loadBreachAlertLog();
   loadExpiries().then(() => {
     const sel = document.getElementById('expirySelect');
     if (sel?.value) loadChain();
@@ -2270,9 +2044,7 @@ loadIndices().then(() => {
 });
 setInterval(loadLtp,           5000);           // LTP every 5s
 setInterval(loadOHLC,          5 * 60 * 1000);  // OHLC every 5 min
-setInterval(loadSrAlertLog,    60 * 1000);       // SR alert log every 1 min
 setInterval(loadMarketUpdateLog, 60 * 1000);     // Market update log every 1 min
-setInterval(loadBreachAlertLog,  60 * 1000);     // Breach alert log every 1 min
 </script>
 </body>
 </html>
