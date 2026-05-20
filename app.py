@@ -938,7 +938,10 @@ def api_chart_data():
     cfg = INDEX_MAP[idx]
     c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
     c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
-    return jsonify(get_chart_data(client, c_exch, c_scrip, interval, days))
+    result  = get_chart_data(client, c_exch, c_scrip, interval, days)
+    if result.get('error') == 'session_expired':
+        return jsonify({'error': 'session_expired'}), 401
+    return jsonify(result)
 
 
 @app.route('/api/analyze-sr')

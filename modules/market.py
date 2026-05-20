@@ -338,10 +338,8 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
                 for _, row in df.iterrows():
                     dt_val = row.get('Datetime') or row.get('datetime') or ''
                     try:
-                        # Handle pandas Timestamp or string
                         s = str(dt_val)[:19].replace('T', ' ')
                         dt = _dt.strptime(s, '%Y-%m-%d %H:%M:%S')
-                        # Convert IST naive datetime to UTC unix seconds
                         unix_ts = int((dt - _dt(1970, 1, 1) - _td(hours=5, minutes=30)).total_seconds())
                     except Exception:
                         continue
@@ -355,7 +353,10 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
                                         'low': l, 'close': c, 'volume': v})
                 if len(candles) >= 5:
                     return {'candles': candles, 'interval_used': ivl, 'count': len(candles)}
-            except Exception:
+            except Exception as _e:
+                err_str = str(_e).lower()
+                if '401' in err_str or 'unauthorized' in err_str or 'token' in err_str:
+                    return {'error': 'session_expired', 'candles': []}
                 continue
 
     return {'error': 'No chart data available for any interval', 'candles': []}

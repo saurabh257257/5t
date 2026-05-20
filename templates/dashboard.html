@@ -1917,6 +1917,14 @@ async function loadChartData() {
   container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4b5563;font-size:0.85em"><div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>Fetching 1 year of data…</div>';
 
   const d = await get(`/api/chart-data?index=${_chartIndex}&interval=4h&days=365`);
+  if (d.error === 'session_expired') {
+    container.innerHTML = `<div style="text-align:center;padding:40px">
+      <div style="color:#fbbf24;font-size:1.1em;margin-bottom:12px">⚠️ 5paisa session expired</div>
+      <div style="color:#6b7280;font-size:0.85em;margin-bottom:18px">Historical data API requires re-login.</div>
+      <a href="/" style="background:#4c1d95;color:#e2e8f0;padding:8px 20px;border-radius:8px;text-decoration:none;font-size:0.9em">🔑 Re-login</a>
+    </div>`;
+    return;
+  }
   if (d.error || !d.candles?.length) {
     container.innerHTML = `<div style="color:#f87171;padding:28px;text-align:center">⚠ ${d.error || 'No data'}</div>`;
     return;
