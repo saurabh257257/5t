@@ -74,6 +74,47 @@ except Exception as _e:
 
 load_dotenv()
 
+# ── In-memory log buffer ────────────────────────────────────────────────────────
+import logging
+import collections
+import sys
+
+class _MemHandler(logging.Handler):
+    """Keep the last MAX_LINES log records in a deque."""
+    MAX_LINES = 500
+    def __init__(self):
+        super().__init__()
+        self.buf = collections.deque(maxlen=self.MAX_LINES)
+    def emit(self, record):
+        self.buf.append(self.format(record))
+
+_mem_handler = _MemHandler()
+_mem_handler.setFormatter(logging.Formatter('%(asctime)s  %(levelname)-7s  %(message)s',
+                                             datefmt='%H:%M:%S'))
+
+# Also redirect print() → logging so scheduler prints appear in the log
+class _PrintCapture:
+    def __init__(self, orig, level=logging.INFO):
+        self._orig = orig
+        self._level = level
+        self._logger = logging.getLogger('app.print')
+    def write(self, msg):
+        msg = msg.rstrip('\n')
+        if msg:
+            self._logger.log(self._level, msg)
+        self._orig.write(msg + '\n')
+    def flush(self):
+        self._orig.flush()
+    def isatty(self):
+        return False
+
+_root_logger = logging.getLogger()
+_root_logger.setLevel(logging.DEBUG)
+_root_logger.addHandler(_mem_handler)
+# Capture werkzeug (Flask request logs) too
+logging.getLogger('werkzeug').setLevel(logging.INFO)
+sys.stdout = _PrintCapture(sys.stdout, logging.INFO)
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "5paisa-flask-secret")
 app.config['PERMANENT_SESSION_LIFETIME'] = __import__('datetime').timedelta(days=30)
@@ -1476,6 +1517,72 @@ def api_db_truncate():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/log')
+def view_log():
+    lines = list(_mem_handler.buf)
+    # colour-code by level
+    def _cls(line):
+        if 'ERROR' in line or '❌' in line:  return 'err'
+        if 'WARNING' in line or '⚠' in line: return 'warn'
+        if '✅' in line or 'SUCCESS' in line: return 'ok'
+        if '[TRADE' in line or '[SL_' in line or '[SCHED' in line: return 'trade'
+        if '[SNAP' in line or '[MARKET' in line: return 'snap'
+        return ''
+    rows = ''.join(
+        f'<div class="ln {_cls(l)}">{l}</div>'
+        for l in reversed(lines)   # newest first
+    )
+    count = len(lines)
+    return f'''<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>App Log</title>
+<meta http-equiv="refresh" content="10">
+<style>
+  body  {{ background:#0d0d1a; color:#94a3b8; font:12px/1.5 "Cascadia Code","Fira Mono",monospace; margin:0; padding:0; }}
+  .top  {{ position:sticky; top:0; background:#12111f; border-bottom:1px solid #2d2b4e;
+           padding:10px 18px; display:flex; gap:14px; align-items:center; z-index:9; }}
+  .top h1 {{ margin:0; font-size:1em; color:#e2e8f0; }}
+  .badge {{ background:#1e1b4b; color:#a78bfa; border-radius:20px; padding:2px 10px; font-size:0.85em; }}
+  .refresh {{ color:#4b5563; font-size:0.78em; }}
+  .copy {{ background:#4c1d95; color:#e2e8f0; border:none; border-radius:6px;
+           padding:4px 12px; cursor:pointer; font-size:0.82em; margin-left:auto; }}
+  .copy:hover {{ background:#5b21b6; }}
+  .log  {{ padding:10px 18px 40px; }}
+  .ln   {{ padding:2px 0; border-bottom:1px solid #12111f; white-space:pre-wrap; word-break:break-all; }}
+  .err  {{ color:#f87171; }}
+  .warn {{ color:#fbbf24; }}
+  .ok   {{ color:#34d399; }}
+  .trade{{ color:#818cf8; }}
+  .snap {{ color:#60a5fa; }}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>📋 App Log</h1>
+  <span class="badge">{count} lines</span>
+  <span class="refresh">auto-refresh 10s</span>
+  <button class="copy" onclick="copyAll()">📋 Copy All</button>
+  <a href="/log" style="color:#6b7280;font-size:0.8em;text-decoration:none">↻ Refresh</a>
+</div>
+<div class="log" id="logbox">{rows or '<div style="color:#4b5563;padding:20px">No log entries yet.</div>'}</div>
+<script>
+function copyAll() {{
+  const text = Array.from(document.querySelectorAll('.ln')).map(e=>e.textContent).join('\\n');
+  navigator.clipboard.writeText(text).then(()=>{{ const b=document.querySelector('.copy'); b.textContent='✅ Copied!'; setTimeout(()=>b.textContent='📋 Copy All',1500); }});
+}}
+</script>
+</body>
+</html>'''
+
+
+@app.route('/log/json')
+def view_log_json():
+    """Raw JSON log dump for programmatic access."""
+    return json.dumps(list(_mem_handler.buf)), 200, {'Content-Type': 'application/json'}
 
 
 if __name__ == '__main__':
