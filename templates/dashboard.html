@@ -585,7 +585,12 @@ header {
 <header>
   <div class="logo">&#x1F4CA; Options Dashboard</div>
 
-  <a href="/logout"><button class="btn-danger">🔒 Lock</button></a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="/relogin" title="Force fresh 5paisa OAuth login (use when charts/historical data stops working)">
+      <button style="background:#1e1c35;border:1px solid #374151;color:#94a3b8;padding:6px 13px;border-radius:7px;cursor:pointer;font-size:0.82em">🔄 Re-login</button>
+    </a>
+    <a href="/logout"><button class="btn-danger">🔒 Lock</button></a>
+  </div>
 </header>
 
 <div class="page">

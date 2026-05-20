@@ -186,6 +186,25 @@ def logout():
     return redirect('/')
 
 
+@app.route('/relogin')
+def relogin():
+    """Force fresh 5paisa OAuth — deletes saved JWT and goes to OAuth flow."""
+    import os as _os
+    session.clear()
+    # Delete saved JWT so verify-pin won't restore the stale session
+    _jwt_file = _os.path.join(_os.path.dirname(__file__), '.5paisa_session.json')
+    try:
+        _os.remove(_jwt_file)
+    except Exception:
+        pass
+    login_url = (
+        f"https://dev-openapi.5paisa.com/WebVendorLogin/VLogin/Index"
+        f"?VendorKey={cred['USER_KEY']}"
+        f"&ResponseURL=http://{DROPLET_IP}:3000/callback"
+    )
+    return render_template('login.html', login_url=login_url)
+
+
 # ── Pages ──────────────────────────────────────────────────────────────────────
 
 @app.route('/dashboard')
