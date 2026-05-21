@@ -493,112 +493,32 @@ def api_analyze_chain():
     chg_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0
     chg_abs = round(ltp - prev_close, 2)
 
-    # ── Fresh S/R analysis (inline, before main Claude call) ─────────────────
-    sr_text = 'No saved S/R analysis available for this index.'
+    # ── Latest saved S/R from DB (set by "Analyze S/R" in chart modal) ───────
+    sr_text = 'No S/R analysis saved — open the chart and run "Analyze S/R with Claude AI" first.'
     sr_meta = None
     try:
-        c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
-        c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
-        chart_sr = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
-        if chart_sr.get('candles'):
-            candles_sr = chart_sr['candles']
-            ltp_sr     = candles_sr[-1]['close'] if candles_sr else ltp
-            recent_sr  = candles_sr[-60:]
-            from datetime import datetime as _dt_sr
-            ohlc_sr = 'Date | O | H | L | C\n'
-            for _c in recent_sr:
-                try:
-                    _d = _dt_sr.utcfromtimestamp(_c['time']).strftime('%d-%b-%y')
-                except Exception:
-                    _d = str(_c['time'])
-                ohlc_sr += f"{_d} | {_c['open']:.0f} | {_c['high']:.0f} | {_c['low']:.0f} | {_c['close']:.0f}\n"
-            yr_hi = max(c['high'] for c in candles_sr if c['high'] > 0)
-            yr_lo = min(c['low']  for c in candles_sr if c['low']  > 0)
-            one_pct_sr = round(ltp_sr * 0.01)
-            sr_prompt = f"""You are a price action trader specialising in index options on Indian markets.
-Index: {idx}  |  Current Price: {ltp_sr:.0f}
-52-Week High: {yr_hi:.0f}  |  52-Week Low: {yr_lo:.0f}
-1% range: {ltp_sr - one_pct_sr:.0f} – {ltp_sr + one_pct_sr:.0f}
-Daily OHLC — last 60 trading days:
-{ohlc_sr}
-Find exactly 2 SUPPORT levels and 2 RESISTANCE levels within 1% of current price.
-A level must have caused a SHARP bounce/rejection (1%+ move in 1 day) at least twice.
-Respond ONLY in valid JSON (no markdown):
-{{"supports":[{{"level":0,"reason":""}}],"resistances":[{{"level":0,"reason":""}}],"verdict":""}}
-Return exactly 2 supports and 2 resistances."""
-            ac_sr = _anthropic.Anthropic()
-            rsp_sr = ac_sr.messages.create(
-                model='claude-haiku-4-5', max_tokens=600,
-                messages=[{'role': 'user', 'content': sr_prompt}]
-            )
-            raw_sr = rsp_sr.content[0].text.strip()
-            if raw_sr.startswith('```'):
-                raw_sr = raw_sr.split('```')[1]
-                if raw_sr.startswith('json'): raw_sr = raw_sr[4:]
-            sr_data = json.loads(raw_sr.strip())
-            fresh_sups = sr_data.get('supports', [])
-            fresh_ress = sr_data.get('resistances', [])
-            # Save fresh S/R to DB
-            try:
-                save_sr(
-                    index_id=idx, ltp=ltp_sr,
-                    supports=fresh_sups, resistances=fresh_ress,
-                    valid_today=[], verdict=sr_data.get('verdict', ''),
-                )
-            except Exception as _srs:
-                print(f'[SR] save error: {_srs}')
-            sup_str = ', '.join(str(s['level']) for s in fresh_sups)
-            res_str = ', '.join(str(r['level']) for r in fresh_ress)
+        sr_history = get_sr_history(idx, limit=1)
+        if sr_history:
+            sr      = sr_history[0]
+            sups    = (sr.get('supports')    or [])[:4]
+            ress    = (sr.get('resistances') or [])[:4]
+            sup_str = ', '.join(str(s['level']) for s in sups)
+            res_str = ', '.join(str(r['level']) for r in ress)
             sr_text = (f"Supports: {sup_str or '—'}\n"
                        f"Resistances: {res_str or '—'}\n"
-                       f"S/R Verdict: {sr_data.get('verdict','')}")
+                       f"Verdict: {sr.get('verdict','')}\n"
+                       f"(S/R at LTP {sr['ltp']} on {sr['saved_at']})")
             sr_meta = {
-                'saved_at':    'fresh',
-                'ltp':         ltp_sr,
-                'supports':    [s['level'] for s in fresh_sups],
-                'resistances': [r['level'] for r in fresh_ress],
+                'saved_at':    sr['saved_at'],
+                'ltp':         sr['ltp'],
+                'supports':    [s['level'] for s in sups],
+                'resistances': [r['level'] for r in ress],
             }
-            print(f'[MS] {idx} fresh S/R: sup={sup_str} res={res_str}')
+            print(f'[MS] {idx} S/R loaded: sup={sup_str} res={res_str}')
         else:
-            # Fall back to saved S/R from DB
-            sr_history = get_sr_history(idx, limit=1)
-            if sr_history:
-                sr     = sr_history[0]
-                sups   = (sr.get('supports')    or [])[:5]
-                ress   = (sr.get('resistances') or [])[:5]
-                sup_str = ', '.join(str(s['level']) for s in sups)
-                res_str = ', '.join(str(r['level']) for r in ress)
-                sr_text = (f"Supports: {sup_str or '—'}\n"
-                           f"Resistances: {res_str or '—'}\n"
-                           f"(S/R from DB at LTP {sr['ltp']} on {sr['saved_at']})")
-                sr_meta = {
-                    'saved_at':    sr['saved_at'],
-                    'ltp':         sr['ltp'],
-                    'supports':    [s['level'] for s in sups],
-                    'resistances': [r['level'] for r in ress],
-                }
-    except Exception as _sre:
-        print(f'[SR] fresh analysis error: {_sre}')
-        # Fall back to saved S/R
-        try:
-            sr_history = get_sr_history(idx, limit=1)
-            if sr_history:
-                sr     = sr_history[0]
-                sups   = (sr.get('supports')    or [])[:5]
-                ress   = (sr.get('resistances') or [])[:5]
-                sup_str = ', '.join(str(s['level']) for s in sups)
-                res_str = ', '.join(str(r['level']) for r in ress)
-                sr_text = (f"Supports: {sup_str or '—'}\n"
-                           f"Resistances: {res_str or '—'}\n"
-                           f"(S/R from DB, error fetching fresh: {str(_sre)[:60]})")
-                sr_meta = {
-                    'saved_at':    sr['saved_at'],
-                    'ltp':         sr['ltp'],
-                    'supports':    [s['level'] for s in sups],
-                    'resistances': [r['level'] for r in ress],
-                }
-        except Exception:
-            pass
+            print(f'[MS] {idx} — no S/R saved yet')
+    except Exception as _e:
+        print(f'[MS] S/R load error: {_e}')
 
     # ── Previous market summaries history (last 5) for context ────────────────
     prev_context = ''
@@ -612,9 +532,13 @@ Return exactly 2 supports and 2 resistances."""
                 if prev.get('structured'):
                     try:
                         ps = json.loads(prev['structured'])
-                        prev_dir   = ps.get('direction', '—').upper()
-                        pt         = ps.get('trade', {})
-                        prev_trade = f"{pt.get('strike')} {pt.get('type')} @ ₹{pt.get('premium')}"
+                        prev_dir = ps.get('direction', '—').upper()
+                        # Handle both old 'trade' (single) and new 'trades' (array)
+                        tlist = ps.get('trades') or ([ps['trade']] if ps.get('trade') else [])
+                        prev_trade = ' | '.join(
+                            f"{t.get('strike')}{t.get('type')} @₹{t.get('premium')}"
+                            for t in tlist if t.get('strike')
+                        ) or '—'
                     except Exception:
                         pass
                 lines.append(
@@ -628,8 +552,8 @@ Return exactly 2 supports and 2 resistances."""
             try:
                 ps0      = json.loads(first.get('structured') or '{}')
                 dir0     = ps0.get('direction', '—').upper()
-                pt0      = ps0.get('trade', {})
-                trade0   = f"{pt0.get('strike')} {pt0.get('type')} @ ₹{pt0.get('premium')}"
+                tlist0   = ps0.get('trades') or ([ps0['trade']] if ps0.get('trade') else [])
+                trade0   = ' | '.join(f"{t.get('strike')}{t.get('type')} @₹{t.get('premium')}" for t in tlist0 if t.get('strike')) or '—'
             except Exception:
                 dir0, trade0 = '—', '—'
             prev_meta = {
@@ -645,7 +569,7 @@ Return exactly 2 supports and 2 resistances."""
     except Exception as _e:
         print(f'[MS] prev fetch error: {_e}')
 
-    prompt = f"""You are an expert Indian options trader. Analyze {idx} and respond ONLY in valid JSON — no text outside the JSON.
+    prompt = f"""You are an expert Indian options trader analyzing {idx}. Respond ONLY in valid JSON.
 
 INPUT DATA
 Index: {idx} | LTP: {ltp} | Prev Close: {prev_close} | Change: {chg_abs:+.2f} ({chg_pct:+.2f}%)
@@ -653,7 +577,7 @@ Expiry: {expiry_lbl} | PCR: {pcr} | Max Pain: {int(max_pain)}
 Top CE OI walls: {', '.join(f"{int(r['strike'])}(OI:{r['ce_oi']},LTP:₹{r['ce_ltp']})" for r in top_ce)}
 Top PE OI walls: {', '.join(f"{int(r['strike'])}(OI:{r['pe_oi']},LTP:₹{r['pe_ltp']})" for r in top_pe)}
 
-S/R LEVELS (Technical):
+S/R LEVELS (from chart analysis):
 {sr_text}
 
 OPTION CHAIN (20 strikes near LTP):
@@ -662,45 +586,58 @@ OPTION CHAIN (20 strikes near LTP):
 Respond ONLY with this JSON (no markdown, no text outside JSON):
 {{
   "direction": "bullish|bearish|neutral",
-  "context": "2-3 sentences: what data (PCR, max pain gap, OI walls, S/R, prev bias) drove the conclusion",
+  "context": "2-3 sentences: what PCR, max pain gap, OI walls, S/R, and previous bias say about today",
   "signals": [
-    "signal 1 — one line, specific level/number",
+    "signal 1 — specific level/number",
     "signal 2",
     "signal 3",
     "signal 4",
     "signal 5"
   ],
-  "trade": {{
-    "action": "BUY",
-    "strike": 0,
-    "type": "CE or PE",
-    "premium": 0.0,
-    "trigger_price": 0,
-    "trigger_condition": "above",
-    "entry_trigger": "one line: what to watch at the trigger_price level",
-    "entry_timing": "best time window, e.g. '9:20-9:45 AM after opening range forms'",
-    "sl": 0.0,
-    "target": 0.0,
-    "reason": "one sentence why this strike"
-  }}
+  "trades": [
+    {{
+      "side": "support",
+      "strike": 0,
+      "type": "PE",
+      "premium": 0.0,
+      "trigger_price": 0,
+      "trigger_condition": "below",
+      "entry_trigger": "one line: enter PE when {idx} falls below <support level>",
+      "entry_timing": "e.g. '9:20-9:45 AM after opening range'",
+      "sl": 0.0,
+      "target": 0.0,
+      "reason": "why this PE strike near support"
+    }},
+    {{
+      "side": "resistance",
+      "strike": 0,
+      "type": "CE",
+      "premium": 0.0,
+      "trigger_price": 0,
+      "trigger_condition": "above",
+      "entry_trigger": "one line: enter CE when {idx} breaks above <resistance level>",
+      "entry_timing": "e.g. '9:20-9:45 AM after opening range'",
+      "sl": 0.0,
+      "target": 0.0,
+      "reason": "why this CE strike near resistance"
+    }}
+  ]
 }}
 
-TRADE RULES:
-- Pick ONE trade only (CE if bullish, PE if bearish)
-- trigger_price: EXACT integer index price to watch (e.g. 24050)
-- trigger_condition: "above" = enter when {idx} >= trigger_price (use for CE); "below" = enter when {idx} <= trigger_price (use for PE)
-- entry_trigger: brief human-readable summary of the trigger
-- entry_timing: time of day guidance
-- sl = premium x 0.70 (30% loss = stop)
-- target = premium + 3 x (premium - sl)  exactly 1:3 R:R
+TRADE RULES (apply to BOTH trades):
+- support trade: PE strike 1-2 strikes below support; trigger_condition = "below"; trigger_price = support level
+- resistance trade: CE strike 1-2 strikes above resistance; trigger_condition = "above"; trigger_price = resistance level
+- Use nearest S/R levels from the S/R data above
+- sl = premium × 0.70 (30% stop)
+- target = premium + 3 × (premium − sl)  [1:3 R:R]
 - Round sl and target to nearest 0.5
-- Choose strike near ATM with strong OI backing"""
+- Choose strikes near ATM with strong OI backing"""
 
     try:
         ac = _anthropic.Anthropic()
         resp = ac.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=900,
+            max_tokens=1400,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = resp.content[0].text.strip()
@@ -713,21 +650,31 @@ TRADE RULES:
 
         structured = json.loads(raw)
 
-        # Build a plain-text version for DB storage
-        t = structured.get('trade', {})
+        trades_list = structured.get('trades', [])
+        # Fall back to old single-trade format for compatibility
+        if not trades_list and structured.get('trade'):
+            trades_list = [structured['trade']]
+
+        # Build plain-text summary for DB storage
+        trades_txt = ''
+        for t in trades_list:
+            side = t.get('side', '').upper()
+            trades_txt += (
+                f"\n[{side} TRADE] BUY {t.get('strike')} {t.get('type')} @ ₹{t.get('premium')} | "
+                f"Trigger: {t.get('trigger_condition','').upper()} {t.get('trigger_price')} | "
+                f"SL ₹{t.get('sl')} | Target ₹{t.get('target')}\n"
+                f"  → {t.get('entry_trigger','')}\n"
+                f"  Timing: {t.get('entry_timing','')} | {t.get('reason','')}\n"
+            )
         analysis_text = (
             f"Direction: {structured.get('direction','').upper()}\n\n"
             f"Context: {structured.get('context','')}\n\n"
             f"Signals:\n" +
             '\n'.join(f"• {s}" for s in structured.get('signals', [])) +
-            f"\n\nTrade: BUY {t.get('strike')} {t.get('type')} @ ₹{t.get('premium')} | "
-            f"SL ₹{t.get('sl')} | Target ₹{t.get('target')} | 1:3 R:R\n"
-            f"Trigger: {t.get('entry_trigger','')}\n"
-            f"Timing: {t.get('entry_timing','')}\n"
-            f"{t.get('reason','')}"
+            f"\n\nTrades:{trades_txt}"
         )
 
-        # Save to market_summary (with structured JSON for cache replay)
+        # Save to market_summary
         try:
             save_market_summary(
                 index_id=idx, expiry_label=expiry_lbl,
@@ -748,56 +695,56 @@ TRADE RULES:
         except Exception as _se:
             print(f'[DB] chain analysis save error: {_se}')
 
-        # Auto-save to trade watchlist — replace any existing pending entry for this index
-        watchlist_id = None
+        # Auto-save BOTH trades to watchlist
+        watchlist_ids = []
         try:
-            t_save = structured.get('trade', {})
-            t_strike     = int(t_save.get('strike', 0))
-            t_type       = (t_save.get('type') or '').upper()        # CE / PE
-            t_premium    = float(t_save.get('premium', 0))
-            t_trigger    = float(t_save.get('trigger_price', 0))
-            t_condition  = (t_save.get('trigger_condition') or 'above').lower()
-            t_sl         = float(t_save.get('sl', 0))
-            t_target     = float(t_save.get('target', 0))
-            if t_strike and t_type and t_trigger:
-                # Find scrip_code from option chain
-                scrip_key  = 'ce_scrip' if t_type == 'CE' else 'pe_scrip'
-                t_scrip    = 0
-                for row_r in rows:
-                    if int(row_r['strike']) == t_strike:
-                        t_scrip = int(row_r.get(scrip_key, 0))
-                        # Also use chain LTP if premium is 0
-                        if t_premium == 0:
-                            ltp_key = 'ce_ltp' if t_type == 'CE' else 'pe_ltp'
-                            t_premium = float(row_r.get(ltp_key, 0))
-                        break
-                watchlist_id = save_watchlist(
-                    index_id=idx, strike=t_strike, option_type=t_type,
-                    scrip_code=t_scrip, premium=t_premium,
-                    trigger_price=t_trigger, trigger_condition=t_condition,
-                    sl=t_sl, target=t_target, qty=1, sl_offset=150,
-                    notes=f"Auto from analysis @ {ltp}",
-                )
-                print(f'[WATCHLIST] {idx} saved id={watchlist_id} '
-                      f'{t_strike}{t_type} trigger={t_condition} {t_trigger}')
+            for t_save in trades_list:
+                t_strike    = int(t_save.get('strike', 0))
+                t_type      = (t_save.get('type') or '').upper()
+                t_premium   = float(t_save.get('premium', 0))
+                t_trigger   = float(t_save.get('trigger_price', 0))
+                t_condition = (t_save.get('trigger_condition') or 'above').lower()
+                t_sl        = float(t_save.get('sl', 0))
+                t_target    = float(t_save.get('target', 0))
+                t_side      = t_save.get('side', '')
+                if t_strike and t_type and t_trigger:
+                    scrip_key = 'ce_scrip' if t_type == 'CE' else 'pe_scrip'
+                    t_scrip   = 0
+                    for row_r in rows:
+                        if int(row_r['strike']) == t_strike:
+                            t_scrip = int(row_r.get(scrip_key, 0))
+                            if t_premium == 0:
+                                ltp_key = 'ce_ltp' if t_type == 'CE' else 'pe_ltp'
+                                t_premium = float(row_r.get(ltp_key, 0))
+                            break
+                    wid = save_watchlist(
+                        index_id=idx, strike=t_strike, option_type=t_type,
+                        scrip_code=t_scrip, premium=t_premium,
+                        trigger_price=t_trigger, trigger_condition=t_condition,
+                        sl=t_sl, target=t_target, qty=1, sl_offset=150,
+                        notes=f"Auto [{t_side}] @ {ltp}",
+                    )
+                    watchlist_ids.append(wid)
+                    print(f'[WATCHLIST] {idx} saved id={wid} '
+                          f'{t_strike}{t_type} [{t_side}] trigger={t_condition} {t_trigger}')
         except Exception as _we:
             print(f'[WATCHLIST] save error: {_we}')
 
         return jsonify({
-            "structured":   structured,
-            "summary":      analysis_text,
-            "pcr":          pcr,
-            "max_pain":     max_pain,
-            "total_ce_oi":  total_ce_oi,
-            "total_pe_oi":  total_pe_oi,
-            "change":       chg_abs,
-            "change_pct":   chg_pct,
-            "ltp":          ltp,
-            "expiry_label": expiry_lbl,
-            "sr_used":      sr_meta,           # None if no S/R saved
-            "prev_used":    bool(prev_context), # True if previous analysis was included
-            "prev_meta":    prev_meta,          # dict with date/time/ltp/direction/trade or None
-            "watchlist_id": watchlist_id,       # id of the auto-saved watchlist entry or None
+            "structured":    structured,
+            "summary":       analysis_text,
+            "pcr":           pcr,
+            "max_pain":      max_pain,
+            "total_ce_oi":   total_ce_oi,
+            "total_pe_oi":   total_pe_oi,
+            "change":        chg_abs,
+            "change_pct":    chg_pct,
+            "ltp":           ltp,
+            "expiry_label":  expiry_lbl,
+            "sr_used":       sr_meta,
+            "prev_used":     bool(prev_context),
+            "prev_meta":     prev_meta,
+            "watchlist_ids": watchlist_ids,
         })
     except json.JSONDecodeError as e:
         print(f'[MS] JSON parse error: {e} | raw: {raw[:200]}')
@@ -1162,35 +1109,41 @@ def api_analyze_sr():
 
     one_pct = round(ltp * 0.01)
 
-    prompt = f"""You are a price action trader specialising in index options on Indian markets.
+    prompt = f"""You are a professional price action trader specialising in Indian index options.
 
+═══ GLOBAL MARKET CONTEXT ═══
+{ctx_txt}
+
+═══ INDEX DATA ═══
 Index: {idx}  |  Current Price: {ltp:.0f}
 52-Week High: {yr_high:.0f}  |  52-Week Low: {yr_low:.0f}
 1% range from current: {ltp - one_pct:.0f} – {ltp + one_pct:.0f}
 
-{ctx_txt}
-
-Daily OHLC — last 60 trading days:
+═══ DAILY OHLC — LAST 60 TRADING DAYS ═══
 {ohlc_txt}
 
-TASK: Using BOTH the price action data AND the global context above, find:
-- Exactly 2 SUPPORT levels within 1% of current price {ltp:.0f} (i.e. between {ltp - one_pct:.0f} and {ltp:.0f})
-- Exactly 2 RESISTANCE levels within 1% of current price {ltp:.0f} (i.e. between {ltp:.0f} and {ltp + one_pct:.0f})
+═══ YOUR TASKS ═══
+1. CONTEXT SUMMARY (2-3 sentences): What do the global indicators (GIFT Nifty trend, VIX level, DXY vs INR, crude direction) say about Indian market risk/direction TODAY?
+2. CHART SUMMARY (2-3 sentences): What has happened on the {idx} chart recently? Trend direction, key swing, where price sits relative to range.
+3. Find EXACTLY 2 SUPPORT levels and EXACTLY 2 RESISTANCE levels within 1% of current price {ltp:.0f}.
+   - A level MUST have caused a sharp bounce/rejection (≥1% move in 1 day) at least TWICE.
+   - If fewer than 2 clean levels exist within 1%, use nearest levels just outside the range.
+4. VERDICT (2 sentences): Today's overall bias + which specific level to watch for the first entry.
 
-Rules:
-1. Level must have caused a SHARP bounce/rejection (1%+ move in 1 day) at least twice in the data.
-2. If global context shows VIX spike, DXY strength or crude weakness — factor that into the bias.
-3. If fewer than 2 clean levels exist within 1%, pick the nearest ones just outside 1% range.
-4. DO NOT include levels where price just drifted through slowly.
-
-valid_today = levels within 1% of current price {ltp:.0f}.
-
-Respond ONLY in valid JSON (no markdown):
+Respond ONLY in valid JSON (no markdown, no text outside JSON):
 {{
-  "supports": [{{"level": 0, "reason": "dates + reaction size, e.g. bounced +1.8% on May 11, Apr 28"}}],
-  "resistances": [{{"level": 0, "reason": "dates + reaction size"}}],
-  "valid_today": [{{"level": 0, "type": "support", "note": "..."}}],
-  "verdict": "2 sentences: today's bias based on price action + global context, and which level to watch."
+  "context_summary": "2-3 sentences on what global indicators mean for Indian markets today",
+  "chart_summary": "2-3 sentences on recent {idx} chart action and where price sits now",
+  "supports": [
+    {{"level": 0, "reason": "specific dates + reaction size, e.g. bounced +1.8% on May 11 and Apr 28"}},
+    {{"level": 0, "reason": "..."}}
+  ],
+  "resistances": [
+    {{"level": 0, "reason": "specific dates + rejection size"}},
+    {{"level": 0, "reason": "..."}}
+  ],
+  "valid_today": [{{"level": 0, "type": "support", "note": "within 1% of current price"}}],
+  "verdict": "2 sentences: bias + level to watch"
 }}
 
 Return exactly 2 supports and 2 resistances."""
@@ -1198,7 +1151,7 @@ Return exactly 2 supports and 2 resistances."""
     try:
         ac  = _anthropic.Anthropic()
         rsp = ac.messages.create(
-            model='claude-haiku-4-5', max_tokens=1400,
+            model='claude-haiku-4-5', max_tokens=1600,
             messages=[{'role': 'user', 'content': prompt}]
         )
         raw = rsp.content[0].text.strip()
@@ -1209,6 +1162,21 @@ Return exactly 2 supports and 2 resistances."""
         data['ltp']     = ltp
         data['index']   = idx
         data['context'] = ctx.get('quotes', [])
+        # Auto-save to DB so market summary refresh can use it immediately
+        try:
+            save_sr(
+                index_id    = idx,
+                ltp         = ltp,
+                supports    = data.get('supports', []),
+                resistances = data.get('resistances', []),
+                valid_today = data.get('valid_today', []),
+                verdict     = data.get('verdict', ''),
+            )
+            data['auto_saved'] = True
+            print(f'[SR] {idx} auto-saved at LTP {ltp:.0f}')
+        except Exception as _se:
+            data['auto_saved'] = False
+            print(f'[SR] auto-save error: {_se}')
         return jsonify(data)
     except json.JSONDecodeError as e:
         return jsonify({'error': f'Claude returned invalid JSON: {e}', 'raw': raw}), 500

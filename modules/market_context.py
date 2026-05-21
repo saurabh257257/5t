@@ -138,6 +138,7 @@ def get_market_context():
         _yf_quote('^INDIAVIX', 'India VIX'),
         _yf_quote('DX-Y.NYB',  'Dollar Index'),
         _yf_quote('CL=F',      'Crude Oil (WTI)'),
+        _yf_quote('INR=X',     'USD/INR'),
     ]
     news = _top_news(5)
 

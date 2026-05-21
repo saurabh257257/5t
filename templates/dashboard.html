@@ -169,6 +169,17 @@ header {
 .ms-level-val.tgt    { color: #34d399; }
 .ms-level-val.rr     { color: #a78bfa; }
 .ms-trade-reason { font-size: 0.78em; color: #6b7280; line-height: 1.5; }
+.ms-trade-box {
+  border-radius: 10px; padding: 12px 14px;
+  border: 1px solid #2d2b4e; background: rgba(255,255,255,0.03);
+}
+.ms-trade-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ms-trade-row:last-of-type { border-bottom: none; }
+.ms-trade-lbl { font-size: 0.7em; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
+.ms-trade-val { font-size: 0.82em; font-weight: 700; color: #e2e8f0; }
 
 /* Option Chain */
 .chain-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
@@ -1277,8 +1288,8 @@ function renderMarketSummary(d) {
   const dir = (s.direction || 'neutral').toLowerCase();
   const dirCls  = dir === 'bullish' ? 'bull' : dir === 'bearish' ? 'bear' : 'neu';
   const dirIcon = dir === 'bullish' ? '▲ Bullish' : dir === 'bearish' ? '▼ Bearish' : '◆ Neutral';
-  const t   = s.trade || {};
-  const tradeCls = (t.type || '').toUpperCase() === 'CE' ? 'ce' : 'pe';
+  // Handle both new 'trades' array and old single 'trade'
+  const tradesList = s.trades || (s.trade ? [s.trade] : []);
 
   // Data-sources pill line
   const sr = d.sr_used;
@@ -1289,12 +1300,9 @@ function renderMarketSummary(d) {
     ? `<span style="color:#a78bfa">✓ Previous summary included</span>`
     : `<span style="color:#6b7280">✗ No previous summary</span>`;
 
-  // risk = entry - sl; target = entry + 3 × risk
-  const entry  = parseFloat(t.premium) || 0;
-  const sl     = parseFloat(t.sl)      || 0;
-  const target = parseFloat(t.target)  || 0;
-  const risk   = entry - sl;
-  const reward = target - entry;
+  // entry/sl/target kept for compatibility (used in trade card map below)
+  const entry  = 0;
+  const sl     = 0;
 
   const signals = (s.signals || []).map(sig =>
     `<div class="ms-signal">
@@ -1360,43 +1368,28 @@ function renderMarketSummary(d) {
       ${prevPill}
     </div>
 
-    <!-- Trade -->
+    <!-- Trades: Support + Resistance -->
     <div>
-      <div class="ms-section-label">🎯 One Trade Today</div>
-      <div class="ms-trade ${tradeCls}">
-        <div class="ms-trade-title">BUY · 1:3 Risk/Reward · Intraday</div>
-        <div class="ms-trade-main">
-          ${t.strike} ${t.type} @ ₹${entry.toFixed(2)}
-        </div>
-        <div class="ms-trade-levels">
-          <div class="ms-level">
-            <div class="ms-level-label">Entry</div>
-            <div class="ms-level-val entry">₹${entry.toFixed(2)}</div>
-          </div>
-          <div class="ms-level">
-            <div class="ms-level-label">Stop Loss</div>
-            <div class="ms-level-val sl">₹${sl.toFixed(2)}</div>
-          </div>
-          <div class="ms-level">
-            <div class="ms-level-label">Target</div>
-            <div class="ms-level-val tgt">₹${target.toFixed(2)}</div>
-          </div>
-          <div class="ms-level">
-            <div class="ms-level-label">Risk : Reward</div>
-            <div class="ms-level-val rr">₹${risk.toFixed(1)} : ₹${reward.toFixed(1)}</div>
-          </div>
-        </div>
-        ${t.entry_trigger ? `
-        <div style="margin-bottom:6px">
-          <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:3px">⚡ Entry Trigger (when to enter)</div>
-          <div style="font-size:0.82em;color:#fbbf24;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:6px;padding:7px 10px;line-height:1.5">${t.entry_trigger}</div>
-        </div>` : ''}
-        ${t.entry_timing ? `
-        <div style="margin-bottom:8px">
-          <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:3px">🕐 Best Time Window</div>
-          <div style="font-size:0.82em;color:#94a3b8;background:#12111f;border:1px solid #2d2b4e;border-radius:6px;padding:7px 10px;line-height:1.5">${t.entry_timing}</div>
-        </div>` : ''}
-        <div class="ms-trade-reason">${t.reason || ''}</div>
+      <div class="ms-section-label">🎯 Two Trades Today</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        ${tradesList.map(t => {
+          const isCE   = (t.type||'').toUpperCase() === 'CE';
+          const sideLbl = t.side === 'support' ? '🛡 Support Trade' : '🚧 Resistance Trade';
+          const sideClr = t.side === 'support' ? '#34d399' : '#f87171';
+          const typClr  = isCE ? '#34d399' : '#f87171';
+          const cond    = (t.trigger_condition || 'above').toUpperCase();
+          const risk    = entry > 0 && sl > 0 ? (parseFloat(t.premium) - parseFloat(t.sl)).toFixed(1) : '—';
+          const rew     = entry > 0 && sl > 0 ? (parseFloat(t.target) - parseFloat(t.premium)).toFixed(1) : '—';
+          return `<div class="ms-trade-box" style="flex:1;min-width:240px;border-color:${sideClr}30">
+            <div style="font-size:0.68em;font-weight:700;color:${sideClr};text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${sideLbl}</div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">Strike</span><span class="ms-trade-val" style="color:${typClr}">${t.strike} ${t.type}</span></div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">Premium</span><span class="ms-trade-val">₹${fmt2(t.premium)}</span></div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">Trigger</span><span class="ms-trade-val" style="color:#fbbf24">${cond} ${fmtN(t.trigger_price)}</span></div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">SL / Target</span><span class="ms-trade-val">₹${fmt2(t.sl)} / ₹${fmt2(t.target)}</span></div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">Timing</span><span class="ms-trade-val" style="color:#94a3b8;font-size:0.9em">${t.entry_timing||'—'}</span></div>
+            <div class="ms-trade-reason" style="margin-top:5px">${t.entry_trigger||''}</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>
 
@@ -1972,7 +1965,7 @@ async function analyzeSR() {
   // Global context pills
   let ctxHtml = '';
   if (d.context?.length) {
-    ctxHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+    ctxHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">' +
       d.context.map(q => {
         const up  = q.change_pct >= 0;
         const clr = up ? '#34d399' : '#f87171';
@@ -1984,10 +1977,21 @@ async function analyzeSR() {
         </span>`;
       }).join('') + '</div>';
   }
-  // Verdict
+
+  // Context summary + chart summary
+  const ctxSummaryHtml = d.context_summary
+    ? `<div style="background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.8em;color:#c4b5fd;line-height:1.6">
+        <span style="font-size:0.7em;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#7c3aed">🌍 Global Context</span><br>${d.context_summary}
+       </div>` : '';
+  const chartSummaryHtml = d.chart_summary
+    ? `<div style="background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.8em;color:#a7f3d0;line-height:1.6">
+        <span style="font-size:0.7em;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#34d399">📈 Chart Summary</span><br>${d.chart_summary}
+       </div>` : '';
+
   document.getElementById('srVerdictBox').style.display = 'block';
-  document.getElementById('srVerdictBox').innerHTML = ctxHtml +
-    `<strong style="color:#fbbf24">📝 Verdict:</strong> ${d.verdict || ''}`;
+  document.getElementById('srVerdictBox').innerHTML =
+    ctxHtml + ctxSummaryHtml + chartSummaryHtml +
+    `<div style="margin-top:4px"><strong style="color:#fbbf24">📝 Verdict:</strong> ${d.verdict || ''}</div>`;
 
   // Valid Today
   if (d.valid_today?.length) {
@@ -2007,7 +2011,13 @@ async function analyzeSR() {
   ).join('');
 
   drawSRLines(d);
-  document.getElementById('btnSaveSr').style.display = 'inline-flex';
+  const saveBtn = document.getElementById('btnSaveSr');
+  saveBtn.style.display = 'inline-flex';
+  if (d.auto_saved) {
+    saveBtn.textContent = '✅ Auto-saved';
+    saveBtn.disabled = true;
+    setTimeout(() => { saveBtn.textContent = '💾 Re-save'; saveBtn.disabled = false; }, 3000);
+  }
 }
 
 async function saveSR() {
