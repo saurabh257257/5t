@@ -865,7 +865,8 @@ def api_watchlist_execute(wid):
     live_price     = float(live.get('ltp', 0))
     stored_premium = float(item['premium'] or 0)
     premium        = live_price if live_price > 0 else stored_premium
-    price          = round(premium * 1.02, 2) if premium > 0 else 0
+    _tk = lambda p: round(round(float(p) / 0.05) * 0.05, 2)   # tick-align to 0.05
+    price          = _tk(premium * 1.02) if premium > 0 else 0
     try:
         result = client.place_order(
             OrderType='B', Exchange=exch, ExchangeType='D',
@@ -1409,7 +1410,8 @@ def api_place_order():
         # 5paisa requires a LIMIT price for derivative orders (market orders rejected).
         # Use LTP + 2% as limit price so the buy fills immediately at market.
         ltp   = float(body.get('ltp', 0))
-        price = round(ltp * 1.02, 2) if ltp > 0 else 0
+        _tk   = lambda p: round(round(float(p) / 0.05) * 0.05, 2)
+        price = _tk(ltp * 1.02) if ltp > 0 else 0
         result = client.place_order(
             OrderType    = 'B',
             Exchange     = exch,

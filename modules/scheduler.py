@@ -21,6 +21,12 @@ _IST = timezone(timedelta(hours=5, minutes=30))
 _LOT_SIZES  = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
 _SL_OFFSETS = {'SENSEX': 150, 'NIFTY': 45, 'BANKNIFTY': 45, 'FINNIFTY': 45}
 
+_TICK = 0.05   # BSE/NSE options tick size
+
+def _t(price):
+    """Round price to nearest 0.05 tick (required by exchange for option orders)."""
+    return round(round(float(price) / _TICK) * _TICK, 2)
+
 def _lot_qty(index_id, lots):
     """Convert lots → actual qty using index lot size."""
     return int(lots) * _LOT_SIZES.get(index_id, 1)
@@ -32,8 +38,8 @@ def _place_sl_order(client, index_id, scrip_code, exch, entry_price, actual_qty)
     SL offset: SENSEX=150 pts, others=45 pts (per-option-premium points).
     """
     sl_offset  = _SL_OFFSETS.get(index_id, 150)
-    sl_trigger = round(max(entry_price - sl_offset, 0.5), 2)
-    sl_limit   = round(max(sl_trigger - 2, 0.5), 2)   # limit price 2 below trigger
+    sl_trigger = _t(max(entry_price - sl_offset, 0.05))
+    sl_limit   = _t(max(sl_trigger - 2, 0.05))   # limit price 2 below trigger
     try:
         result = client.place_order(
             OrderType='S', Exchange=exch, ExchangeType='D',
@@ -382,7 +388,7 @@ def run_trade_watcher():
             stored_premium = float(item['premium'] or 0)
             # Use live price; fall back to stored premium if live fetch fails
             premium = live_price if live_price > 0 else stored_premium
-            price   = round(premium * 1.02, 2) if premium > 0 else 0   # limit 2% above
+            price   = _t(premium * 1.02) if premium > 0 else 0   # limit 2% above, tick-aligned
 
             print(f'[TRADE_WATCHER] {index_id} option LTP={live_price} stored={stored_premium} order_price={price}')
 
@@ -476,7 +482,7 @@ def run_trade_watcher():
                     continue
 
                 # Place sell order to exit
-                price  = round(cur_ltp * 0.98, 2)   # sell limit 2% below LTP
+                price  = _t(cur_ltp * 0.98)   # sell limit 2% below LTP, tick-aligned
                 result = client.place_order(
                     OrderType='S', Exchange=exch, ExchangeType='D',
                     ScripCode=scrip_code, Qty=qty,
