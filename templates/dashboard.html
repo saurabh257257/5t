@@ -1406,6 +1406,8 @@ function renderMarketSummary(d) {
 async function loadChainSummary() {
   if (!currentExpiryTs || !currentIndex) return;
 
+  loadMarketNews();   // always refresh news on manual refresh
+
   const card = document.getElementById('chainSummaryCard');
   const body = document.getElementById('csBody');
   const cfg  = INDICES.find(i => i.id === currentIndex);
@@ -1497,13 +1499,15 @@ async function loadMarketNews() {
     }).join('');
 
     // ── News list ────────────────────────────────────────────────────────────
-    const nHtml = news.map((h, i) =>
-      `<div style="display:flex;gap:6px;align-items:baseline;line-height:1.45">
+    const nHtml = news.map((h, i) => {
+      // Defensive: handle any key name variation from backend
+      const t = h.title || h.headline || h.name || h.text || Object.values(h)[0] || '—';
+      return `<div style="display:flex;gap:6px;align-items:baseline;line-height:1.45">
         <span style="font-size:0.7em;font-weight:700;color:#7c3aed;min-width:14px">${i+1}.</span>
-        <span style="font-size:0.75em;color:#cbd5e1">${h.title}</span>
+        <span style="font-size:0.75em;color:#cbd5e1">${t}</span>
         ${h.pub ? `<span style="font-size:0.65em;color:#4b5563;white-space:nowrap">${h.pub}</span>` : ''}
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
     strip.innerHTML = `
       <div style="padding:10px 0 8px">
