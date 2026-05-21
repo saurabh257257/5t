@@ -853,18 +853,6 @@ header {
             Loading chart data…
           </div>
         </div>
-        <!-- GIFT Nifty + India VIX aux charts -->
-        <div id="auxChartsRow" style="display:none;margin-top:14px;display:flex;flex-direction:column;gap:10px">
-          <div>
-            <div style="font-size:0.72em;font-weight:700;color:#94a3b8;letter-spacing:0.5px;margin-bottom:4px">📈 GIFT NIFTY — 1 Month</div>
-            <div id="giftChart" style="height:130px;background:#0d0d1a;border-radius:8px;border:1px solid #1e1c35"></div>
-          </div>
-          <div>
-            <div style="font-size:0.72em;font-weight:700;color:#94a3b8;letter-spacing:0.5px;margin-bottom:4px">🌡️ INDIA VIX — 1 Month</div>
-            <div id="vixChart" style="height:130px;background:#0d0d1a;border-radius:8px;border:1px solid #1e1c35"></div>
-          </div>
-        </div>
-
         <div class="verdict-box" id="srVerdictBox" style="display:none"></div>
         <div class="valid-today-section" id="validTodaySection" style="display:none">
           <div class="valid-today-title">⚡ Valid Today — within 2% of current price</div>
@@ -1918,9 +1906,6 @@ function openChartModal() {
 function closeChartModal() {
   document.getElementById('chartModal').classList.remove('open');
   if (chartInstance) { try { chartInstance.remove(); } catch(e){} chartInstance = null; }
-  Object.keys(_auxInstances).forEach(k => {
-    if (_auxInstances[k]) { try { _auxInstances[k].remove(); } catch(e){} _auxInstances[k] = null; }
-  });
 }
 
 function switchChartTab(tab) {
@@ -1936,7 +1921,7 @@ async function loadChartData() {
   const container = document.getElementById('chartContainer');
   container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4b5563;font-size:0.85em"><div class="spinner" style="width:28px;height:28px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:10px"></div>Fetching 1 year of data…</div>';
 
-  const d = await get(`/api/chart-data?index=${_chartIndex}&interval=4h&days=365`);
+  const d = await get(`/api/chart-data?index=${_chartIndex}&interval=60m&days=365`);
   if (d.error === 'session_expired') {
     container.innerHTML = `<div style="text-align:center;padding:40px">
       <div style="color:#fbbf24;font-size:1.1em;margin-bottom:12px">⚠️ 5paisa session expired</div>
@@ -1972,50 +1957,6 @@ async function loadChartData() {
     if (chartInstance) chartInstance.applyOptions({ width: container.clientWidth });
   });
   if (srData) drawSRLines(srData);
-  loadAuxCharts();
-}
-
-let _auxInstances = {};
-async function loadAuxCharts() {
-  const auxDefs = [
-    { id: 'giftChart', key: 'GIFTNIFTY', color: '#a78bfa', label: 'GIFT NIFTY' },
-    { id: 'vixChart',  key: 'INDIAVIX',  color: '#fb923c', label: 'INDIA VIX'  },
-  ];
-  document.getElementById('auxChartsRow').style.display = 'flex';
-
-  for (const def of auxDefs) {
-    const container = document.getElementById(def.id);
-    // Destroy previous instance
-    if (_auxInstances[def.id]) {
-      try { _auxInstances[def.id].remove(); } catch(e) {}
-      _auxInstances[def.id] = null;
-    }
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#374151;font-size:0.8em">Loading…</div>';
-
-    const d = await get(`/api/aux-chart?key=${def.key}`);
-    if (!d.candles || !d.candles.length) {
-      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#374151;font-size:0.78em">${d.error || 'No data'}</div>`;
-      continue;
-    }
-    container.innerHTML = '';
-    const chart = LightweightCharts.createChart(container, {
-      width:  container.clientWidth,
-      height: 130,
-      layout: { background: { color: '#0d0d1a' }, textColor: '#6b7280' },
-      grid:   { vertLines: { color: '#111' }, horzLines: { color: '#111' } },
-      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#1e1c35', scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: '#1e1c35', timeVisible: false },
-      handleScroll: true, handleScale: true,
-    });
-    const series = chart.addLineSeries({ color: def.color, lineWidth: 2, priceLineVisible: false });
-    series.setData(d.candles);
-    chart.timeScale().fitContent();
-    _auxInstances[def.id] = chart;
-    window.addEventListener('resize', () => {
-      if (_auxInstances[def.id]) _auxInstances[def.id].applyOptions({ width: container.clientWidth });
-    });
-  }
 }
 
 function zoomChart(range) {
@@ -2085,9 +2026,25 @@ async function analyzeSR() {
   }
   srData = d;
 
+  // Global context pills
+  let ctxHtml = '';
+  if (d.context?.length) {
+    ctxHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+      d.context.map(q => {
+        const up  = q.change_pct >= 0;
+        const clr = up ? '#34d399' : '#f87171';
+        const arr = up ? '▲' : '▼';
+        return `<span style="background:#12111f;border:1px solid #2d2b4e;border-radius:6px;padding:3px 9px;font-size:0.75em;color:#94a3b8">
+          <span style="color:#e2e8f0;font-weight:600">${q.label.split(' ')[0]}</span>
+          <span style="color:#6b7280;margin:0 4px">prev ${q.prev}</span>
+          <span style="color:${clr}">${arr} ${q.current} (${q.change_pct >= 0 ? '+' : ''}${q.change_pct}%)</span>
+        </span>`;
+      }).join('') + '</div>';
+  }
   // Verdict
   document.getElementById('srVerdictBox').style.display = 'block';
-  document.getElementById('srVerdictBox').innerHTML = `<strong style="color:#fbbf24">📝 Verdict:</strong> ${d.verdict || ''}`;
+  document.getElementById('srVerdictBox').innerHTML = ctxHtml +
+    `<strong style="color:#fbbf24">📝 Verdict:</strong> ${d.verdict || ''}`;
 
   // Valid Today
   if (d.valid_today?.length) {

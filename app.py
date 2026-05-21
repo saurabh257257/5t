@@ -1024,7 +1024,7 @@ def api_analyze_sr():
         return jsonify({'error': f'Unknown index: {idx}'}), 400
     cfg = INDEX_MAP[idx]
 
-    # Fetch 1-year daily candles
+    # Fetch 1-year daily candles for S/R analysis
     c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
     c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
     chart = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
@@ -1034,7 +1034,7 @@ def api_analyze_sr():
     candles = chart['candles']
     ltp     = candles[-1]['close'] if candles else 0
 
-    # Build last 60 days OHLC text for the prompt
+    # Build last 60 days OHLC text
     recent  = candles[-60:]
     from datetime import datetime as _dt
     def fmt_ts(ts):
@@ -1048,39 +1048,53 @@ def api_analyze_sr():
     yr_high = max(c['high']  for c in candles if c['high'] > 0)
     yr_low  = min(c['low']   for c in candles if c['low']  > 0)
 
+    # Fetch global market context (GIFT Nifty, VIX, DXY, Crude + news)
+    from modules.market_context import get_market_context
+    try:
+        ctx = get_market_context()
+        ctx_txt = ctx['as_text']
+    except Exception:
+        ctx_txt = '(global context unavailable)'
+
+    one_pct = round(ltp * 0.01)
+
     prompt = f"""You are a price action trader specialising in index options on Indian markets.
 
 Index: {idx}  |  Current Price: {ltp:.0f}
 52-Week High: {yr_high:.0f}  |  52-Week Low: {yr_low:.0f}
+1% range from current: {ltp - one_pct:.0f} – {ltp + one_pct:.0f}
+
+{ctx_txt}
 
 Daily OHLC — last 60 trading days:
 {ohlc_txt}
 
-TASK: Find exactly 2 SUPPORT and 2 RESISTANCE levels where a MOMENTUM MOVE is likely if price reaches that level — i.e. levels where options buyers can catch a fast move.
+TASK: Using BOTH the price action data AND the global context above, find:
+- Exactly 2 SUPPORT levels within 1% of current price {ltp:.0f} (i.e. between {ltp - one_pct:.0f} and {ltp:.0f})
+- Exactly 2 RESISTANCE levels within 1% of current price {ltp:.0f} (i.e. between {ltp:.0f} and {ltp + one_pct:.0f})
 
-Rules for selecting a level:
-1. Price must have BOUNCED or REVERSED sharply from that level at least 2-3 times in the data (not just touched).
-2. The level must have caused a 1%+ single-day move when tested.
-3. Prefer levels that are also round numbers or 52-week high/low.
-4. DO NOT include levels that price chopped through slowly — only sharp reaction zones.
-5. Pick levels that are CLOSEST to current price {ltp:.0f} so they are tradeable NOW.
+Rules:
+1. Level must have caused a SHARP bounce/rejection (1%+ move in 1 day) at least twice in the data.
+2. If global context shows VIX spike, DXY strength or crude weakness — factor that into the bias.
+3. If fewer than 2 clean levels exist within 1%, pick the nearest ones just outside 1% range.
+4. DO NOT include levels where price just drifted through slowly.
 
-valid_today = levels within 3% of current price {ltp:.0f}.
+valid_today = levels within 1% of current price {ltp:.0f}.
 
-Respond ONLY in valid JSON (no markdown, no explanation outside JSON):
+Respond ONLY in valid JSON (no markdown):
 {{
-  "supports": [{{"level": 0, "reason": "one line: dates + how price reacted (e.g. bounced 2% on May 11, Apr 28)"}}],
-  "resistances": [{{"level": 0, "reason": "one line: dates + how price reacted"}}],
+  "supports": [{{"level": 0, "reason": "dates + reaction size, e.g. bounced +1.8% on May 11, Apr 28"}}],
+  "resistances": [{{"level": 0, "reason": "dates + reaction size"}}],
   "valid_today": [{{"level": 0, "type": "support", "note": "..."}}],
-  "verdict": "2 sentences max: which level to watch today and what move to expect on breach/bounce."
+  "verdict": "2 sentences: today's bias based on price action + global context, and which level to watch."
 }}
 
-Return exactly 2 supports and 2 resistances. No moderate levels. Only momentum zones."""
+Return exactly 2 supports and 2 resistances."""
 
     try:
         ac  = _anthropic.Anthropic()
         rsp = ac.messages.create(
-            model='claude-haiku-4-5', max_tokens=1200,
+            model='claude-haiku-4-5', max_tokens=1400,
             messages=[{'role': 'user', 'content': prompt}]
         )
         raw = rsp.content[0].text.strip()
@@ -1088,8 +1102,9 @@ Return exactly 2 supports and 2 resistances. No moderate levels. Only momentum z
             raw = raw.split('```')[1]
             if raw.startswith('json'): raw = raw[4:]
         data = json.loads(raw.strip())
-        data['ltp']   = ltp
-        data['index'] = idx
+        data['ltp']     = ltp
+        data['index']   = idx
+        data['context'] = ctx.get('quotes', [])
         return jsonify(data)
     except json.JSONDecodeError as e:
         return jsonify({'error': f'Claude returned invalid JSON: {e}', 'raw': raw}), 500
