@@ -1300,9 +1300,6 @@ function renderMarketSummary(d) {
     ? `<span style="color:#a78bfa">✓ Previous summary included</span>`
     : `<span style="color:#6b7280">✗ No previous summary</span>`;
 
-  // entry/sl/target kept for compatibility (used in trade card map below)
-  const entry  = 0;
-  const sl     = 0;
 
   const signals = (s.signals || []).map(sig =>
     `<div class="ms-signal">
@@ -1378,14 +1375,18 @@ function renderMarketSummary(d) {
           const sideClr = t.side === 'support' ? '#34d399' : '#f87171';
           const typClr  = isCE ? '#34d399' : '#f87171';
           const cond    = (t.trigger_condition || 'above').toUpperCase();
-          const risk    = entry > 0 && sl > 0 ? (parseFloat(t.premium) - parseFloat(t.sl)).toFixed(1) : '—';
-          const rew     = entry > 0 && sl > 0 ? (parseFloat(t.target) - parseFloat(t.premium)).toFixed(1) : '—';
+          const tPrem   = parseFloat(t.premium) || 0;
+          const tSl     = parseFloat(t.sl) || 0;
+          const tTgt    = parseFloat(t.target) || 0;
+          const risk    = tPrem > 0 && tSl > 0 ? (tPrem - tSl).toFixed(1) : '—';
+          const rew     = tPrem > 0 && tTgt > 0 ? (tTgt - tPrem).toFixed(1) : '—';
           return `<div class="ms-trade-box" style="flex:1;min-width:240px;border-color:${sideClr}30">
             <div style="font-size:0.68em;font-weight:700;color:${sideClr};text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${sideLbl}</div>
             <div class="ms-trade-row"><span class="ms-trade-lbl">Strike</span><span class="ms-trade-val" style="color:${typClr}">${t.strike} ${t.type}</span></div>
             <div class="ms-trade-row"><span class="ms-trade-lbl">Premium</span><span class="ms-trade-val">₹${fmt2(t.premium)}</span></div>
             <div class="ms-trade-row"><span class="ms-trade-lbl">Trigger</span><span class="ms-trade-val" style="color:#fbbf24">${cond} ${fmtN(t.trigger_price)}</span></div>
             <div class="ms-trade-row"><span class="ms-trade-lbl">SL / Target</span><span class="ms-trade-val">₹${fmt2(t.sl)} / ₹${fmt2(t.target)}</span></div>
+            <div class="ms-trade-row"><span class="ms-trade-lbl">Risk / Reward</span><span class="ms-trade-val" style="color:#a78bfa">-₹${risk} / +₹${rew}</span></div>
             <div class="ms-trade-row"><span class="ms-trade-lbl">Timing</span><span class="ms-trade-val" style="color:#94a3b8;font-size:0.9em">${t.entry_timing||'—'}</span></div>
             <div class="ms-trade-reason" style="margin-top:5px">${t.entry_trigger||''}</div>
           </div>`;
