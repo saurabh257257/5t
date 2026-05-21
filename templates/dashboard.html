@@ -170,10 +170,6 @@ header {
 .ms-level-val.rr     { color: #a78bfa; }
 .ms-trade-reason { font-size: 0.78em; color: #6b7280; line-height: 1.5; }
 
-/* Chain + AI side by side */
-.chain-ai-wrap { display: flex; gap: 14px; align-items: flex-start; }
-.chain-ai-wrap .chain-card { flex: 1; min-width: 0; }
-
 /* Option Chain */
 .chain-card { background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px; overflow: hidden; }
 .chain-scroll { overflow-x: auto; max-height: calc(100vh - 320px); overflow-y: auto; }
@@ -235,46 +231,7 @@ header {
 .ce-ltp  { font-weight: 700; color: #a3e635; }
 .pe-ltp  { font-weight: 700; color: #fb7185; }
 
-/* AI Side Panel */
-.ai-panel {
-  width: 360px; flex-shrink: 0;
-  background: #1a1830; border: 1px solid #2d2b4e; border-radius: 14px;
-  overflow: hidden; position: sticky; top: 70px;
-  max-height: calc(100vh - 90px); display: flex; flex-direction: column;
-  animation: slideIn 0.2s ease;
-}
-@keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
-.ai-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #2d2b4e; background: #12111f; flex-shrink: 0; }
-.ai-header-left { display: flex; align-items: center; gap: 8px; }
-.ai-title { font-weight: 700; font-size: 0.9em; color: #e2e8f0; }
-.ai-badge { font-size: 0.6em; padding: 2px 7px; border-radius: 10px; background: #1e1c45; color: #a78bfa; border: 1px solid #4c3f8a; font-weight: 700; text-transform: uppercase; }
-.ai-header-right { display: flex; align-items: center; gap: 6px; }
-.ai-refresh { padding: 4px 10px; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; border: 1px solid #2d2b4e; background: transparent; color: #94a3b8; transition: all 0.15s; }
-.ai-refresh:hover { border-color: #7c3aed; color: #a78bfa; }
-.btn-close { padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid #4c3f8a; background: transparent; color: #a78bfa; }
-.btn-close:hover { background: #2d2b4e; }
-.ai-body { padding: 0; overflow-y: auto; flex: 1; font-size: 0.82em; line-height: 1.7; }
-.ai-loading { padding: 40px; text-align: center; }
-.ai-loading .spinner { width: 26px; height: 26px; border: 2px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
-.ai-loading-text { font-size: 0.82em; color: #6b7280; }
-.ai-loading-sub  { font-size: 0.72em; color: #4b5563; margin-top: 4px; }
-.ai-strike-bar { padding: 10px 16px; background: rgba(124,58,237,0.08); border-bottom: 1px solid #2d2b4e; display: flex; gap: 14px; flex-wrap: wrap; }
-.ai-strike-info .lbl { font-size: 0.72em; color: #6b7280; }
-.ai-strike-info .val { font-weight: 700; font-size: 0.85em; }
-.ai-strike-info .val.ce  { color: #34d399; }
-.ai-strike-info .val.pe  { color: #f87171; }
-.ai-strike-info .val.str { color: #a78bfa; }
-.ai-content { padding: 14px 16px; }
-.ai-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #1e1c35; }
-.ai-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.ai-section-title { font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c3aed; margin-bottom: 5px; }
-.ai-section-body { color: #cbd5e1; font-size: 0.88em; line-height: 1.65; }
-.ai-section-body strong { color: #e2e8f0; }
-.ai-section-body .bull { color: #34d399; font-weight: 600; }
-.ai-section-body .bear { color: #f87171; font-weight: 600; }
-.ai-section-body .neu  { color: #fbbf24; font-weight: 600; }
-.ai-trade-box { background: rgba(124,58,237,0.1); border: 1px solid #4c3f8a; border-radius: 8px; padding: 10px 12px; margin-top: 6px; font-size: 0.88em; color: #c4b5fd; line-height: 1.6; }
-.ai-error { padding: 20px 16px; color: #f87171; font-size: 0.82em; }
+/* (AI strike panel removed) */
 
 /* States */
 .state-box { padding: 52px; text-align: center; color: #4b5563; font-size: 0.9em; }
@@ -282,8 +239,6 @@ header {
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .chain-ai-wrap { flex-direction: column; }
-  .ai-panel { width: 100%; position: static; max-height: 60vh; }
   .cs-stats { flex-wrap: wrap; }
   .cs-stat { min-width: 45%; }
 }
@@ -320,9 +275,6 @@ header {
   .cs-stats  { flex-wrap: wrap; }
   .cs-stat   { min-width: 48%; flex: none; }
   .cs-body   { font-size: 0.8em; }
-
-  /* AI panel */
-  .ai-panel { position: static; max-height: 55vh; }
 
   /* Modals — full screen on mobile */
   .modal-overlay { align-items: flex-end; }
@@ -687,29 +639,13 @@ header {
     <div id="watchlistBody" style="padding:0 18px 14px"></div>
   </div>
 
-  <!-- Option Chain + AI Strike Panel -->
-  <div class="chain-ai-wrap">
-    <div class="chain-card">
-      <div id="chainBody">
-        <div class="state-box">
-          <div class="state-icon">&#x1F4CA;</div>
-          Select an expiry and click Load Chain
-        </div>
+  <!-- Option Chain -->
+  <div class="chain-card">
+    <div id="chainBody">
+      <div class="state-box">
+        <div class="state-icon">&#x1F4CA;</div>
+        Select an expiry and click Load Chain
       </div>
-    </div>
-
-    <div class="ai-panel" id="aiPanel" style="display:none">
-      <div class="ai-header">
-        <div class="ai-header-left">
-          <span class="ai-title" id="aiTitle">Strike Analysis</span>
-          <span class="ai-badge">Claude AI</span>
-        </div>
-        <div class="ai-header-right">
-          <button class="ai-refresh" onclick="reanalyze()">&#x21BB; Refresh</button>
-          <button class="btn-close" onclick="closeAiPanel()">&#x2715;</button>
-        </div>
-      </div>
-      <div class="ai-body" id="aiBody"></div>
     </div>
   </div>
 
@@ -935,7 +871,6 @@ function switchIndex() {
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="state-icon">&#x1F4CA;</div>Select an expiry and click Load Chain</div>';
   document.getElementById('statusTxt').textContent = '';
-  closeAiPanel();
   loadLtp();
   loadOHLC();
   loadExpiries();
@@ -1246,8 +1181,8 @@ function renderChain(data, labelOverride) {
     const isItmCe = itmCeStrike !== null && r.strike === itmCeStrike;
     const isItmPe = itmPeStrike !== null && r.strike === itmPeStrike;
     const cs = r.ce_scrip || 0, ps = r.pe_scrip || 0;
-    const ce = cs ? `onclick="pick(this,'ce',${r.strike},${cs},${ps})"` : '';
-    const pe = ps ? `onclick="pick(this,'pe',${r.strike},${cs},${ps})"` : '';
+    const ce = '';
+    const pe = '';
 
     const ceBuyBtn = (isItmCe && cs)
       ? `<button class="btn-buy-opt" onclick="event.stopPropagation();openBuyModal(${cs},'CE',${r.strike},${r.ce_ltp},'${optExch}',${lotSize})">🛒 Buy</button>`
@@ -1313,7 +1248,6 @@ async function loadChain() {
   document.getElementById('chainBody').innerHTML =
     '<div class="state-box"><div class="spinner" style="width:30px;height:30px;border:3px solid #2d2b4e;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px"></div>Loading option chain…</div>';
   document.getElementById('chainSummaryCard').style.display = 'none';
-  closeAiPanel();
 
   const d = await get(`/api/option-chain?index=${currentIndex}&expiry_ts=${ts}`);
   document.getElementById('statusTxt').textContent = '';
@@ -1493,7 +1427,7 @@ async function loadChainSummary() {
   // Reset stats bar
   ['csPcr','csMaxPain','csCeOi','csPeOi','csPriceChg'].forEach(id =>
     document.getElementById(id).textContent = '—');
-  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Claude analyzing S/R + chain + previous context…</div></div>';
+  body.innerHTML = '<div class="cs-loading"><div class="spinner"></div><div class="cs-loading-txt">Running fresh S/R analysis + Claude market summary…</div></div>';
 
   const d = await get(
     `/api/analyze-chain?index=${currentIndex}&expiry_ts=${currentExpiryTs}` +
@@ -1838,57 +1772,6 @@ setInterval(() => {
   const card = document.getElementById('watchlistCard');
   if (card && card.style.display !== 'none') loadWatchlist();
 }, 30000);
-
-// ── Strike AI Panel ───────────────────────────────────────────────────────────
-let currentStrike = null, currentCeScrip = null, currentPeScrip = null;
-
-function pick(cell, side, strike, ceScrip, peScrip) {
-  document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
-  cell.closest('tr').classList.add(side === 'ce' ? 'sel-ce' : 'sel-pe');
-  currentStrike = strike; currentCeScrip = ceScrip; currentPeScrip = peScrip;
-  const row = chainData.find(r => r.strike === strike);
-  showAnalysis(strike, ceScrip, peScrip, row);
-}
-
-function reanalyze() {
-  if (currentStrike) {
-    const row = chainData.find(r => r.strike === currentStrike);
-    showAnalysis(currentStrike, currentCeScrip, currentPeScrip, row);
-  }
-}
-
-function closeAiPanel() {
-  document.getElementById('aiPanel').style.display = 'none';
-  currentStrike = null;
-  document.querySelectorAll('#chainBody tr').forEach(r => r.classList.remove('sel-ce','sel-pe'));
-}
-
-async function showAnalysis(strike, ceScrip, peScrip, row) {
-  const panel = document.getElementById('aiPanel');
-  const body  = document.getElementById('aiBody');
-  panel.style.display = 'flex';
-  document.getElementById('aiTitle').textContent = `${currentIndex} ${strike}`;
-
-  const ceLtp = row ? fmt2(row.ce_ltp) : '—';
-  const peLtp = row ? fmt2(row.pe_ltp) : '—';
-
-  body.innerHTML = `
-    <div class="ai-strike-bar">
-      <div class="ai-strike-info"><div class="lbl">Strike</div><div class="val str">${strike}</div></div>
-      <div class="ai-strike-info"><div class="lbl">CE LTP</div><div class="val ce">₹${ceLtp}</div></div>
-      <div class="ai-strike-info"><div class="lbl">PE LTP</div><div class="val pe">₹${peLtp}</div></div>
-    </div>
-    <div class="ai-loading">
-      <div class="spinner"></div>
-      <div class="ai-loading-text">Claude is analyzing…</div>
-      <div class="ai-loading-sub">Fetching CE &amp; PE history</div>
-    </div>`;
-
-  const d = await get(`/api/analyze?ce_scrip=${ceScrip}&pe_scrip=${peScrip}&strike=${strike}&interval=15m&days=2`);
-  const bar = body.querySelector('.ai-strike-bar')?.outerHTML || '';
-  if (d.error) { body.innerHTML = bar + `<div class="ai-error">&#x26A0; ${d.error}</div>`; return; }
-  body.innerHTML = bar + renderAnalysis(d.summary);
-}
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 function inlineMd(text) {

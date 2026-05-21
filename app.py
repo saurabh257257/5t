@@ -493,62 +493,153 @@ def api_analyze_chain():
     chg_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0
     chg_abs = round(ltp - prev_close, 2)
 
-    # ── S/R context from last saved analysis ──────────────────────────────────
-    sr_text     = 'No saved S/R analysis available for this index.'
-    sr_meta     = None   # returned to frontend for display
+    # ── Fresh S/R analysis (inline, before main Claude call) ─────────────────
+    sr_text = 'No saved S/R analysis available for this index.'
+    sr_meta = None
     try:
-        sr_history = get_sr_history(idx, limit=1)
-        if sr_history:
-            sr      = sr_history[0]
-            sups    = (sr.get('supports')    or [])[:5]
-            ress    = (sr.get('resistances') or [])[:5]
-            sup_str = ', '.join(str(s['level']) for s in sups)
-            res_str = ', '.join(str(r['level']) for r in ress)
+        c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
+        c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
+        chart_sr = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
+        if chart_sr.get('candles'):
+            candles_sr = chart_sr['candles']
+            ltp_sr     = candles_sr[-1]['close'] if candles_sr else ltp
+            recent_sr  = candles_sr[-60:]
+            from datetime import datetime as _dt_sr
+            ohlc_sr = 'Date | O | H | L | C\n'
+            for _c in recent_sr:
+                try:
+                    _d = _dt_sr.utcfromtimestamp(_c['time']).strftime('%d-%b-%y')
+                except Exception:
+                    _d = str(_c['time'])
+                ohlc_sr += f"{_d} | {_c['open']:.0f} | {_c['high']:.0f} | {_c['low']:.0f} | {_c['close']:.0f}\n"
+            yr_hi = max(c['high'] for c in candles_sr if c['high'] > 0)
+            yr_lo = min(c['low']  for c in candles_sr if c['low']  > 0)
+            one_pct_sr = round(ltp_sr * 0.01)
+            sr_prompt = f"""You are a price action trader specialising in index options on Indian markets.
+Index: {idx}  |  Current Price: {ltp_sr:.0f}
+52-Week High: {yr_hi:.0f}  |  52-Week Low: {yr_lo:.0f}
+1% range: {ltp_sr - one_pct_sr:.0f} – {ltp_sr + one_pct_sr:.0f}
+Daily OHLC — last 60 trading days:
+{ohlc_sr}
+Find exactly 2 SUPPORT levels and 2 RESISTANCE levels within 1% of current price.
+A level must have caused a SHARP bounce/rejection (1%+ move in 1 day) at least twice.
+Respond ONLY in valid JSON (no markdown):
+{{"supports":[{{"level":0,"reason":""}}],"resistances":[{{"level":0,"reason":""}}],"verdict":""}}
+Return exactly 2 supports and 2 resistances."""
+            ac_sr = _anthropic.Anthropic()
+            rsp_sr = ac_sr.messages.create(
+                model='claude-haiku-4-5', max_tokens=600,
+                messages=[{'role': 'user', 'content': sr_prompt}]
+            )
+            raw_sr = rsp_sr.content[0].text.strip()
+            if raw_sr.startswith('```'):
+                raw_sr = raw_sr.split('```')[1]
+                if raw_sr.startswith('json'): raw_sr = raw_sr[4:]
+            sr_data = json.loads(raw_sr.strip())
+            fresh_sups = sr_data.get('supports', [])
+            fresh_ress = sr_data.get('resistances', [])
+            # Save fresh S/R to DB
+            try:
+                save_sr(
+                    index_id=idx, ltp=ltp_sr,
+                    supports=fresh_sups, resistances=fresh_ress,
+                    valid_today=[], verdict=sr_data.get('verdict', ''),
+                )
+            except Exception as _srs:
+                print(f'[SR] save error: {_srs}')
+            sup_str = ', '.join(str(s['level']) for s in fresh_sups)
+            res_str = ', '.join(str(r['level']) for r in fresh_ress)
             sr_text = (f"Supports: {sup_str or '—'}\n"
                        f"Resistances: {res_str or '—'}\n"
-                       f"(S/R analysed at LTP {sr['ltp']} on {sr['saved_at']})")
+                       f"S/R Verdict: {sr_data.get('verdict','')}")
             sr_meta = {
-                'saved_at':    sr['saved_at'],
-                'ltp':         sr['ltp'],
-                'supports':    [s['level'] for s in sups],
-                'resistances': [r['level'] for r in ress],
+                'saved_at':    'fresh',
+                'ltp':         ltp_sr,
+                'supports':    [s['level'] for s in fresh_sups],
+                'resistances': [r['level'] for r in fresh_ress],
             }
-            print(f'[MS] {idx} S/R loaded: sup={sup_str} res={res_str}')
+            print(f'[MS] {idx} fresh S/R: sup={sup_str} res={res_str}')
         else:
-            print(f'[MS] {idx} — no S/R saved yet')
-    except Exception as _e:
-        print(f'[SR] fetch error: {_e}')
+            # Fall back to saved S/R from DB
+            sr_history = get_sr_history(idx, limit=1)
+            if sr_history:
+                sr     = sr_history[0]
+                sups   = (sr.get('supports')    or [])[:5]
+                ress   = (sr.get('resistances') or [])[:5]
+                sup_str = ', '.join(str(s['level']) for s in sups)
+                res_str = ', '.join(str(r['level']) for r in ress)
+                sr_text = (f"Supports: {sup_str or '—'}\n"
+                           f"Resistances: {res_str or '—'}\n"
+                           f"(S/R from DB at LTP {sr['ltp']} on {sr['saved_at']})")
+                sr_meta = {
+                    'saved_at':    sr['saved_at'],
+                    'ltp':         sr['ltp'],
+                    'supports':    [s['level'] for s in sups],
+                    'resistances': [r['level'] for r in ress],
+                }
+    except Exception as _sre:
+        print(f'[SR] fresh analysis error: {_sre}')
+        # Fall back to saved S/R
+        try:
+            sr_history = get_sr_history(idx, limit=1)
+            if sr_history:
+                sr     = sr_history[0]
+                sups   = (sr.get('supports')    or [])[:5]
+                ress   = (sr.get('resistances') or [])[:5]
+                sup_str = ', '.join(str(s['level']) for s in sups)
+                res_str = ', '.join(str(r['level']) for r in ress)
+                sr_text = (f"Supports: {sup_str or '—'}\n"
+                           f"Resistances: {res_str or '—'}\n"
+                           f"(S/R from DB, error fetching fresh: {str(_sre)[:60]})")
+                sr_meta = {
+                    'saved_at':    sr['saved_at'],
+                    'ltp':         sr['ltp'],
+                    'supports':    [s['level'] for s in sups],
+                    'resistances': [r['level'] for r in ress],
+                }
+        except Exception:
+            pass
 
-    # ── Previous market summary for context ───────────────────────────────────
+    # ── Previous market summaries history (last 5) for context ────────────────
     prev_context = ''
     prev_meta    = None
     try:
-        prev = get_latest_market_summary(idx)
-        if prev:
-            # Extract direction from stored structured JSON if available
-            prev_dir = '—'
-            prev_trade = '—'
-            if prev.get('structured'):
-                try:
-                    ps = json.loads(prev['structured'])
-                    prev_dir   = ps.get('direction', '—').upper()
-                    pt         = ps.get('trade', {})
-                    prev_trade = f"{pt.get('strike')} {pt.get('type')} @ ₹{pt.get('premium')}"
-                except Exception:
-                    pass
-            prev_context = (
-                f"\n═══ PREVIOUS MARKET SUMMARY ({prev['date']} {prev['time']}, LTP {prev['ltp']}) ═══\n"
-                f"{prev['analysis']}\n"
-                f"[Compare — note bias shifts, new OI walls, changed levels]\n\n"
-            )
+        history = get_market_summary_history(idx, limit=5)
+        if history:
+            lines = ['\n═══ PREVIOUS MARKET SUMMARY HISTORY (newest first) ═══']
+            for i, prev in enumerate(history):
+                prev_dir = '—'; prev_trade = '—'
+                if prev.get('structured'):
+                    try:
+                        ps = json.loads(prev['structured'])
+                        prev_dir   = ps.get('direction', '—').upper()
+                        pt         = ps.get('trade', {})
+                        prev_trade = f"{pt.get('strike')} {pt.get('type')} @ ₹{pt.get('premium')}"
+                    except Exception:
+                        pass
+                lines.append(
+                    f"\n[{i+1}] {prev['date']} {prev['time']} | LTP {prev['ltp']} | {prev_dir} | Trade: {prev_trade}"
+                )
+                lines.append(prev['analysis'][:400] + ('…' if len(prev['analysis']) > 400 else ''))
+            lines.append('\n[Compare history — note bias shifts, changing OI walls, evolving levels]\n')
+            prev_context = '\n'.join(lines)
+            # Meta uses the most recent for display
+            first = history[0]
+            try:
+                ps0      = json.loads(first.get('structured') or '{}')
+                dir0     = ps0.get('direction', '—').upper()
+                pt0      = ps0.get('trade', {})
+                trade0   = f"{pt0.get('strike')} {pt0.get('type')} @ ₹{pt0.get('premium')}"
+            except Exception:
+                dir0, trade0 = '—', '—'
             prev_meta = {
-                'date':      prev['date'],
-                'time':      prev['time'],
-                'ltp':       prev['ltp'],
-                'direction': prev_dir,
-                'trade':     prev_trade,
+                'date':      first['date'],
+                'time':      first['time'],
+                'ltp':       first['ltp'],
+                'direction': dir0,
+                'trade':     trade0,
             }
-            print(f'[MS] {idx} prev summary: {prev_dir} @ LTP {prev["ltp"]} ({prev["date"]} {prev["time"]})')
+            print(f'[MS] {idx} history: {len(history)} prev summaries loaded')
         else:
             print(f'[MS] {idx} — no previous summary found')
     except Exception as _e:
@@ -718,6 +809,19 @@ TRADE RULES:
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/market-news')
+def api_market_news():
+    """Fetch top 5 market news + global context quotes (GIFT Nifty, VIX, DXY, Crude)."""
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        from modules.market_context import get_market_context
+        ctx = get_market_context()
+        return jsonify({'quotes': ctx['quotes'], 'news': ctx['news']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/market-summary/today')
