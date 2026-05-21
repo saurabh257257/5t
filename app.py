@@ -628,9 +628,9 @@ TRADE RULES (apply to BOTH trades):
 - support trade: PE strike 1-2 strikes below support; trigger_condition = "below"; trigger_price = support level
 - resistance trade: CE strike 1-2 strikes above resistance; trigger_condition = "above"; trigger_price = resistance level
 - Use nearest S/R levels from the S/R data above
-- sl = premium × 0.70 (30% stop)
-- target = premium + 3 × (premium − sl)  [1:3 R:R]
-- Round sl and target to nearest 0.5
+- sl = round(premium × 0.70) — 30% stop loss, INTEGER only
+- target = round(premium + 3 × (premium − sl)) — 1:3 R:R, INTEGER only
+- ALL numeric fields (premium, sl, target, trigger_price, strike) must be INTEGER whole numbers — NO decimals
 - Choose strikes near ATM with strong OI backing"""
 
     try:
@@ -654,6 +654,15 @@ TRADE RULES (apply to BOTH trades):
         # Fall back to old single-trade format for compatibility
         if not trades_list and structured.get('trade'):
             trades_list = [structured['trade']]
+
+        # Force all trade numeric values to integers (round numbers)
+        for _t in trades_list:
+            for _k in ('premium', 'sl', 'target', 'trigger_price', 'strike'):
+                if _k in _t:
+                    try:
+                        _t[_k] = round(float(_t[_k]))
+                    except (TypeError, ValueError):
+                        pass
 
         # Build plain-text summary for DB storage
         trades_txt = ''
@@ -701,11 +710,11 @@ TRADE RULES (apply to BOTH trades):
             for t_save in trades_list:
                 t_strike    = int(t_save.get('strike', 0))
                 t_type      = (t_save.get('type') or '').upper()
-                t_premium   = float(t_save.get('premium', 0))
-                t_trigger   = float(t_save.get('trigger_price', 0))
+                t_premium   = round(float(t_save.get('premium', 0)))
+                t_trigger   = round(float(t_save.get('trigger_price', 0)))
                 t_condition = (t_save.get('trigger_condition') or 'above').lower()
-                t_sl        = float(t_save.get('sl', 0))
-                t_target    = float(t_save.get('target', 0))
+                t_sl        = round(float(t_save.get('sl', 0)))
+                t_target    = round(float(t_save.get('target', 0)))
                 t_side      = t_save.get('side', '')
                 if t_strike and t_type and t_trigger:
                     scrip_key = 'ce_scrip' if t_type == 'CE' else 'pe_scrip'

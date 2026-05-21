@@ -22,30 +22,35 @@ _BROWSER_HEADS = {
 
 # ── Real GIFT Nifty from NSE India ────────────────────────────────────────────
 def _gift_nifty():
-    """Fetch actual GIFT Nifty (NSE IFSC) prev close + current from NSE India."""
+    """Fetch GIFT Nifty — NSE India first, then Nifty 50 (^NSEI) as fallback."""
     try:
         sess = requests.Session()
-        # Warm up cookies
         sess.get('https://www.nseindia.com', headers=_BROWSER_HEADS, timeout=_TIMEOUT)
         resp = sess.get(
             'https://www.nseindia.com/api/quote-derivative?symbol=GIFTNIFTY',
             headers=_BROWSER_HEADS, timeout=_TIMEOUT
         )
         data = resp.json()
-        info = data.get('info', {})
+        info    = data.get('info', {})
         current = float(info.get('lastPrice', 0) or 0)
         prev    = float(info.get('previousClose', 0) or 0)
         if current == 0:
-            # Try alternate key
-            fut = data.get('stocks', [{}])[0].get('metadata', {})
+            fut     = data.get('stocks', [{}])[0].get('metadata', {})
             current = float(fut.get('lastPrice', 0) or 0)
             prev    = float(fut.get('previousClose', 0) or 0)
-        chg_pct = round((current - prev) / prev * 100, 2) if prev else 0
-        return {'label': 'GIFT Nifty', 'prev': round(prev, 2),
-                'current': round(current, 2), 'change_pct': chg_pct}
-    except Exception as e:
-        # Fallback: try Yahoo Finance SGX / Nifty futures
-        return _yf_quote('NIFTY_FUT.NS', 'GIFT Nifty (YF fallback)')
+        if current > 0:
+            chg_pct = round((current - prev) / prev * 100, 2) if prev else 0
+            return {'label': 'GIFT Nifty', 'prev': round(prev, 2),
+                    'current': round(current, 2), 'change_pct': chg_pct}
+        # NSE returned 0 — fall through to Yahoo
+        raise ValueError('NSE returned 0')
+    except Exception:
+        # Fallback: Nifty 50 spot from Yahoo Finance (most reliable)
+        r = _yf_quote('^NSEI', 'Nifty 50')
+        if r['current'] == 0:
+            # Last resort: try NIFTY futures symbol
+            r = _yf_quote('NIFTY.NS', 'GIFT Nifty (~)')
+        return r
 
 
 # ── Yahoo Finance quote ───────────────────────────────────────────────────────
@@ -93,10 +98,17 @@ def _top_news(n=5):
         except ET.ParseError:
             root = ET.fromstring(resp.text.encode('utf-8'))
 
-        items = root.findall('.//item')[:n]
-        out   = []
-        for item in items:
-            # Try direct findtext first, then iterate children (handles namespaced tags)
+        from email.utils import parsedate_to_datetime as _parse_rfc
+        now_ist   = datetime.now(_IST)
+        cutoff    = now_ist - timedelta(hours=24)  # last 24 hours
+
+        all_items = root.findall('.//item')
+        out       = []
+        for item in all_items:
+            if len(out) >= n:
+                break
+
+            # Extract title (handle namespaced tags)
             title = item.findtext('title')
             if not title:
                 for child in item:
@@ -114,10 +126,38 @@ def _top_news(n=5):
             if not title:
                 continue
 
-            pub = (item.findtext('pubDate') or '')[:16].strip()
-            out.append({'title': title, 'pub': pub})
+            # Filter: only items published in the last 24 hours (IST)
+            pub_raw = (item.findtext('pubDate') or '').strip()
+            pub_lbl = pub_raw[:16]
+            try:
+                pub_dt  = _parse_rfc(pub_raw).astimezone(_IST)
+                if pub_dt < cutoff:
+                    continue   # too old — skip
+                pub_lbl = pub_dt.strftime('%d %b %H:%M')
+            except Exception:
+                pass  # can't parse date — include anyway
 
-        return out if out else [{'title': 'No market news available', 'pub': ''}]
+            out.append({'title': title, 'pub': pub_lbl})
+
+        # If nothing in last 24h (weekend/holiday), loosen to last 48h
+        if not out:
+            cutoff48 = now_ist - timedelta(hours=48)
+            for item in all_items[:n]:
+                title = item.findtext('title') or ''
+                title = title.split(' - ')[0].strip()
+                if not title:
+                    continue
+                pub_raw = (item.findtext('pubDate') or '').strip()
+                pub_lbl = pub_raw[:16]
+                try:
+                    pub_dt  = _parse_rfc(pub_raw).astimezone(_IST)
+                    if pub_dt >= cutoff48:
+                        pub_lbl = pub_dt.strftime('%d %b %H:%M')
+                        out.append({'title': title, 'pub': pub_lbl})
+                except Exception:
+                    out.append({'title': title, 'pub': pub_lbl})
+
+        return out[:n] if out else [{'title': 'No recent market news available', 'pub': ''}]
 
     except Exception as e:
         print(f'[NEWS] fetch error: {e}')
