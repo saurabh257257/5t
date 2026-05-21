@@ -963,6 +963,57 @@ def api_chart_data():
     return jsonify(result)
 
 
+@app.route('/api/aux-chart')
+def api_aux_chart():
+    """Fetch 1-month daily candles for GIFT Nifty or India VIX."""
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    key = request.args.get('key', '').upper()
+
+    # Scrip definitions — (exch, exch_type, scrip_code)
+    _AUX = {
+        'INDIAVIX':  [('N', 'C', 999920027), ('N', 'D', 999920027)],
+        'GIFTNIFTY': [('N', 'C', 999920028), ('N', 'D', 999920028),
+                      ('N', 'C', 13),        ('N', 'D', 13)],
+    }
+    if key not in _AUX:
+        return jsonify({'error': f'Unknown key: {key}'}), 400
+
+    from datetime import date as _d, timedelta as _td, datetime as _dt2
+    today     = _d.today().strftime('%Y-%m-%d')
+    from_date = (_d.today() - _td(days=35)).strftime('%Y-%m-%d')
+
+    for exch, et, scrip in _AUX[key]:
+        try:
+            df = client.historical_data(exch, et, int(scrip), '1d', from_date, today)
+            if df is None or isinstance(df, str) or len(df) < 3:
+                continue
+            candles = []
+            for _, row in df.iterrows():
+                dt_val = row.get('Datetime') or row.get('datetime') or ''
+                try:
+                    s  = str(dt_val)[:10]
+                    dt = _dt2.strptime(s, '%Y-%m-%d')
+                    unix_ts = int((dt - _dt2(1970, 1, 1) - __import__('datetime').timedelta(hours=5, minutes=30)).total_seconds())
+                except Exception:
+                    continue
+                from modules.market import _extract_ohlc_row
+                o, h, l, c = _extract_ohlc_row(row)
+                val = c if c > 0 else o
+                if val > 0:
+                    candles.append({'time': unix_ts, 'value': val})
+            if len(candles) >= 3:
+                return jsonify({'candles': candles, 'scrip': scrip, 'key': key})
+        except Exception as e:
+            err = str(e).lower()
+            if '401' in err or 'unauthorized' in err:
+                return jsonify({'error': 'session_expired'}), 401
+            continue
+
+    return jsonify({'error': f'No data available for {key}', 'candles': []})
+
+
 @app.route('/api/analyze-sr')
 def api_analyze_sr():
     client = require_auth()

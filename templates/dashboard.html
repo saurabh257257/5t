@@ -853,6 +853,18 @@ header {
             Loading chart data…
           </div>
         </div>
+        <!-- GIFT Nifty + India VIX aux charts -->
+        <div id="auxChartsRow" style="display:none;margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="font-size:0.72em;font-weight:700;color:#94a3b8;letter-spacing:0.5px;margin-bottom:4px">📈 GIFT NIFTY — 1 Month</div>
+            <div id="giftChart" style="height:130px;background:#0d0d1a;border-radius:8px;border:1px solid #1e1c35"></div>
+          </div>
+          <div>
+            <div style="font-size:0.72em;font-weight:700;color:#94a3b8;letter-spacing:0.5px;margin-bottom:4px">🌡️ INDIA VIX — 1 Month</div>
+            <div id="vixChart" style="height:130px;background:#0d0d1a;border-radius:8px;border:1px solid #1e1c35"></div>
+          </div>
+        </div>
+
         <div class="verdict-box" id="srVerdictBox" style="display:none"></div>
         <div class="valid-today-section" id="validTodaySection" style="display:none">
           <div class="valid-today-title">⚡ Valid Today — within 2% of current price</div>
@@ -1906,6 +1918,9 @@ function openChartModal() {
 function closeChartModal() {
   document.getElementById('chartModal').classList.remove('open');
   if (chartInstance) { try { chartInstance.remove(); } catch(e){} chartInstance = null; }
+  Object.keys(_auxInstances).forEach(k => {
+    if (_auxInstances[k]) { try { _auxInstances[k].remove(); } catch(e){} _auxInstances[k] = null; }
+  });
 }
 
 function switchChartTab(tab) {
@@ -1957,6 +1972,50 @@ async function loadChartData() {
     if (chartInstance) chartInstance.applyOptions({ width: container.clientWidth });
   });
   if (srData) drawSRLines(srData);
+  loadAuxCharts();
+}
+
+let _auxInstances = {};
+async function loadAuxCharts() {
+  const auxDefs = [
+    { id: 'giftChart', key: 'GIFTNIFTY', color: '#a78bfa', label: 'GIFT NIFTY' },
+    { id: 'vixChart',  key: 'INDIAVIX',  color: '#fb923c', label: 'INDIA VIX'  },
+  ];
+  document.getElementById('auxChartsRow').style.display = 'flex';
+
+  for (const def of auxDefs) {
+    const container = document.getElementById(def.id);
+    // Destroy previous instance
+    if (_auxInstances[def.id]) {
+      try { _auxInstances[def.id].remove(); } catch(e) {}
+      _auxInstances[def.id] = null;
+    }
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#374151;font-size:0.8em">Loading…</div>';
+
+    const d = await get(`/api/aux-chart?key=${def.key}`);
+    if (!d.candles || !d.candles.length) {
+      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#374151;font-size:0.78em">${d.error || 'No data'}</div>`;
+      continue;
+    }
+    container.innerHTML = '';
+    const chart = LightweightCharts.createChart(container, {
+      width:  container.clientWidth,
+      height: 130,
+      layout: { background: { color: '#0d0d1a' }, textColor: '#6b7280' },
+      grid:   { vertLines: { color: '#111' }, horzLines: { color: '#111' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor: '#1e1c35', scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { borderColor: '#1e1c35', timeVisible: false },
+      handleScroll: true, handleScale: true,
+    });
+    const series = chart.addLineSeries({ color: def.color, lineWidth: 2, priceLineVisible: false });
+    series.setData(d.candles);
+    chart.timeScale().fitContent();
+    _auxInstances[def.id] = chart;
+    window.addEventListener('resize', () => {
+      if (_auxInstances[def.id]) _auxInstances[def.id].applyOptions({ width: container.clientWidth });
+    });
+  }
 }
 
 function zoomChart(range) {
