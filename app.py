@@ -483,15 +483,47 @@ def api_analyze_chain():
     top_ce = sorted(rows, key=lambda r: r['ce_oi'], reverse=True)[:5]
     top_pe = sorted(rows, key=lambda r: r['pe_oi'], reverse=True)[:5]
 
-    # 20 strikes nearest to LTP for detailed analysis
+    # 20 strikes nearest to LTP for context
     near_rows = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:20]
-    chain_txt = "Strike | CE_LTP | CE_OI | CE_ChgOI | CE_Vol | PE_LTP | PE_OI | PE_ChgOI | PE_Vol\n"
+    chain_txt = "Strike | CE_LTP | CE_OI | PE_LTP | PE_OI\n"
     for r in near_rows:
-        chain_txt += (f"{int(r['strike'])} | {r['ce_ltp']} | {r['ce_oi']} | {r['ce_chg_oi']} | "
-                      f"{r['ce_vol']} | {r['pe_ltp']} | {r['pe_oi']} | {r['pe_chg_oi']} | {r['pe_vol']}\n")
+        chain_txt += (f"{int(r['strike'])} | {r['ce_ltp']} | {r['ce_oi']} | {r['pe_ltp']} | {r['pe_oi']}\n")
 
     chg_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0
     chg_abs = round(ltp - prev_close, 2)
+
+    # ── Pre-calculate best ITM CE/PE candidates (sorted by extrinsic value) ───
+    # ITM CE: strike < LTP, intrinsic = LTP - strike, extrinsic = ce_ltp - intrinsic
+    # ITM PE: strike > LTP, intrinsic = strike - LTP, extrinsic = pe_ltp - intrinsic
+    itm_ce_list = []
+    itm_pe_list = []
+    for r in rows:
+        if r['strike'] < ltp and float(r.get('ce_ltp') or 0) > 0:
+            intrinsic = ltp - r['strike']
+            extrinsic = max(0.0, float(r['ce_ltp']) - intrinsic)
+            # Only deep ITM with significant intrinsic value
+            if intrinsic > 0 and extrinsic >= 0:
+                itm_ce_list.append({
+                    'strike': int(r['strike']), 'ltp': r['ce_ltp'],
+                    'intrinsic': round(intrinsic), 'extrinsic': round(extrinsic, 2),
+                    'oi': r['ce_oi'], 'scrip': int(r.get('ce_scrip', 0)),
+                })
+        if r['strike'] > ltp and float(r.get('pe_ltp') or 0) > 0:
+            intrinsic = r['strike'] - ltp
+            extrinsic = max(0.0, float(r['pe_ltp']) - intrinsic)
+            if intrinsic > 0 and extrinsic >= 0:
+                itm_pe_list.append({
+                    'strike': int(r['strike']), 'ltp': r['pe_ltp'],
+                    'intrinsic': round(intrinsic), 'extrinsic': round(extrinsic, 2),
+                    'oi': r['pe_oi'], 'scrip': int(r.get('pe_scrip', 0)),
+                })
+    # Sort by extrinsic ascending (lowest time value first = best ITM)
+    itm_ce_list.sort(key=lambda x: x['extrinsic'])
+    itm_pe_list.sort(key=lambda x: x['extrinsic'])
+    best_ce = itm_ce_list[:5]   # top 5 ITM CE by lowest extrinsic
+    best_pe = itm_pe_list[:5]   # top 5 ITM PE by lowest extrinsic
+    best_ce_txt = ' | '.join(f"Strike {c['strike']} CE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_ce) or 'None found'
+    best_pe_txt = ' | '.join(f"Strike {c['strike']} PE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_pe) or 'None found'
 
     # ── Latest saved S/R from DB (set by "Analyze S/R" in chart modal) ───────
     sr_text = 'No S/R analysis saved — open the chart and run "Analyze S/R with Claude AI" first.'
@@ -582,6 +614,10 @@ S/R LEVELS (from chart analysis):
 
 OPTION CHAIN (20 strikes near LTP):
 {chain_txt}
+
+DEEP ITM CANDIDATES — sorted by extrinsic value (lowest = best, time-value waste ≈ 0):
+Best ITM CE (strike BELOW LTP — buy if bullish): {best_ce_txt}
+Best ITM PE (strike ABOVE LTP — buy if bearish): {best_pe_txt}
 {prev_context}
 Respond ONLY with this JSON (no markdown, no text outside JSON):
 {{
@@ -599,39 +635,38 @@ Respond ONLY with this JSON (no markdown, no text outside JSON):
       "side": "support",
       "strike": 0,
       "type": "PE",
-      "premium": 0.0,
+      "premium": 0,
       "trigger_price": 0,
       "trigger_condition": "below",
       "entry_trigger": "one line: enter PE when {idx} falls below <support level>",
       "entry_timing": "e.g. '9:20-9:45 AM after opening range'",
-      "sl": 0.0,
-      "target": 0.0,
-      "reason": "why this PE strike near support"
+      "sl": 0,
+      "target": 0,
+      "reason": "ITM PE chosen: strike above LTP, extrinsic ≈ 0, high delta"
     }},
     {{
       "side": "resistance",
       "strike": 0,
       "type": "CE",
-      "premium": 0.0,
+      "premium": 0,
       "trigger_price": 0,
       "trigger_condition": "above",
       "entry_trigger": "one line: enter CE when {idx} breaks above <resistance level>",
       "entry_timing": "e.g. '9:20-9:45 AM after opening range'",
-      "sl": 0.0,
-      "target": 0.0,
-      "reason": "why this CE strike near resistance"
+      "sl": 0,
+      "target": 0,
+      "reason": "ITM CE chosen: strike below LTP, extrinsic ≈ 0, high delta"
     }}
   ]
 }}
 
-TRADE RULES (apply to BOTH trades):
-- support trade: PE strike 1-2 strikes below support; trigger_condition = "below"; trigger_price = support level
-- resistance trade: CE strike 1-2 strikes above resistance; trigger_condition = "above"; trigger_price = resistance level
-- Use nearest S/R levels from the S/R data above
-- sl = round(premium × 0.70) — 30% stop loss, INTEGER only
-- target = round(premium + 3 × (premium − sl)) — 1:3 R:R, INTEGER only
-- ALL numeric fields (premium, sl, target, trigger_price, strike) must be INTEGER whole numbers — NO decimals
-- Choose strikes near ATM with strong OI backing"""
+TRADE RULES — DEEP ITM ONLY:
+- CE trade (resistance side): MUST pick from the Best ITM CE list above (strike BELOW LTP). Choose the one with LOWEST extrinsic value. trigger_condition = "above"; trigger_price = nearest resistance level from S/R.
+- PE trade (support side): MUST pick from the Best ITM PE list above (strike ABOVE LTP). Choose the one with LOWEST extrinsic value. trigger_condition = "below"; trigger_price = nearest support level from S/R.
+- ITM options have high delta — they move almost like the index — low time-value waste.
+- sl = round(premium × 0.75) — 25% stop loss, INTEGER only
+- target = round(premium + 2 × (premium − sl)) — 1:2 R:R, INTEGER only
+- ALL numeric fields (premium, sl, target, trigger_price, strike) must be INTEGER whole numbers — NO decimals"""
 
     try:
         ac = _anthropic.Anthropic()
@@ -718,14 +753,28 @@ TRADE RULES (apply to BOTH trades):
                 t_side      = t_save.get('side', '')
                 if t_strike and t_type and t_trigger:
                     scrip_key = 'ce_scrip' if t_type == 'CE' else 'pe_scrip'
+                    ltp_key   = 'ce_ltp'   if t_type == 'CE' else 'pe_ltp'
                     t_scrip   = 0
+                    # Search all rows (not just near_rows) — ITM strikes may be far from ATM
                     for row_r in rows:
                         if int(row_r['strike']) == t_strike:
                             t_scrip = int(row_r.get(scrip_key, 0))
                             if t_premium == 0:
-                                ltp_key = 'ce_ltp' if t_type == 'CE' else 'pe_ltp'
                                 t_premium = float(row_r.get(ltp_key, 0))
                             break
+                    # Also check ITM candidate lists for scrip code if still missing
+                    if t_scrip == 0 and t_type == 'CE':
+                        for c in best_ce:
+                            if c['strike'] == t_strike:
+                                t_scrip = c.get('scrip', 0)
+                                if t_premium == 0: t_premium = float(c.get('ltp', 0))
+                                break
+                    if t_scrip == 0 and t_type == 'PE':
+                        for c in best_pe:
+                            if c['strike'] == t_strike:
+                                t_scrip = c.get('scrip', 0)
+                                if t_premium == 0: t_premium = float(c.get('ltp', 0))
+                                break
                     wid = save_watchlist(
                         index_id=idx, strike=t_strike, option_type=t_type,
                         scrip_code=t_scrip, premium=t_premium,
@@ -1085,38 +1134,60 @@ def api_analyze_sr():
         return jsonify({'error': f'Unknown index: {idx}'}), 400
     cfg = INDEX_MAP[idx]
 
-    # Fetch 1-year daily candles for S/R analysis
     c_exch  = cfg.get('chart_exch',  cfg['feed_exch'])
     c_scrip = cfg.get('chart_scrip', cfg['feed_scrip'])
-    chart = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
-    if 'error' in chart or not chart.get('candles'):
-        return jsonify({'error': 'Could not fetch historical data for S/R analysis'})
 
-    candles = chart['candles']
-    ltp     = candles[-1]['close'] if candles else 0
+    # ── Fetch LT chart: try 4H, fall back to 60m ─────────────────────────────
+    lt_chart = get_chart_data(client, c_exch, c_scrip, interval='4h', days=400)
+    if lt_chart.get('error') == 'session_expired':
+        return jsonify({'error': 'session_expired'}), 401
+    if 'error' in lt_chart or not lt_chart.get('candles'):
+        lt_chart = get_chart_data(client, c_exch, c_scrip, interval='60m', days=365)
+    if 'error' in lt_chart or not lt_chart.get('candles'):
+        # final fallback to daily
+        lt_chart = get_chart_data(client, c_exch, c_scrip, interval='1d', days=380)
+    if 'error' in lt_chart or not lt_chart.get('candles'):
+        return jsonify({'error': 'Could not fetch long-term chart data'})
 
-    # Build last 60 days OHLC text
-    recent  = candles[-60:]
+    # ── Fetch ST chart: 15m, 7 days ──────────────────────────────────────────
+    st_chart = get_chart_data(client, c_exch, c_scrip, interval='15m', days=7)
+    if 'error' in st_chart or not st_chart.get('candles'):
+        st_chart = get_chart_data(client, c_exch, c_scrip, interval='60m', days=5)
+
+    lt_candles = lt_chart['candles']
+    st_candles = st_chart.get('candles', [])
+    ltp = lt_candles[-1]['close'] if lt_candles else 0
+
+    # ── Build text for Claude ─────────────────────────────────────────────────
     from datetime import datetime as _dt
     def fmt_ts(ts):
-        try:    return _dt.utcfromtimestamp(ts).strftime('%d-%b-%y')
+        try:    return _dt.utcfromtimestamp(ts).strftime('%d-%b %H:%M')
         except: return str(ts)
 
-    ohlc_txt = 'Date | O | H | L | C\n'
-    for c in recent:
-        ohlc_txt += f"{fmt_ts(c['time'])} | {c['open']:.0f} | {c['high']:.0f} | {c['low']:.0f} | {c['close']:.0f}\n"
+    lt_recent  = lt_candles[-60:]
+    lt_ohlc    = 'DateTime | O | H | L | C\n'
+    for c in lt_recent:
+        lt_ohlc += f"{fmt_ts(c['time'])} | {c['open']:.0f} | {c['high']:.0f} | {c['low']:.0f} | {c['close']:.0f}\n"
 
-    yr_high = max(c['high']  for c in candles if c['high'] > 0)
-    yr_low  = min(c['low']   for c in candles if c['low']  > 0)
+    st_recent  = st_candles[-100:]
+    st_ohlc    = 'DateTime | O | H | L | C\n'
+    for c in st_recent:
+        st_ohlc += f"{fmt_ts(c['time'])} | {c['open']:.0f} | {c['high']:.0f} | {c['low']:.0f} | {c['close']:.0f}\n"
 
-    # Fetch global market context (GIFT Nifty, VIX, DXY, Crude + news)
+    yr_high = max((c['high'] for c in lt_candles if c['high'] > 0), default=ltp)
+    yr_low  = min((c['low']  for c in lt_candles if c['low']  > 0), default=ltp)
+
+    # ── Global market context ─────────────────────────────────────────────────
     from modules.market_context import get_market_context
     try:
-        ctx = get_market_context()
+        ctx     = get_market_context()
         ctx_txt = ctx['as_text']
     except Exception:
         ctx_txt = '(global context unavailable)'
+        ctx     = {'quotes': []}
 
+    lt_interval_lbl = lt_chart.get('interval_used', '4H').upper()
+    st_interval_lbl = st_chart.get('interval_used', '15m').upper()
     one_pct = round(ltp * 0.01)
 
     prompt = f"""You are a professional price action trader specialising in Indian index options.
@@ -1127,41 +1198,39 @@ def api_analyze_sr():
 ═══ INDEX DATA ═══
 Index: {idx}  |  Current Price: {ltp:.0f}
 52-Week High: {yr_high:.0f}  |  52-Week Low: {yr_low:.0f}
-1% range from current: {ltp - one_pct:.0f} – {ltp + one_pct:.0f}
+1% of current price ≈ {one_pct}
 
-═══ DAILY OHLC — LAST 60 TRADING DAYS ═══
-{ohlc_txt}
+═══ LONG-TERM CHART ({lt_interval_lbl}) — LAST {len(lt_recent)} BARS ═══
+{lt_ohlc}
+
+═══ SHORT-TERM CHART ({st_interval_lbl}) — LAST 7 DAYS ═══
+{st_ohlc}
 
 ═══ YOUR TASKS ═══
-1. CONTEXT SUMMARY (2-3 sentences): What do the global indicators (GIFT Nifty trend, VIX level, DXY vs INR, crude direction) say about Indian market risk/direction TODAY?
-2. CHART SUMMARY (2-3 sentences): What has happened on the {idx} chart recently? Trend direction, key swing, where price sits relative to range.
-3. Find EXACTLY 2 SUPPORT levels and EXACTLY 2 RESISTANCE levels within 1% of current price {ltp:.0f}.
-   - A level MUST have caused a sharp bounce/rejection (≥1% move in 1 day) at least TWICE.
-   - If fewer than 2 clean levels exist within 1%, use nearest levels just outside the range.
-4. VERDICT (2 sentences): Today's overall bias + which specific level to watch for the first entry.
+1. CONTEXT SUMMARY (2-3 sentences): What do global indicators (GIFT Nifty, VIX, DXY, Crude) say about Indian market direction TODAY?
+2. LT CHART SUMMARY (2 sentences): Trend + where price sits in long-term range on {lt_interval_lbl} chart.
+3. LONG-TERM S/R: EXACTLY 2 SUPPORT and 2 RESISTANCE from the {lt_interval_lbl} chart within 2% of {ltp:.0f}. Each must have caused a sharp bounce/rejection ≥1% at least TWICE.
+4. ST CHART SUMMARY (2 sentences): Short-term pattern on {st_interval_lbl} chart and any key intraday level.
+5. SHORT-TERM S/R: EXACTLY 2 SUPPORT and 2 RESISTANCE from the {st_interval_lbl} chart within 1% of {ltp:.0f}.
+6. VERDICT (2 sentences): Intraday bias today + specific level to watch for entry.
 
-Respond ONLY in valid JSON (no markdown, no text outside JSON):
+Respond ONLY in valid JSON:
 {{
-  "context_summary": "2-3 sentences on what global indicators mean for Indian markets today",
-  "chart_summary": "2-3 sentences on recent {idx} chart action and where price sits now",
-  "supports": [
-    {{"level": 0, "reason": "specific dates + reaction size, e.g. bounced +1.8% on May 11 and Apr 28"}},
-    {{"level": 0, "reason": "..."}}
-  ],
-  "resistances": [
-    {{"level": 0, "reason": "specific dates + rejection size"}},
-    {{"level": 0, "reason": "..."}}
-  ],
-  "valid_today": [{{"level": 0, "type": "support", "note": "within 1% of current price"}}],
-  "verdict": "2 sentences: bias + level to watch"
+  "context_summary": "...",
+  "lt_chart_summary": "...",
+  "lt_supports":    [{{"level": 0, "reason": "..."}}, {{"level": 0, "reason": "..."}}],
+  "lt_resistances": [{{"level": 0, "reason": "..."}}, {{"level": 0, "reason": "..."}}],
+  "st_chart_summary": "...",
+  "st_supports":    [{{"level": 0, "reason": "..."}}, {{"level": 0, "reason": "..."}}],
+  "st_resistances": [{{"level": 0, "reason": "..."}}, {{"level": 0, "reason": "..."}}],
+  "verdict": "..."
 }}
-
-Return exactly 2 supports and 2 resistances."""
+Return exactly 2 items in each of the 4 S/R arrays."""
 
     try:
         ac  = _anthropic.Anthropic()
         rsp = ac.messages.create(
-            model='claude-haiku-4-5', max_tokens=1600,
+            model='claude-haiku-4-5', max_tokens=1800,
             messages=[{'role': 'user', 'content': prompt}]
         )
         raw = rsp.content[0].text.strip()
@@ -1169,27 +1238,38 @@ Return exactly 2 supports and 2 resistances."""
             raw = raw.split('```')[1]
             if raw.startswith('json'): raw = raw[4:]
         data = json.loads(raw.strip())
-        data['ltp']     = ltp
-        data['index']   = idx
-        data['context'] = ctx.get('quotes', [])
-        # Auto-save to DB so market summary refresh can use it immediately
+        data['ltp']         = ltp
+        data['index']       = idx
+        data['context']     = ctx.get('quotes', [])
+        data['lt_interval'] = lt_interval_lbl
+        data['st_interval'] = st_interval_lbl
+        # Include candle arrays for frontend charts
+        data['lt_candles']  = lt_candles
+        data['st_candles']  = st_candles
+        # Backward-compat aliases
+        data['supports']    = data.get('lt_supports', [])
+        data['resistances'] = data.get('lt_resistances', [])
+        data['chart_summary'] = data.get('lt_chart_summary', '')
+        data['valid_today']   = []
+
+        # Auto-save LT S/R to DB
         try:
             save_sr(
                 index_id    = idx,
                 ltp         = ltp,
-                supports    = data.get('supports', []),
-                resistances = data.get('resistances', []),
-                valid_today = data.get('valid_today', []),
+                supports    = data.get('lt_supports', []),
+                resistances = data.get('lt_resistances', []),
+                valid_today = [],
                 verdict     = data.get('verdict', ''),
             )
             data['auto_saved'] = True
-            print(f'[SR] {idx} auto-saved at LTP {ltp:.0f}')
+            print(f'[SR] {idx} dual-timeframe analysis saved at LTP {ltp:.0f}')
         except Exception as _se:
             data['auto_saved'] = False
             print(f'[SR] auto-save error: {_se}')
         return jsonify(data)
     except json.JSONDecodeError as e:
-        return jsonify({'error': f'Claude returned invalid JSON: {e}', 'raw': raw}), 500
+        return jsonify({'error': f'Claude returned invalid JSON: {e}', 'raw': raw[:300]}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

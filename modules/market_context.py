@@ -46,7 +46,7 @@ def _gift_nifty():
         raise ValueError('NSE returned 0')
     except Exception:
         # Fallback: Nifty 50 spot from Yahoo Finance (most reliable)
-        r = _yf_quote('^NSEI', 'Nifty 50')
+        r = _yf_quote('^NSEI', 'GIFT Nifty')
         if r['current'] == 0:
             # Last resort: try NIFTY futures symbol
             r = _yf_quote('NIFTY.NS', 'GIFT Nifty (~)')

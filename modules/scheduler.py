@@ -19,7 +19,7 @@ from modules.telegram import send_message
 _IST = timezone(timedelta(hours=5, minutes=30))
 
 _LOT_SIZES  = {'SENSEX': 20, 'NIFTY': 65, 'BANKNIFTY': 30, 'FINNIFTY': 30}
-_SL_OFFSETS = {'SENSEX': 150, 'NIFTY': 45, 'BANKNIFTY': 45, 'FINNIFTY': 45}
+_SL_OFFSETS = {'SENSEX': 150, 'NIFTY': 47, 'BANKNIFTY': 45, 'FINNIFTY': 45}
 
 _TICK = 0.05   # BSE/NSE options tick size
 
