@@ -174,9 +174,17 @@ header {
 .chart-ph {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 14px; background: #12111f; border-bottom: 1px solid #2d2b4e;
+  gap: 8px;
 }
-.chart-ph-title { font-weight: 700; font-size: 0.84em; color: #e2e8f0; }
+.chart-ph-title { font-weight: 700; font-size: 0.84em; color: #e2e8f0; flex-shrink: 0; }
 .chart-ph-badge { font-size: 0.65em; color: #6b7280; }
+.chart-ph-right { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.chart-zoom-btn {
+  padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: 700;
+  cursor: pointer; border: 1px solid #374151; background: #1e1c35; color: #94a3b8;
+  line-height: 1.4; transition: background 0.12s;
+}
+.chart-zoom-btn:hover { background: #2d2b4e; color: #e2e8f0; border-color: #7c3aed; }
 .chart-inner    { width: 100%; height: 280px; background: #12111f; }
 .sr-pills-row   { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px; border-top: 1px solid #1e1c35; min-height: 36px; }
 .sr-pill {
@@ -185,6 +193,14 @@ header {
 }
 .sr-pill.sup { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
 .sr-pill.res { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+
+/* ── News categories ─────────────────────────────────────────────────────────── */
+.ctx-news-cat {
+  font-size: 0.62em; font-weight: 700; text-transform: uppercase; letter-spacing: .7px;
+  color: #7c3aed; margin: 8px 0 3px; padding-bottom: 2px;
+  border-bottom: 1px solid #2d2b4e;
+}
+.ctx-news-cat:first-child { margin-top: 0; }
 
 /* ── Loading spinner ─────────────────────────────────────────────────────────── */
 .spinner { width: 22px; height: 22px; border: 2px solid #2d2b4e; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.7s linear infinite; }
@@ -363,7 +379,12 @@ header {
       <div class="chart-panel" id="ltChartPanel">
         <div class="chart-ph">
           <span class="chart-ph-title">📊 Long-Term — 1 Year</span>
-          <span class="chart-ph-badge" id="ltChartBadge">4H · loading…</span>
+          <div class="chart-ph-right">
+            <button class="chart-zoom-btn" onclick="zoomChart('lt', 1)" title="Zoom In">+</button>
+            <button class="chart-zoom-btn" onclick="zoomChart('lt', -1)" title="Zoom Out">−</button>
+            <button class="chart-zoom-btn" onclick="resetChart('lt')" title="Fit All">⊡</button>
+            <span class="chart-ph-badge" id="ltChartBadge">4H · loading…</span>
+          </div>
         </div>
         <div class="chart-inner" id="ltChartInner">
           <div class="loading-row" style="height:100%;justify-content:center"><div class="spinner"></div>Loading chart…</div>
@@ -377,7 +398,12 @@ header {
       <div class="chart-panel" id="stChartPanel">
         <div class="chart-ph">
           <span class="chart-ph-title">⚡ Short-Term — 7 Days</span>
-          <span class="chart-ph-badge" id="stChartBadge">15m · loading…</span>
+          <div class="chart-ph-right">
+            <button class="chart-zoom-btn" onclick="zoomChart('st', 1)" title="Zoom In">+</button>
+            <button class="chart-zoom-btn" onclick="zoomChart('st', -1)" title="Zoom Out">−</button>
+            <button class="chart-zoom-btn" onclick="resetChart('st')" title="Fit All">⊡</button>
+            <span class="chart-ph-badge" id="stChartBadge">15m · loading…</span>
+          </div>
         </div>
         <div class="chart-inner" id="stChartInner">
           <div class="loading-row" style="height:100%;justify-content:center"><div class="spinner"></div>Loading chart…</div>
@@ -527,6 +553,27 @@ function initCharts() {
   });
 }
 
+// ── Chart zoom / reset ───────────────────────────────────────────────────────
+function zoomChart(which, dir) {
+  const chart = which === 'lt' ? ltChart : stChart;
+  if (!chart) return;
+  const ts    = chart.timeScale();
+  const range = ts.getVisibleLogicalRange();
+  if (!range) return;
+  const center = (range.from + range.to) / 2;
+  const half   = (range.to - range.from) / 2;
+  // dir > 0 = zoom in (shrink visible range), dir < 0 = zoom out (expand)
+  const factor = dir > 0 ? 0.55 : 1.65;
+  ts.setVisibleLogicalRange({
+    from: center - half * factor,
+    to:   center + half * factor,
+  });
+}
+function resetChart(which) {
+  const chart = which === 'lt' ? ltChart : stChart;
+  if (chart) chart.timeScale().fitContent();
+}
+
 // ── Chart rendering ───────────────────────────────────────────────────────────
 function _drawSROnChart(series, chart, supports, resistances, labelPrefix) {
   const handles = [];
@@ -627,11 +674,22 @@ async function loadSavedSR() {
 }
 
 // ── Market Context ────────────────────────────────────────────────────────────
-async function loadMarketContext() {
-  const body = document.getElementById('ctxBody');
-  body.innerHTML = '<div class="loading-row"><div class="spinner"></div>Loading global context…</div>';
+async function loadMarketContext(useCached = false) {
+  const body  = document.getElementById('ctxBody');
+  const badge = document.getElementById('ctxBadge');
+  if (!useCached) {
+    body.innerHTML = '<div class="loading-row"><div class="spinner"></div>Fetching global context…</div>';
+    badge.style.display = 'none';
+  }
   try {
-    const data = await get('/api/market-news');
+    const url  = useCached ? '/api/market-news?cached=1' : '/api/market-news';
+    const data = await get(url);
+
+    if (data.empty) {
+      body.innerHTML = '<div style="color:#4b5563;font-size:0.78em;padding:8px 0">No saved context yet — click ↺ Refresh All to fetch.</div>';
+      return;
+    }
+
     const quotes = data.quotes || [];
     const news   = data.news   || [];
 
@@ -645,22 +703,37 @@ async function loadMarketContext() {
       </div>`;
     }).join('');
 
-    const nHtml = news.map((h, i) => {
-      const t = h.title || h.headline || h.name || Object.values(h)[0] || '—';
-      return `<div class="ctx-news-item">
-        <span class="ctx-news-num">${i+1}.</span>
-        <span class="ctx-news-txt">${t}</span>
-        ${h.pub ? `<span class="ctx-news-pub">${h.pub}</span>` : ''}
-      </div>`;
-    }).join('');
+    // Render news grouped by category
+    const grouped = {};
+    const catOrder = [];
+    news.forEach(h => {
+      const cat = h.category || '📰 News';
+      if (!grouped[cat]) { grouped[cat] = []; catOrder.push(cat); }
+      grouped[cat].push(h);
+    });
+    let nHtml = '';
+    catOrder.forEach(cat => {
+      nHtml += `<div class="ctx-news-cat">${cat}</div>`;
+      grouped[cat].forEach(h => {
+        nHtml += `<div class="ctx-news-item">
+          <span class="ctx-news-txt">${h.title || '—'}</span>
+          ${h.pub ? `<span class="ctx-news-pub">&nbsp;${h.pub}</span>` : ''}
+        </div>`;
+      });
+    });
+
+    const cacheNote = data.from_cache && data.saved_at
+      ? `<div style="font-size:0.62em;color:#4b5563;margin-top:6px">📚 Saved ${data.saved_at} · click Refresh to update</div>`
+      : '';
 
     body.innerHTML = `
       <div class="ctx-quotes">${qHtml}</div>
       <div class="ctx-news">
-        <div class="ctx-news-title">📰 Top Market News</div>
+        <div class="ctx-news-title">📰 Market News</div>
         ${nHtml}
+        ${cacheNote}
       </div>`;
-    document.getElementById('ctxBadge').style.display = 'none';
+    badge.style.display = 'none';
   } catch(e) {
     body.innerHTML = `<div style="color:#4b5563;font-size:0.78em;padding:6px 0">Market context unavailable</div>`;
   }
@@ -869,8 +942,8 @@ async function refreshAll() {
     // 1. Live LTP + OHLC
     await Promise.all([loadLtp(), loadOHLC()]);
 
-    // 2. Market context (global indicators + news)
-    await loadMarketContext();
+    // 2. Market context (global indicators + news) — fresh fetch + auto-save to cache
+    await loadMarketContext(false);
 
     // 3. Ensure expiry loaded
     if (!currentExpiryTs) await loadExpiries();
@@ -1126,10 +1199,12 @@ async function loadMarketUpdateLog() {
 
 // ── Initialization ────────────────────────────────────────────────────────────
 async function init() {
-  // Live LTP + OHLC + market context kick off immediately
+  // Live LTP + OHLC (always fresh — lightweight polls)
   loadLtp();
   loadOHLC();
-  loadMarketContext();
+
+  // Market context: load from cache on init (no external fetch)
+  loadMarketContext(true);
 
   // Load LWC, init charts, then load chart data
   loadLWC(() => {

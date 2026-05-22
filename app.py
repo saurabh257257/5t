@@ -818,12 +818,43 @@ TRADE RULES — DEEP ITM ONLY:
 
 @app.route('/api/market-news')
 def api_market_news():
-    """Fetch top 5 market news + global context quotes (GIFT Nifty, VIX, DXY, Crude)."""
+    """
+    Fetch global context quotes + multi-category news.
+    ?cached=1  → return last saved from DB (no external fetch)
+    (default)  → fetch fresh, auto-save to DB cache, return result
+    """
     if not require_auth():
         return jsonify({'error': 'Not authenticated'}), 401
+
+    use_cache = request.args.get('cached', '0') == '1'
+
+    if use_cache:
+        raw = get_setting('market_context_cache', '')
+        if raw:
+            try:
+                data = json.loads(raw)
+                data['from_cache'] = True
+                return jsonify(data)
+            except Exception:
+                pass
+        return jsonify({'quotes': [], 'news': [], 'from_cache': True, 'empty': True})
+
+    # Fresh fetch
     try:
         from modules.market_context import get_market_context
+        from datetime import datetime as _dt2, timezone as _tz2, timedelta as _td2
         ctx = get_market_context()
+        # Save to DB settings for next cached load
+        try:
+            _IST2 = _tz2(_td2(hours=5, minutes=30))
+            cache_payload = {
+                'quotes':   ctx['quotes'],
+                'news':     ctx['news'],
+                'saved_at': _dt2.now(_IST2).strftime('%d %b %Y %H:%M'),
+            }
+            set_setting('market_context_cache', json.dumps(cache_payload))
+        except Exception as _ce:
+            print(f'[CTX] cache save error: {_ce}')
         return jsonify({'quotes': ctx['quotes'], 'news': ctx['news']})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
