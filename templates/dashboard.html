@@ -367,6 +367,17 @@ header {
     </select>
     <span class="ctrl-lbl" style="margin-left:8px">Prev Close</span>
     <span id="ctrlPrevClose" style="font-size:0.88em;color:#a78bfa;font-weight:700">—</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <span class="ctrl-lbl">Auto-Refresh Analysis</span>
+      <select class="sx-select" id="autoRefreshFreq" style="min-width:130px" onchange="setAutoRefresh()">
+        <option value="0">Off</option>
+        <option value="30">Every 30 min</option>
+        <option value="60" selected>Every 1 hr</option>
+        <option value="120">Every 2 hr</option>
+        <option value="240">Every 4 hr</option>
+      </select>
+      <span style="font-size:0.72em;color:#4b5563" id="nextRefreshHint"></span>
+    </span>
     <span class="ctrl-status" id="ctrlStatus"></span>
   </div>
 
@@ -1072,6 +1083,9 @@ async function loadChainSummary() {
 
   body.innerHTML = d.structured ? renderMarketSummary(d) : `<div style="font-size:0.82em;color:#94a3b8;line-height:1.65;padding:4px 0">${d.summary||''}</div>`;
   setUpdatedAt('msUpdatedAt');
+  // Auto-set price alerts from ITM trade triggers
+  const trades = d.structured ? (d.structured.trades || (d.structured.trade ? [d.structured.trade] : [])) : [];
+  applyTradeAlerts(trades);
 }
 
 // ── Try today's cached summary ────────────────────────────────────────────────
@@ -1097,6 +1111,14 @@ async function tryLoadTodaySummary() {
       if (!cached.ltp) cached.ltp = lastLtp;
       body.innerHTML = cached.structured ? renderMarketSummary(cached)
         : `<div style="font-size:0.82em;color:#94a3b8;line-height:1.65;padding:4px 0">${cached.analysis||''}</div>`;
+      setUpdatedAt('msUpdatedAt');
+      // Restore trade alerts from cached analysis
+      let cachedStructured = null;
+      if (cached.structured) {
+        try { cachedStructured = typeof cached.structured === 'string' ? JSON.parse(cached.structured) : cached.structured; } catch(_) {}
+      }
+      const cachedTrades = cachedStructured ? (cachedStructured.trades || (cachedStructured.trade ? [cachedStructured.trade] : [])) : [];
+      applyTradeAlerts(cachedTrades);
       return;
     }
   } catch (_) {}
@@ -1333,11 +1355,11 @@ async function loadChainTable() {
     }
     const ltp = lastLtp || 0;
 
-    // Find ATM strike
+    // ATM strike
     const atmStrike = rows.reduce((best, r) =>
       Math.abs(r.strike - ltp) < Math.abs(best - ltp) ? r.strike : best, rows[0].strike);
 
-    // Find max pain (strike where total pain for all options is lowest)
+    // Max pain (full calculation)
     let mpStrike = rows[0].strike, minPain = Infinity;
     for (const target of rows) {
       let pain = 0;
@@ -1348,67 +1370,89 @@ async function loadChainTable() {
       if (pain < minPain) { minPain = pain; mpStrike = target.strike; }
     }
 
-    // Highest CE OI (resistance wall) and PE OI (support wall)
+    // Highest CE & PE OI walls
     let maxCeOi = 0, wallCeStrike = 0, maxPeOi = 0, wallPeStrike = 0;
     rows.forEach(r => {
       if ((r.ce_oi||0) > maxCeOi) { maxCeOi = r.ce_oi; wallCeStrike = r.strike; }
       if ((r.pe_oi||0) > maxPeOi) { maxPeOi = r.pe_oi; wallPeStrike = r.strike; }
     });
 
-    // Filter ±15 strikes around ATM
-    const strikes = rows.map(r => r.strike).sort((a,b) => a-b);
-    const atmIdx  = strikes.indexOf(atmStrike);
-    const lo = Math.max(0, atmIdx - 15);
-    const hi = Math.min(strikes.length - 1, atmIdx + 15);
-    const visible = rows.filter(r => r.strike >= strikes[lo] && r.strike <= strikes[hi]);
-
-    const fmtOi  = n => n >= 10000000 ? (n/10000000).toFixed(2)+'Cr' : n >= 100000 ? (n/100000).toFixed(1)+'L' : parseInt(n||0).toLocaleString('en-IN');
+    const fmtOi  = n => n >= 10000000 ? (n/10000000).toFixed(2)+'Cr' : n >= 100000 ? (n/100000).toFixed(1)+'L' : n >= 1000 ? (n/1000).toFixed(1)+'K' : parseInt(n||0).toString();
     const fmtChg = n => {
-      if (!n) return '<span style="color:#4b5563">—</span>';
+      if (!n) return '<span style="color:#2d2b4e">—</span>';
       return `<span class="${n>0?'chg-p':'chg-n'}">${n>0?'+':''}${fmtOi(n)}</span>`;
     };
+    const bar = (val, max, color) => {
+      const pct = max > 0 ? Math.min(100, Math.round(val / max * 100)) : 0;
+      return `<div style="display:flex;align-items:center;gap:5px">
+        <div style="width:60px;height:6px;background:#1e1c35;border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div>
+        </div>
+        <span>${fmtOi(val)}</span>
+      </div>`;
+    };
 
-    let html = `<table class="chain-table">
-      <thead><tr>
-        <th class="ce-oi-col">CE OI</th>
-        <th>CE ΔOI</th>
-        <th>CE LTP</th>
-        <th class="csc">STRIKE</th>
-        <th>PE LTP</th>
-        <th>PE ΔOI</th>
-        <th class="pe-oi-col">PE OI</th>
-      </tr></thead><tbody>`;
+    // Build full table (all strikes, sorted descending so highest strike at top)
+    const sorted = [...rows].sort((a,b) => b.strike - a.strike);
+    let html = `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;background:#12111f;border-bottom:1px solid #2d2b4e;flex-wrap:wrap">
+        <button class="btn-sm" onclick="scrollToAtm()" style="font-size:0.72em;padding:3px 9px">⬇ Jump to ATM ${parseInt(atmStrike).toLocaleString('en-IN')}</button>
+        <span style="font-size:0.72em;color:#6b7280">Max Pain: <b style="color:#fbbf24">${parseInt(mpStrike).toLocaleString('en-IN')}</b></span>
+        <span style="font-size:0.72em;color:#f87171">Top CE Wall: <b>${parseInt(wallCeStrike).toLocaleString('en-IN')}</b></span>
+        <span style="font-size:0.72em;color:#34d399">Top PE Wall: <b>${parseInt(wallPeStrike).toLocaleString('en-IN')}</b></span>
+        <span style="font-size:0.72em;color:#6b7280">${rows.length} strikes</span>
+      </div>
+      <div style="max-height:460px;overflow-y:auto" id="chainScroll">
+      <table class="chain-table">
+        <thead style="position:sticky;top:0;z-index:2;background:#12111f">
+          <tr>
+            <th style="text-align:right;width:90px">CE OI</th>
+            <th style="text-align:right">CE ΔOI</th>
+            <th style="text-align:right">CE LTP</th>
+            <th class="csc" style="min-width:110px">STRIKE</th>
+            <th style="text-align:right">PE LTP</th>
+            <th style="text-align:right">PE ΔOI</th>
+            <th style="text-align:right;width:90px">PE OI</th>
+          </tr>
+        </thead>
+        <tbody id="chainTbody">`;
 
-    for (const r of visible) {
-      const isAtm   = r.strike === atmStrike;
-      const isMp    = r.strike === mpStrike;
-      const isCeW   = r.strike === wallCeStrike;
-      const isPeW   = r.strike === wallPeStrike;
+    for (const r of sorted) {
+      const isAtm  = r.strike === atmStrike;
+      const isMp   = r.strike === mpStrike;
+      const isCeW  = r.strike === wallCeStrike;
+      const isPeW  = r.strike === wallPeStrike;
       let cls = 'chain-row';
       if (isAtm) cls += ' chain-atm';
       if (isMp)  cls += ' chain-mp';
       if (isCeW) cls += ' chain-ce-wall';
       if (isPeW) cls += ' chain-pe-wall';
+      const lbl = (isAtm?' 🎯':'') + (isMp?' 💛':'');
 
-      const atm = isAtm ? ' 🎯' : '';
-      const mp  = isMp  ? ' 💛' : '';
-      html += `<tr class="${cls}">
-        <td class="ce-oi-col">${fmtOi(r.ce_oi||0)}</td>
-        <td>${fmtChg(r.ce_chg_oi)}</td>
-        <td>${r.ce_ltp ? parseFloat(r.ce_ltp).toFixed(1) : '—'}</td>
-        <td class="csc">${parseInt(r.strike).toLocaleString('en-IN')}${atm}${mp}</td>
-        <td>${r.pe_ltp ? parseFloat(r.pe_ltp).toFixed(1) : '—'}</td>
-        <td>${fmtChg(r.pe_chg_oi)}</td>
-        <td class="pe-oi-col">${fmtOi(r.pe_oi||0)}</td>
+      html += `<tr class="${cls}" data-strike="${r.strike}" ${isAtm?'id="chainAtmRow"':''}>
+        <td style="text-align:right" class="ce-oi-col">${bar(r.ce_oi||0, maxCeOi, '#f87171')}</td>
+        <td style="text-align:right">${fmtChg(r.ce_chg_oi)}</td>
+        <td style="text-align:right;color:${r.ce_ltp?'#f87171':'#2d2b4e'}">${r.ce_ltp?parseFloat(r.ce_ltp).toFixed(1):'—'}</td>
+        <td class="csc">${parseInt(r.strike).toLocaleString('en-IN')}${lbl}</td>
+        <td style="text-align:right;color:${r.pe_ltp?'#34d399':'#2d2b4e'}">${r.pe_ltp?parseFloat(r.pe_ltp).toFixed(1):'—'}</td>
+        <td style="text-align:right">${fmtChg(r.pe_chg_oi)}</td>
+        <td style="text-align:right" class="pe-oi-col">${bar(r.pe_oi||0, maxPeOi, '#34d399')}</td>
       </tr>`;
     }
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     wrap.innerHTML = html;
     document.getElementById('chainLegend').style.display = 'flex';
     setUpdatedAt('chainUpdatedAt');
+    // Auto scroll to ATM
+    setTimeout(scrollToAtm, 80);
   } catch(e) {
     wrap.innerHTML = `<div style="padding:12px 14px;font-size:0.8em;color:#f87171">⚠ ${e.message}</div>`;
   }
+}
+
+function scrollToAtm() {
+  const row = document.getElementById('chainAtmRow');
+  if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // ── Analysis History ──────────────────────────────────────────────────────────
@@ -1550,13 +1594,67 @@ function checkAlerts() {
     if (hit) {
       a.triggered = true; changed = true;
       const msg = `🔔 SENSEX Alert! ${a.cond === 'above' ? '▲' : '▼'} ₹${a.price.toLocaleString('en-IN')} hit @ ₹${parseInt(lastLtp).toLocaleString('en-IN')}${a.note ? ' — ' + a.note : ''}`;
-      showToast(msg, 'alert', 10000);
+      showToast(msg, 'alert', 12000);
       if (Notification && Notification.permission === 'granted') {
         new Notification('📊 SENSEX Alert', { body: msg.replace(/<[^>]+>/g,''), icon: '' });
       }
     }
   });
   if (changed) { _saveAlerts(); renderAlerts(); }
+}
+
+// ── Auto Trade Alerts ─────────────────────────────────────────────────────────
+// Called after every market summary render — syncs trade triggers to alert list
+function applyTradeAlerts(trades) {
+  if (!trades || !trades.length) return;
+  // Remove previously auto-generated trade alerts (tagged autoTrade:true)
+  _alerts = _alerts.filter(a => !a.autoTrade);
+  let added = 0;
+  for (const t of trades) {
+    const price = parseInt(t.trigger_price || 0);
+    const cond  = (t.trigger_condition || '').toLowerCase() === 'below' ? 'below' : 'above';
+    if (!price) continue;
+    const side  = (t.side || '').toUpperCase() || (cond === 'above' ? 'CE' : 'PE');
+    const note  = `🤖 ${t.strike} ${t.type} @ ₹${t.premium} | SL ₹${t.sl} TGT ₹${t.target} [${side}]`;
+    _alerts.push({ id: Date.now() + added, price, cond, note, triggered: false, autoTrade: true });
+    added++;
+  }
+  if (added) {
+    _saveAlerts();
+    renderAlerts();
+    showToast(`🤖 ${added} trade alert${added>1?'s':''} set from ITM trade recommendations`, 'ok', 5000);
+    if (Notification && Notification.permission === 'default') Notification.requestPermission();
+  }
+}
+
+// ── Auto-refresh analysis ─────────────────────────────────────────────────────
+let _autoRefreshTimer = null;
+function setAutoRefresh() {
+  if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+  const mins = parseInt(document.getElementById('autoRefreshFreq').value || '0');
+  try { localStorage.setItem('auto_refresh_mins', mins); } catch(_) {}
+  const hint = document.getElementById('nextRefreshHint');
+  if (!mins) { hint.textContent = ''; return; }
+  // Run analysis refresh (chain summary only — not full S/R re-analysis)
+  const runRefresh = async () => {
+    const t = new Date();
+    const ist = new Date(t.getTime() + (5.5*3600000 - t.getTimezoneOffset()*60000));
+    const h = ist.getUTCHours(), m = ist.getUTCMinutes();
+    const isMarketHours = (h > 9 || (h === 9 && m >= 15)) && (h < 15 || (h === 15 && m <= 30));
+    if (!isMarketHours) {
+      hint.textContent = 'Market closed — skip';
+      return;
+    }
+    hint.textContent = '⏳ Auto-refreshing…';
+    await Promise.all([loadLtp(), loadOHLC()]);
+    await loadChainSummary();    // runs full AI analysis + saves + sets trade alerts
+    loadChainTable();
+    loadHistoryTab(_curHistTab);
+    loadAutoUpdates();
+    hint.textContent = `Last: ${nowIST()}`;
+  };
+  _autoRefreshTimer = setInterval(runRefresh, mins * 60 * 1000);
+  hint.textContent = `Every ${mins} min`;
 }
 
 // ── Initialization ────────────────────────────────────────────────────────────
@@ -1618,6 +1716,15 @@ async function init() {
   // Load alerts from localStorage
   _loadAlerts();
   renderAlerts();
+
+  // Restore auto-refresh setting
+  try {
+    const savedMins = localStorage.getItem('auto_refresh_mins');
+    if (savedMins && parseInt(savedMins) > 0) {
+      document.getElementById('autoRefreshFreq').value = savedMins;
+    }
+  } catch(_) {}
+  setAutoRefresh();
 
   // Auto-update history
   loadAutoUpdates();
