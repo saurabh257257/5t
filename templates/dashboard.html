@@ -371,9 +371,16 @@ header {
     </select>
     <span class="ctrl-lbl" style="margin-left:8px">Prev Close</span>
     <span id="ctrlPrevClose" style="font-size:0.88em;color:#a78bfa;font-weight:700">—</span>
-    <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
-      <span class="ctrl-lbl">Auto-Refresh Analysis</span>
-      <select class="sx-select" id="autoRefreshFreq" style="min-width:130px" onchange="setAutoRefresh()">
+    <span style="margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap"
+             title="If checked, alerts and auto-refresh only fire during market hours">
+        <input type="checkbox" id="globalMarketHours" style="accent-color:#7c3aed;width:14px;height:14px"
+               onchange="onGlobalMarketHoursChange()">
+        <span style="font-size:0.78em;color:#94a3b8;font-weight:600">🕐 Market hours only (9:00–15:30 IST)</span>
+      </label>
+      <span style="width:1px;height:18px;background:#2d2b4e"></span>
+      <span class="ctrl-lbl">Auto-Refresh</span>
+      <select class="sx-select" id="autoRefreshFreq" style="min-width:120px" onchange="setAutoRefresh()">
         <option value="0">Off</option>
         <option value="30">Every 30 min</option>
         <option value="60" selected>Every 1 hr</option>
@@ -570,10 +577,10 @@ header {
         </select>
       </div>
       <div class="mc-row">
-        <label style="font-size:0.78em;color:#6b7280;display:flex;align-items:center;gap:5px">
-          <input type="checkbox" id="marketUpdateMarketHours" style="accent-color:#7c3aed">
-          Market hours only (9:00–15:30 IST)
-        </label>
+        <span style="font-size:0.78em;color:#4b5563">
+          🕐 Market hours setting controlled by the top bar checkbox
+          — <span id="mhStatusLabel" style="color:#6b7280">loading…</span>
+        </span>
       </div>
       <button class="mc-save" onclick="saveMarketUpdateConfig()">Save</button>
       <button class="mc-save" style="background:#1e3a2a;border:1px solid #059669;color:#34d399;margin-left:6px" onclick="runAutoUpdateNow()">▶ Run Now</button>
@@ -1151,6 +1158,8 @@ async function refreshAll() {
     await doAnalyzeSR();
 
     // 5. Option chain market summary + ITM trades
+    //    loadChainSummary already calls applyTradeAlerts() inside it — clearing
+    //    old auto-trade alerts and setting fresh ones from the new recommendations
     await loadChainSummary();
 
     // 6. Reload option chain + history
@@ -1159,6 +1168,9 @@ async function refreshAll() {
 
     // 7. Reload auto-update history
     loadAutoUpdates();
+
+    // 8. Sync market-hours label in monitor card
+    _syncMarketHoursLabel();
 
     document.getElementById('ctrlStatus').textContent = `Last refresh: ${nowStr()}`;
   } catch(e) {
@@ -1297,7 +1309,9 @@ async function loadMarketUpdateConfig() {
   if (d.error) return;
   document.getElementById('marketUpdateEnabled').checked     = d.enabled;
   document.getElementById('marketUpdateFreq').value          = String(d.freq_min);
-  document.getElementById('marketUpdateMarketHours').checked = !!d.market_hours;
+  // Sync global market-hours checkbox from DB setting (one source of truth → top bar)
+  document.getElementById('globalMarketHours').checked = !!d.market_hours;
+  _syncMarketHoursLabel();
   const badge = document.getElementById('marketUpdateBadge');
   badge.textContent = d.enabled ? `ON · every ${d.freq_min} min` : 'OFF';
   badge.className   = `mc-badge ${d.enabled ? 'on' : 'off'}`;
@@ -1311,7 +1325,7 @@ async function loadMarketUpdateConfig() {
 async function saveMarketUpdateConfig() {
   const enabled      = document.getElementById('marketUpdateEnabled').checked;
   const freq_min     = parseInt(document.getElementById('marketUpdateFreq').value);
-  const market_hours = document.getElementById('marketUpdateMarketHours').checked;
+  const market_hours = document.getElementById('globalMarketHours').checked;
   const hint         = document.getElementById('marketUpdateHint');
   hint.textContent = 'Saving…'; hint.style.color = '#6b7280';
   const r = await fetch('/api/market-update/config', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -1368,6 +1382,37 @@ function nowIST() {
 function setUpdatedAt(elId) {
   const el = document.getElementById(elId);
   if (el) el.textContent = 'Updated ' + nowIST();
+}
+
+// ── Global market-hours gate ──────────────────────────────────────────────────
+function _isWithinMarketHours() {
+  const now = new Date();
+  // Convert to IST
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const h = ist.getHours(), m = ist.getMinutes();
+  const mins = h * 60 + m;
+  return mins >= 9 * 60 && mins <= 15 * 60 + 30;
+}
+function _marketHoursActive() {
+  // Returns true if the gate is ON and we are OUTSIDE market hours (i.e. block the action)
+  const checked = document.getElementById('globalMarketHours')?.checked;
+  return checked && !_isWithinMarketHours();
+}
+function _syncMarketHoursLabel() {
+  const el = document.getElementById('mhStatusLabel');
+  if (!el) return;
+  const checked = document.getElementById('globalMarketHours')?.checked;
+  if (!checked) { el.textContent = 'OFF — alerts/refresh fire anytime'; el.style.color = '#4b5563'; return; }
+  const inMkt = _isWithinMarketHours();
+  el.textContent = inMkt ? 'ON — market is OPEN ✅' : 'ON — market is CLOSED ⏸';
+  el.style.color = inMkt ? '#34d399' : '#f87171';
+}
+function onGlobalMarketHoursChange() {
+  _syncMarketHoursLabel();
+  setAutoRefresh(); // restart interval with new setting
+  // Save to DB so scheduler stays in sync
+  saveMarketUpdateConfig();
+  try { localStorage.setItem('global_mh', document.getElementById('globalMarketHours').checked ? '1' : '0'); } catch(_) {}
 }
 
 // ── Option Chain Table ────────────────────────────────────────────────────────
@@ -1616,6 +1661,8 @@ function renderAlerts() {
 
 function checkAlerts() {
   if (!lastLtp || !_alerts.length) return;
+  // If market-hours gate is ON and we're outside market hours, skip
+  if (_marketHoursActive()) return;
   let changed = false;
   _alerts.forEach(a => {
     if (a.triggered) return;
@@ -1634,25 +1681,37 @@ function checkAlerts() {
 }
 
 // ── Auto Trade Alerts ─────────────────────────────────────────────────────────
-// Called after every market summary render — syncs trade triggers to alert list
+// Called after every market summary render — replaces old auto-trade alerts with
+// fresh triggers from the latest ITM trade recommendations.
 function applyTradeAlerts(trades) {
-  if (!trades || !trades.length) return;
-  // Remove previously auto-generated trade alerts (tagged autoTrade:true)
+  // Always clean old auto-trade alerts first (even if no new trades)
+  const oldCount = _alerts.filter(a => a.autoTrade).length;
   _alerts = _alerts.filter(a => !a.autoTrade);
+
+  if (!trades || !trades.length) {
+    if (oldCount) { _saveAlerts(); renderAlerts(); }
+    return;
+  }
+
   let added = 0;
   for (const t of trades) {
     const price = parseInt(t.trigger_price || 0);
     const cond  = (t.trigger_condition || '').toLowerCase() === 'below' ? 'below' : 'above';
     if (!price) continue;
-    const side  = (t.side || '').toUpperCase() || (cond === 'above' ? 'CE' : 'PE');
-    const note  = `🤖 ${t.strike} ${t.type} @ ₹${t.premium} | SL ₹${t.sl} TGT ₹${t.target} [${side}]`;
+    const side = (t.side || (cond === 'above' ? 'RESISTANCE' : 'SUPPORT')).toUpperCase();
+    const note = `🤖 [${side}] ${t.strike} ${t.type} @ ₹${t.premium} | SL ₹${t.sl} TGT ₹${t.target}`;
     _alerts.push({ id: Date.now() + added, price, cond, note, triggered: false, autoTrade: true });
     added++;
   }
+
+  _saveAlerts();
+  renderAlerts();
+
   if (added) {
-    _saveAlerts();
-    renderAlerts();
-    showToast(`🤖 ${added} trade alert${added>1?'s':''} set from ITM trade recommendations`, 'ok', 5000);
+    const msgs = _alerts.filter(a => a.autoTrade).map(a =>
+      `${a.cond === 'above' ? '▲' : '▼'} ₹${a.price.toLocaleString('en-IN')} — ${a.note}`
+    ).join('\n');
+    showToast(`🤖 ${added} trade trigger${added>1?'s':''} set:\n${msgs}`, 'ok', 6000);
     if (Notification && Notification.permission === 'default') Notification.requestPermission();
   }
 }
@@ -1667,17 +1726,13 @@ function setAutoRefresh() {
   if (!mins) { hint.textContent = ''; return; }
   // Run analysis refresh (chain summary only — not full S/R re-analysis)
   const runRefresh = async () => {
-    const t = new Date();
-    const ist = new Date(t.getTime() + (5.5*3600000 - t.getTimezoneOffset()*60000));
-    const h = ist.getUTCHours(), m = ist.getUTCMinutes();
-    const isMarketHours = (h > 9 || (h === 9 && m >= 15)) && (h < 15 || (h === 15 && m <= 30));
-    if (!isMarketHours) {
-      hint.textContent = 'Market closed — skip';
+    if (_marketHoursActive()) {
+      hint.textContent = '⏸ Market closed';
       return;
     }
     hint.textContent = '⏳ Auto-refreshing…';
     await Promise.all([loadLtp(), loadOHLC()]);
-    await loadChainSummary();    // runs full AI analysis + saves + sets trade alerts
+    await loadChainSummary();    // runs full AI + saves + applyTradeAlerts inside
     loadChainTable();
     loadHistoryTab(_curHistTab);
     loadAutoUpdates();
@@ -1746,6 +1801,13 @@ async function init() {
   // Load alerts from localStorage
   _loadAlerts();
   renderAlerts();
+
+  // Restore market-hours gate from localStorage (overridden later by DB setting from loadMarketUpdateConfig)
+  try {
+    const mh = localStorage.getItem('global_mh');
+    if (mh !== null) document.getElementById('globalMarketHours').checked = mh === '1';
+  } catch(_) {}
+  _syncMarketHoursLabel();
 
   // Restore auto-refresh setting
   try {
