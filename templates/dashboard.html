@@ -352,6 +352,10 @@ header {
     <div id="mktStatus" class="closed-dot">—</div>
     <span id="hdTime" style="font-size:0.72em;color:#4b5563">—</span>
     <button class="btn-refresh" id="btnRefreshAll" onclick="refreshAll()">↺ Refresh All</button>
+    <button class="btn-refresh" id="btnSendTg" onclick="sendToTelegram()"
+      style="background:linear-gradient(135deg,#0088cc,#006699);margin-left:0">
+      ✈ Send to Telegram
+    </button>
     <a href="/relogin"><button class="btn-sm">🔄 Re-login</button></a>
     <a href="/logout"><button class="btn-danger">🔒 Lock</button></a>
   </div>
@@ -1319,6 +1323,32 @@ async function saveMarketUpdateConfig() {
     loadMarketUpdateConfig();
   } else {
     hint.textContent = '⚠ ' + (d.error || 'Failed'); hint.style.color = '#f87171';
+  }
+}
+
+// ── Send to Telegram ─────────────────────────────────────────────────────────
+async function sendToTelegram() {
+  const btn = document.getElementById('btnSendTg');
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending…';
+  try {
+    const r = await fetch('/api/send-full-summary', { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      btn.textContent = '✅ Sent!';
+      showToast('✈ Full summary sent to Telegram successfully', 'ok', 4000);
+    } else {
+      btn.textContent = '⚠ Failed';
+      showToast('⚠ ' + (d.error || 'Telegram send failed'), '', 6000);
+    }
+  } catch(e) {
+    btn.textContent = '⚠ Error';
+    showToast('⚠ Network error: ' + e.message, '', 5000);
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '✈ Send to Telegram';
+    }, 3000);
   }
 }
 

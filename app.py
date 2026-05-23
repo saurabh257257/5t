@@ -1473,6 +1473,123 @@ def api_auto_update_run_now():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/send-full-summary', methods=['POST'])
+def api_send_full_summary():
+    """Send a comprehensive dashboard summary to Telegram immediately."""
+    from modules.telegram import send_message
+    from datetime import datetime, timezone, timedelta
+    _IST = timezone(timedelta(hours=5, minutes=30))
+    client = require_auth()
+    if not client:
+        return jsonify({'error': 'Not authenticated'}), 401
+    now_str = datetime.now(_IST).strftime('%H:%M IST')
+    try:
+        # 1. Live LTP + OHLC
+        ltp_data = get_index_ltp(client, 'B', 999901, 'SENSEX')
+        ltp        = float(ltp_data.get('ltp', 0))
+        change     = float(ltp_data.get('change', 0))
+        change_pct = float(ltp_data.get('change_pct', 0))
+        open_      = float(ltp_data.get('open', 0))
+        high       = float(ltp_data.get('high', 0))
+        low        = float(ltp_data.get('low', 0))
+    except Exception:
+        ltp = change = change_pct = open_ = high = low = 0
+
+    # 2. Latest market summary from DB
+    ms            = get_latest_market_summary('SENSEX')
+    ms_structured = None
+    if ms and ms.get('structured'):
+        try: ms_structured = json.loads(ms['structured'])
+        except Exception: pass
+
+    direction   = 'NEUTRAL'
+    context_txt = ''
+    signals     = []
+    trades      = []
+    pcr         = float(ms.get('pcr', 0) or 0) if ms else 0
+    max_pain    = int(ms.get('max_pain', 0) or 0) if ms else 0
+
+    if ms_structured:
+        direction   = ms_structured.get('direction', 'neutral').upper()
+        context_txt = ms_structured.get('context', '')
+        signals     = ms_structured.get('signals', [])
+        trades      = ms_structured.get('trades', [])
+        if not trades and ms_structured.get('trade'):
+            trades = [ms_structured['trade']]
+
+    # 3. Latest S/R from DB
+    sr_hist = get_sr_history('SENSEX', limit=1)
+    sr      = sr_hist[0] if sr_hist else None
+
+    # 4. Latest auto-update from DB (for quick direction cross-check)
+    auto_upds = get_auto_updates('SENSEX', limit=1)
+    auto_u    = auto_upds[0] if auto_upds else None
+
+    # ── Build message ─────────────────────────────────────────────────────
+    dir_emoji = '🟢' if 'BULL' in direction else ('🔴' if 'BEAR' in direction else '🟡')
+    chg_arrow = '▲' if change >= 0 else '▼'
+    chg_sign  = '+' if change >= 0 else ''
+
+    parts = [f'{dir_emoji} <b>SENSEX Dashboard Summary — {now_str}</b>\n']
+
+    # LTP block
+    if ltp:
+        parts.append(f'<b>LTP:</b> ₹{ltp:,.2f}  {chg_arrow} {chg_sign}{change:.0f} ({chg_sign}{change_pct:.2f}%)')
+        if open_ or high or low:
+            parts.append(f'<b>OHLC:</b> O {open_:,.0f}  H <b>{high:,.0f}</b>  L <b>{low:,.0f}</b>')
+
+    # Chain stats
+    if pcr or max_pain:
+        pcr_lbl = 'Bullish' if pcr > 1.2 else ('Bearish' if pcr < 0.8 else 'Neutral')
+        parts.append(f'<b>PCR:</b> {pcr:.2f} ({pcr_lbl})  |  <b>Max Pain:</b> ₹{max_pain:,}')
+
+    parts.append(f'\n<b>📊 Direction: {direction}</b>')
+
+    if context_txt:
+        parts.append(f'\n📋 <b>Context:</b>\n{context_txt}')
+
+    if signals:
+        parts.append('\n⚡ <b>Signals:</b>')
+        for s in signals[:5]:
+            parts.append(f'  • {s}')
+
+    if trades:
+        parts.append('\n🎯 <b>ITM Trade Setups:</b>')
+        for t in trades:
+            side = (t.get('side') or '').upper()
+            cond = (t.get('trigger_condition') or '').upper()
+            tp   = int(t.get('trigger_price') or 0)
+            parts.append(
+                f"\n  [{side}] BUY <b>{t.get('strike')} {t.get('type')}</b> @ ₹{t.get('premium')}"
+                f"\n  Trigger: {cond} ₹{tp:,} | SL ₹{t.get('sl')} | TGT ₹{t.get('target')}"
+                f"\n  ↳ {t.get('entry_trigger','')}"
+            )
+            if t.get('entry_timing'):
+                parts.append(f'  ⏰ {t["entry_timing"]}')
+
+    if sr:
+        sups = ', '.join(str(int(s['level'] if isinstance(s, dict) else s)) for s in (sr.get('supports') or [])[:5])
+        ress = ', '.join(str(int(r['level'] if isinstance(r, dict) else r)) for r in (sr.get('resistances') or [])[:5])
+        parts.append(f'\n🛡 <b>Support:</b> {sups or "—"}')
+        parts.append(f'🚧 <b>Resistance:</b> {ress or "—"}')
+        if sr.get('verdict'):
+            parts.append(f'<i>{sr["verdict"][:180]}</i>')
+
+    if auto_u:
+        parts.append(f'\n🤖 <b>Auto-Update ({auto_u.get("saved_at","")[:16]}):</b>')
+        for line in (auto_u.get('summary') or '').split('\n')[:4]:
+            if line.strip(): parts.append(f'  {line.strip()}')
+
+    if ms:
+        parts.append(f'\n<i>Analysis saved: {ms.get("date","")} {ms.get("time","")} IST</i>')
+
+    msg  = '\n'.join(parts)
+    sent = send_message(msg)
+    if sent:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Telegram not configured or send failed. Check BOT_TOKEN / CHAT_ID in .env'}), 500
+
+
 @app.route('/api/market-update/last-sent')
 def api_market_update_last_sent():
     client = require_auth()
