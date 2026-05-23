@@ -130,12 +130,27 @@ def init_db():
             c.execute('ALTER TABLE trade_watchlist ADD COLUMN exit_reason TEXT')
         except Exception:
             pass
+        # Auto-updates table (full AI refresh saved on schedule)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS auto_updates (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                index_id    TEXT    NOT NULL DEFAULT 'SENSEX',
+                saved_at    TEXT    NOT NULL,
+                ltp         REAL,
+                change_pct  REAL,
+                pcr         REAL,
+                max_pain    REAL,
+                direction   TEXT,
+                summary     TEXT,
+                tg_sent     INTEGER DEFAULT 0
+            )
+        ''')
         # Seed default settings
         defaults = [
             ('market_update_enabled',      'false'),
-            ('market_update_freq_min',     '5'),
-            ('market_update_indices',      'SENSEX,NIFTY,BANKNIFTY,FINNIFTY'),
-            ('market_update_market_hours', 'false'),
+            ('market_update_freq_min',     '30'),
+            ('market_update_indices',      'SENSEX'),
+            ('market_update_market_hours', 'true'),
         ]
         for key, val in defaults:
             c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, val))
@@ -429,5 +444,35 @@ def update_watchlist_exit(wid, exit_price, exit_reason):
             (exit_reason, float(exit_price), now, exit_reason, wid)
         )
         c.commit()
+
+
+# ── Auto Updates (scheduled full AI refresh) ──────────────────────────────────
+
+def save_auto_update(index_id, ltp, change_pct, pcr, max_pain, direction, summary, tg_sent=True):
+    now = datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S')
+    with _conn() as c:
+        c.execute('''
+            INSERT INTO auto_updates
+            (index_id, saved_at, ltp, change_pct, pcr, max_pain, direction, summary, tg_sent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (index_id, now, ltp, change_pct, pcr, max_pain, direction, summary,
+              1 if tg_sent else 0))
+        c.commit()
+        # Keep last 200 rows
+        c.execute('DELETE FROM auto_updates WHERE id NOT IN '
+                  '(SELECT id FROM auto_updates ORDER BY id DESC LIMIT 200)')
+        c.commit()
+
+
+def get_auto_updates(index_id='SENSEX', limit=20):
+    with _conn() as c:
+        try:
+            rows = c.execute(
+                'SELECT * FROM auto_updates WHERE index_id=? ORDER BY id DESC LIMIT ?',
+                (index_id, limit)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
 
 

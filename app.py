@@ -15,7 +15,8 @@ from modules.db import (init_db, save_sr, get_sr_history, delete_sr, get_snapsho
                         save_market_summary, get_latest_market_summary, get_market_summary_history,
                         delete_market_summary, get_today_market_summary,
                         save_watchlist, get_watchlist, cancel_watchlist,
-                        update_watchlist_item, update_watchlist_executed, update_watchlist_failed)
+                        update_watchlist_item, update_watchlist_executed, update_watchlist_failed,
+                        save_auto_update, get_auto_updates)
 
 # ── Load index config from indices.json ────────────────────────────────────────
 _INDICES_FILE = os.path.join(os.path.dirname(__file__), 'indices.json')
@@ -62,11 +63,6 @@ try:
         _scheduler.add_job(run_market_update, 'interval', minutes=_mu_freq,
                            id='market_update', max_instances=1, misfire_grace_time=60)
         print(f'[SCHEDULER] Market Update started — every {_mu_freq} min')
-    # Trade Watchlist watcher — checks pending conditions every 2 min during market hours
-    from modules.scheduler import run_trade_watcher
-    _scheduler.add_job(run_trade_watcher, 'interval', minutes=2,
-                       id='trade_watcher', max_instances=1, misfire_grace_time=60)
-    print('[SCHEDULER] Trade Watcher started — every 2 min')
     _scheduler.start()
     print('[SCHEDULER] Started — SENSEX snapshots every 1 min during market hours')
 except Exception as _e:
@@ -1454,6 +1450,29 @@ def api_delete_chain_analysis(record_id):
     return jsonify({'success': True, 'deleted': deleted})
 
 
+@app.route('/api/auto-updates')
+def api_auto_updates():
+    """Return saved auto-update history for SENSEX."""
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    idx   = request.args.get('index', 'SENSEX').upper()
+    limit = int(request.args.get('limit', 20))
+    return jsonify({'updates': get_auto_updates(idx, limit)})
+
+
+@app.route('/api/auto-updates/run-now', methods=['POST'])
+def api_auto_update_run_now():
+    """Force an immediate full auto-update (for testing / manual trigger)."""
+    if not require_auth():
+        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        from modules.scheduler import run_market_update
+        run_market_update()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/market-update/last-sent')
 def api_market_update_last_sent():
     client = require_auth()
@@ -1486,8 +1505,8 @@ def api_market_update_config_set():
     freq_min = int(body.get('freq_min', 5))
     indices      = body.get('indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY')
     market_hours = bool(body.get('market_hours', False))
-    if freq_min not in (1, 2, 5, 10, 15):
-        return jsonify({'error': 'freq_min must be 1, 2, 5, 10, or 15'}), 400
+    if freq_min not in (5, 10, 15, 30, 60):
+        return jsonify({'error': 'freq_min must be 5, 10, 15, 30, or 60'}), 400
     set_setting('market_update_enabled',      'true' if enabled else 'false')
     set_setting('market_update_freq_min',     str(freq_min))
     set_setting('market_update_indices',      str(indices))
@@ -1708,6 +1727,7 @@ def api_scheduler_toggle():
 _ALLOWED_TABLES = {
     'sr_levels', 'chain_snapshots', 'chain_analysis',
     'sr_alerts', 'breach_alerts', 'settings', 'market_summary', 'trade_watchlist',
+    'auto_updates',
 }
 
 def _db_conn():

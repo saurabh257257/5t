@@ -358,16 +358,13 @@ header {
         </div>
       </div>
 
-      <!-- Trade Watchlist -->
-      <div class="panel-card" id="watchlistCard" style="display:none">
+      <!-- Auto-Update recent log (last 3 entries) -->
+      <div class="panel-card" id="autoUpdatePreviewCard" style="display:none">
         <div class="card-hd">
-          <span class="card-title">📌 Trade Watchlist</span>
-          <div style="display:flex;align-items:center;gap:7px">
-            <span class="wl-badge" id="watchlistBadge">0 pending</span>
-            <button class="btn-sm" onclick="loadWatchlist()">↻</button>
-          </div>
+          <span class="card-title">🔄 Recent Auto-Updates</span>
+          <button class="btn-sm" onclick="loadAutoUpdates()">↻</button>
         </div>
-        <div id="watchlistBody" style="padding:0 14px 12px"></div>
+        <div id="autoUpdatePreviewBody" style="padding:0 14px 12px"></div>
       </div>
 
     </div><!-- /.col-left -->
@@ -417,10 +414,10 @@ header {
 
   </div><!-- /.main-grid -->
 
-  <!-- Market Update Config -->
+  <!-- Auto Market Update Config + History -->
   <div class="monitor-card">
     <div class="mc-hd">
-      <span class="mc-hd-title">📈 Market Update (Telegram)</span>
+      <span class="mc-hd-title">🤖 Auto Market Update (Telegram)</span>
       <div style="display:flex;align-items:center;gap:8px">
         <span class="mc-badge off" id="marketUpdateBadge">loading…</span>
         <label class="mc-toggle">
@@ -433,11 +430,11 @@ header {
       <div class="mc-row">
         <span class="mc-lbl">Frequency</span>
         <select class="mc-sel" id="marketUpdateFreq">
-          <option value="1">Every 1 min</option>
-          <option value="2">Every 2 min</option>
-          <option value="5" selected>Every 5 min</option>
+          <option value="5">Every 5 min</option>
           <option value="10">Every 10 min</option>
           <option value="15">Every 15 min</option>
+          <option value="30" selected>Every 30 min</option>
+          <option value="60">Every 60 min</option>
         </select>
       </div>
       <div class="mc-row">
@@ -447,12 +444,18 @@ header {
         </label>
       </div>
       <button class="mc-save" onclick="saveMarketUpdateConfig()">Save</button>
+      <button class="mc-save" style="background:#1e3a2a;border:1px solid #059669;color:#34d399;margin-left:6px" onclick="runAutoUpdateNow()">▶ Run Now</button>
       <span class="mc-hint" id="marketUpdateHint"></span>
     </div>
+
+    <!-- Auto-Update History Log -->
     <div class="mc-log-wrap">
-      <div class="mc-log-hd"><span class="mc-log-title">Last Sent</span></div>
-      <div class="mc-log-body" id="marketUpdateLog">
-        <div class="mc-log-empty">Not sent yet.</div>
+      <div class="mc-log-hd" style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px">
+        <span class="mc-log-title">📋 Auto-Update History</span>
+        <span style="font-size:0.68em;color:#4b5563" id="muLastSent"></span>
+      </div>
+      <div id="autoUpdateLog" style="max-height:320px;overflow-y:auto">
+        <div class="mc-log-empty">No auto-updates yet — enable and save to start.</div>
       </div>
     </div>
   </div>
@@ -897,7 +900,6 @@ async function loadChainSummary() {
   chgEl.className   = 'stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
 
   body.innerHTML = d.structured ? renderMarketSummary(d) : `<div style="font-size:0.82em;color:#94a3b8;line-height:1.65;padding:4px 0">${d.summary||''}</div>`;
-  loadWatchlist();
 }
 
 // ── Try today's cached summary ────────────────────────────────────────────────
@@ -923,7 +925,6 @@ async function tryLoadTodaySummary() {
       if (!cached.ltp) cached.ltp = lastLtp;
       body.innerHTML = cached.structured ? renderMarketSummary(cached)
         : `<div style="font-size:0.82em;color:#94a3b8;line-height:1.65;padding:4px 0">${cached.analysis||''}</div>`;
-      loadWatchlist();
       return;
     }
   } catch (_) {}
@@ -954,8 +955,8 @@ async function refreshAll() {
     // 5. Option chain market summary + ITM trades
     await loadChainSummary();
 
-    // 6. Watchlist refresh
-    loadWatchlist();
+    // 6. Reload auto-update history
+    loadAutoUpdates();
 
     document.getElementById('ctrlStatus').textContent = `Last refresh: ${nowStr()}`;
   } catch(e) {
@@ -967,159 +968,84 @@ async function refreshAll() {
   }
 }
 
-// ── Trade Watchlist ───────────────────────────────────────────────────────────
-async function loadWatchlist() {
-  const card  = document.getElementById('watchlistCard');
-  const body  = document.getElementById('watchlistBody');
-  const badge = document.getElementById('watchlistBadge');
+// ── Auto-Update History ───────────────────────────────────────────────────────
+async function loadAutoUpdates() {
+  const log     = document.getElementById('autoUpdateLog');
+  const preview = document.getElementById('autoUpdatePreviewCard');
+  const pbody   = document.getElementById('autoUpdatePreviewBody');
   try {
-    const d = await get('/api/watchlist?limit=20');
-    const items = d.watchlist || [];
-    card.style.display = 'block';
-    const pending = items.filter(i => i.status === 'pending');
-    const active  = items.filter(i => i.status === 'executed' && !i.exit_at);
-    const history = items.filter(i => !['pending','executed'].includes(i.status) || i.exit_at);
-    badge.textContent = `${pending.length} watching · ${active.length} active`;
-    badge.className   = `wl-badge${active.length ? ' on' : ''}`;
+    const d    = await get('/api/auto-updates?index=SENSEX&limit=20');
+    const rows = d.updates || [];
 
-    if (!items.length) {
-      body.innerHTML = '<div style="color:#4b5563;font-size:0.82em;padding:10px 0">No watchlist entries yet — click ↺ Refresh All to generate ITM trades.</div>';
+    // Show preview card in left panel (last 3)
+    if (rows.length > 0) {
+      preview.style.display = 'block';
+      pbody.innerHTML = rows.slice(0, 3).map(u => {
+        const dirClr  = u.direction === 'bullish' ? '#34d399' : u.direction === 'bearish' ? '#f87171' : '#fbbf24';
+        const dirIcon = u.direction === 'bullish' ? '🟢' : u.direction === 'bearish' ? '🔴' : '🟡';
+        const chg     = parseFloat(u.change_pct || 0);
+        return `<div style="padding:8px 0;border-bottom:1px solid #1e1c35">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-size:0.72em;color:#6b7280">${(u.saved_at||'').slice(0,16)}</span>
+            <span style="font-size:0.72em;font-weight:700;color:${dirClr}">${dirIcon} ${(u.direction||'').toUpperCase()}</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:0.74em;margin-bottom:4px">
+            <span>₹${parseInt(u.ltp||0).toLocaleString('en-IN')}</span>
+            <span style="color:${chg>=0?'#34d399':'#f87171'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</span>
+            <span style="color:#6b7280">PCR ${parseFloat(u.pcr||0).toFixed(2)}</span>
+            <span style="color:#6b7280">MP ${parseInt(u.max_pain||0).toLocaleString('en-IN')}</span>
+          </div>
+          <div style="font-size:0.74em;color:#94a3b8;line-height:1.45;white-space:pre-line">${(u.summary||'').split('\n').slice(0,2).join('\n')}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Full history log in the monitor card
+    if (!rows.length) {
+      log.innerHTML = '<div class="mc-log-empty">No auto-updates yet — enable and save to start.</div>';
       return;
     }
-
-    // Pending
-    const pendingHtml = pending.length ? `
-      <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;margin:10px 0 5px">⏳ Watching</div>
-      ${pending.map(it => {
-        const cond = it.trigger_condition==='above'
-          ? `<strong>SENSEX ≥ ${Number(it.trigger_price).toLocaleString()}</strong>`
-          : `<strong>SENSEX ≤ ${Number(it.trigger_price).toLocaleString()}</strong>`;
-        return `<div style="border:1px solid #2d2b4e;border-radius:8px;padding:9px 12px;margin:0 0 7px;background:#0d0d1a">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">
-            <div>
-              <span style="color:#fbbf24;font-size:0.78em;font-weight:700">⏳ WATCHING</span>
-              <span style="color:#e2e8f0;font-weight:700;margin-left:8px">SENSEX · BUY ${it.strike} ${it.option_type}</span>
-              <span style="color:#94a3b8;font-size:0.8em"> @ ₹${it.premium} (ITM)</span>
-            </div>
-            <div style="display:flex;gap:5px">
-              <button onclick="executeWatchlistNow(${it.id},this)" style="background:#064e3b;border:1px solid #059669;color:#34d399;border-radius:5px;padding:2px 8px;font-size:0.73em;cursor:pointer;white-space:nowrap">▶ Now</button>
-              <button onclick="cancelWatchlist(${it.id})" style="background:none;border:1px solid #374151;color:#6b7280;border-radius:5px;padding:2px 7px;font-size:0.73em;cursor:pointer">✕</button>
-            </div>
+    log.innerHTML = rows.map(u => {
+      const dirClr  = u.direction === 'bullish' ? '#34d399' : u.direction === 'bearish' ? '#f87171' : '#fbbf24';
+      const dirIcon = u.direction === 'bullish' ? '🟢' : u.direction === 'bearish' ? '🔴' : '🟡';
+      const chg     = parseFloat(u.change_pct || 0);
+      const lines   = (u.summary || '').split('\n');
+      return `<div style="padding:8px 16px;border-bottom:1px solid #1a1830">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-size:0.72em;color:#6b7280">${(u.saved_at||'').slice(0,16)}</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:0.72em;font-weight:700;color:${dirClr}">${dirIcon} ${(u.direction||'').toUpperCase()}</span>
+            ${u.tg_sent ? `<span style="font-size:0.62em;color:#7c3aed">✈ sent</span>` : ''}
           </div>
-          <div style="font-size:0.76em;color:#94a3b8;margin-bottom:7px">Enter when ${cond} · ${(it.created_at||'').slice(0,16)}</div>
-          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-            <label style="font-size:0.7em;color:#6b7280">Lots</label>
-            <input id="qty_${it.id}" type="number" min="1" max="50" value="${it.qty||1}"
-              style="width:48px;padding:2px 5px;background:#1e1b4b;border:1px solid #374151;color:#e2e8f0;border-radius:4px;font-size:0.78em">
-            <label style="font-size:0.7em;color:#6b7280">SL offset (₹)</label>
-            <input id="sloff_${it.id}" type="number" min="10" max="1000" value="${it.sl_offset||150}"
-              style="width:58px;padding:2px 5px;background:#1e1b4b;border:1px solid #374151;color:#e2e8f0;border-radius:4px;font-size:0.78em">
-            <button onclick="saveWatchlistItem(${it.id})"
-              style="padding:2px 9px;background:#4c1d95;border:none;color:#e2e8f0;border-radius:4px;font-size:0.72em;cursor:pointer">Save</button>
-          </div>
-        </div>`;
-      }).join('')}` : '';
-
-    // Active
-    let activeHtml = '';
-    if (active.length) {
-      const livePrices = {};
-      await Promise.all(active.map(async pos => {
-        if (!pos.scrip_code) return;
-        try {
-          const exch = pos.index_id==='SENSEX'?'B':'N';
-          const r = await get(`/api/ltp?scripcode=${pos.scrip_code}&exch=${exch}&exch_type=D`);
-          livePrices[pos.id] = r.ltp||0;
-        } catch(_){}
-      }));
-      activeHtml = `
-        <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#34d399;margin:10px 0 5px">🟢 Active</div>
-        ${active.map(pos => {
-          const entry = parseFloat(pos.execution_price||pos.premium||0);
-          const slOff = parseFloat(pos.sl_offset||150);
-          const slPx  = Math.max(entry-slOff,0.5), tgtPx = entry+3*slOff;
-          const qty   = parseInt(pos.qty||1);
-          const cur   = livePrices[pos.id]||0;
-          const pnl   = cur?(cur-entry)*qty*(_LOT_SIZES[pos.index_id]||1):null;
-          const pnlClr= pnl===null?'#6b7280':pnl>=0?'#34d399':'#f87171';
-          const range = tgtPx-slPx;
-          const prog  = range>0&&cur?Math.max(0,Math.min(100,(cur-slPx)/range*100)):50;
-          return `<div style="border:1px solid #1a3a2a;border-radius:8px;padding:9px 12px;margin:0 0 7px;background:#0a150f">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-              <div><span style="color:#34d399;font-size:0.78em;font-weight:700">🟢 ACTIVE</span> <span style="color:#e2e8f0;font-weight:700;margin-left:7px">BUY ${pos.strike} ${pos.option_type} (ITM)</span></div>
-              <span style="color:${pnlClr};font-weight:700;font-size:0.88em">${pnl===null?'—':`₹${pnl>=0?'+':''}${pnl.toFixed(0)}`}</span>
-            </div>
-            <div style="display:flex;gap:16px;font-size:0.76em;margin-bottom:7px">
-              <div><span style="color:#6b7280">Entry</span> <span style="color:#e2e8f0">₹${entry.toFixed(1)}</span></div>
-              <div><span style="color:#6b7280">Now</span> <span style="color:#fbbf24;font-weight:700">${cur?`₹${cur.toFixed(1)}`:'—'}</span></div>
-              <div><span style="color:#f87171">SL</span> <span style="color:#f87171">₹${slPx.toFixed(0)}</span></div>
-              <div><span style="color:#34d399">Tgt</span> <span style="color:#34d399">₹${tgtPx.toFixed(0)}</span></div>
-            </div>
-            <div style="height:4px;background:#1e1b4b;border-radius:3px;overflow:hidden">
-              <div style="width:${prog.toFixed(1)}%;height:100%;background:${pnl!==null&&pnl>=0?'#34d399':'#f87171'};transition:width 0.4s"></div>
-            </div>
-          </div>`;
-        }).join('')}`;
-    }
-
-    // History
-    const histHtml = history.length ? `
-      <div style="font-size:0.68em;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#6b7280;margin:10px 0 5px">📋 History</div>
-      ${history.slice(0,5).map(it => {
-        const entry = parseFloat(it.execution_price||it.premium||0);
-        const exit  = parseFloat(it.exit_price||0);
-        const pnl   = exit&&entry?((exit-entry)*(it.qty||1)).toFixed(0):null;
-        const sIcon = it.status==='sl_hit'?'🛑':it.status==='target_hit'?'🎯':it.status==='cancelled'?'🚫':'❌';
-        const sClr  = it.status==='target_hit'?'#34d399':it.status==='sl_hit'?'#f87171':'#6b7280';
-        return `<div style="display:flex;gap:8px;font-size:0.74em;padding:4px 0;border-bottom:1px solid #1e1b4b;color:#6b7280">
-          <span style="color:${sClr}">${sIcon}</span>
-          <span style="color:#94a3b8">${it.strike} ${it.option_type} (ITM)</span>
-          ${entry?`<span>₹${entry.toFixed(1)}</span>`:''}
-          ${exit?`<span style="color:${parseFloat(pnl||0)>=0?'#34d399':'#f87171'}">→₹${exit.toFixed(1)}</span>`:''}
-          <span style="margin-left:auto">${(it.exit_at||it.executed_at||it.created_at||'').slice(0,16)}</span>
-        </div>`;
-      }).join('')}` : '';
-
-    body.innerHTML = pendingHtml + activeHtml + histHtml ||
-      '<div style="color:#4b5563;font-size:0.82em;padding:10px 0">No entries yet.</div>';
-  } catch(e) { console.error('loadWatchlist', e); }
+        </div>
+        <div style="display:flex;gap:10px;font-size:0.73em;color:#94a3b8;margin-bottom:4px">
+          <span>₹${parseInt(u.ltp||0).toLocaleString('en-IN')}</span>
+          <span style="color:${chg>=0?'#34d399':'#f87171'}">${chg>=0?'▲':' ▼'} ${Math.abs(chg).toFixed(2)}%</span>
+          <span>PCR ${parseFloat(u.pcr||0).toFixed(2)}</span>
+          <span>MaxPain ${parseInt(u.max_pain||0).toLocaleString('en-IN')}</span>
+        </div>
+        <div style="font-size:0.73em;color:#cbd5e1;line-height:1.5;white-space:pre-line">${(u.summary||'').replace(/\n/g,'<br>')}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('loadAutoUpdates', e); }
 }
 
-async function saveWatchlistItem(wid) {
-  const qty = parseInt(document.getElementById(`qty_${wid}`).value)||1;
-  const sl_offset = parseFloat(document.getElementById(`sloff_${wid}`).value)||150;
-  await fetch(`/api/watchlist/${wid}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({qty,sl_offset})});
-  loadWatchlist();
-}
-
-async function cancelWatchlist(wid) {
-  if (!confirm('Cancel this watchlist entry?')) return;
-  await fetch(`/api/watchlist/${wid}`,{method:'DELETE'});
-  loadWatchlist();
-}
-
-async function executeWatchlistNow(wid, btn) {
-  if (!confirm('Execute this ITM trade NOW at live market price?')) return;
-  btn.disabled = true; btn.textContent = '⏳…';
+async function runAutoUpdateNow() {
+  const hint = document.getElementById('marketUpdateHint');
+  hint.textContent = '⏳ Running…'; hint.style.color = '#6b7280';
   try {
-    const r = await fetch(`/api/watchlist/${wid}/execute`,{method:'POST'});
+    const r = await fetch('/api/auto-updates/run-now', {method: 'POST'});
     const d = await r.json();
     if (d.success) {
-      btn.textContent = '✅';
-      setTimeout(() => loadWatchlist(), 1200);
+      hint.textContent = '✅ Done — check Telegram'; hint.style.color = '#34d399';
+      setTimeout(() => { hint.textContent = ''; loadAutoUpdates(); }, 2500);
     } else {
-      btn.textContent = '❌';
-      alert('Order failed: '+(d.error||JSON.stringify(d)));
-      btn.disabled = false;
+      hint.textContent = '⚠ ' + (d.error || 'Failed'); hint.style.color = '#f87171';
     }
-  } catch(e) { btn.textContent='❌'; btn.disabled=false; }
+  } catch(e) {
+    hint.textContent = '⚠ Error'; hint.style.color = '#f87171';
+  }
 }
-
-// Auto-refresh watchlist P&L every 30s
-setInterval(() => {
-  const c = document.getElementById('watchlistCard');
-  if (c && c.style.display !== 'none') loadWatchlist();
-}, 30000);
 
 // ── Buy modal (for manual buys if needed) ─────────────────────────────────────
 let _buyScripCode=0, _buyLotSize=1, _buyExch='B', _buyLtp=0;
@@ -1168,33 +1094,34 @@ async function loadMarketUpdateConfig() {
   const d = await get('/api/market-update/config');
   if (d.error) return;
   document.getElementById('marketUpdateEnabled').checked     = d.enabled;
-  document.getElementById('marketUpdateFreq').value          = d.freq_min;
+  document.getElementById('marketUpdateFreq').value          = String(d.freq_min);
   document.getElementById('marketUpdateMarketHours').checked = !!d.market_hours;
   const badge = document.getElementById('marketUpdateBadge');
   badge.textContent = d.enabled ? `ON · every ${d.freq_min} min` : 'OFF';
   badge.className   = `mc-badge ${d.enabled ? 'on' : 'off'}`;
+  // Show last-sent time
+  const ls = await get('/api/market-update/last-sent');
+  if (ls.last_sent) {
+    const el = document.getElementById('muLastSent');
+    if (el) el.textContent = 'Last: ' + ls.last_sent.slice(0,16);
+  }
 }
 async function saveMarketUpdateConfig() {
   const enabled      = document.getElementById('marketUpdateEnabled').checked;
   const freq_min     = parseInt(document.getElementById('marketUpdateFreq').value);
   const market_hours = document.getElementById('marketUpdateMarketHours').checked;
   const hint         = document.getElementById('marketUpdateHint');
-  hint.textContent = 'Saving…'; hint.style.color='#6b7280';
-  const r = await fetch('/api/market-update/config',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({enabled,freq_min,indices:'SENSEX',market_hours})});
+  hint.textContent = 'Saving…'; hint.style.color = '#6b7280';
+  const r = await fetch('/api/market-update/config', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({enabled, freq_min, indices:'SENSEX', market_hours})});
   const d = await r.json();
   if (d.success) {
-    hint.textContent='✓ Saved'; hint.style.color='#34d399';
-    setTimeout(()=>{hint.textContent='';},2200);
+    hint.textContent = '✓ Saved'; hint.style.color = '#34d399';
+    setTimeout(() => { hint.textContent = ''; }, 2200);
     loadMarketUpdateConfig();
-  } else { hint.textContent='⚠ '+(d.error||'Failed'); hint.style.color='#f87171'; }
-}
-async function loadMarketUpdateLog() {
-  const el = document.getElementById('marketUpdateLog');
-  const d  = await get('/api/market-update/last-sent');
-  if (!d.last_sent) { el.innerHTML='<div class="mc-log-empty">Not sent yet.</div>'; return; }
-  const t = d.last_sent.slice(11,16), dt = d.last_sent.slice(0,10);
-  el.innerHTML = `<div class="mc-log-row"><span style="color:#6b7280">Last sent:</span><span style="color:#34d399">${t} IST</span><span style="margin-left:auto;color:#4b5563">${dt}</span></div>`;
+  } else {
+    hint.textContent = '⚠ ' + (d.error || 'Failed'); hint.style.color = '#f87171';
+  }
 }
 
 // ── Initialization ────────────────────────────────────────────────────────────
@@ -1241,12 +1168,11 @@ async function init() {
   await loadExpiries();
   tryLoadTodaySummary();
 
-  // Watchlist
-  loadWatchlist();
+  // Auto-update history
+  loadAutoUpdates();
 
   // Monitor config
   loadMarketUpdateConfig();
-  loadMarketUpdateLog();
 
   // LTP poll every 30s
   setInterval(loadLtp, 30000);

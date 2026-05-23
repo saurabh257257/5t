@@ -13,7 +13,8 @@ from modules.market import get_expiry_dates, get_option_chain_data, get_index_lt
 from modules.db import (save_snapshot, cleanup_old_snapshots,
                         get_sr_history, get_setting, set_setting,
                         get_pending_watchlist, update_watchlist_executed, update_watchlist_failed,
-                        get_watchlist, update_watchlist_exit)
+                        get_watchlist, update_watchlist_exit,
+                        save_auto_update)
 from modules.telegram import send_message
 
 _IST = timezone(timedelta(hours=5, minutes=30))
@@ -179,140 +180,202 @@ In 80 words max: (1) Bias bullish/bearish/neutral + reason, (2) Key support leve
         print(f'[SCHEDULER] Error in run_sensex_snapshot: {e}')
 
 
-# ── Market Update ──────────────────────────────────────────────────────────────
-
-def _load_indices_cfg():
-    """Load all indices from indices.json relative to this file."""
-    try:
-        _idx_file = os.path.join(os.path.dirname(__file__), '..', 'indices.json')
-        with open(_idx_file) as f:
-            return json.load(f)
-    except Exception:
-        return [
-            {'id': 'SENSEX',    'label': 'SENSEX',    'feed_exch': 'B', 'feed_scrip': 999901, 'chart_exch': 'B', 'chart_scrip': 999901},
-            {'id': 'NIFTY',     'label': 'NIFTY 50',  'feed_exch': 'N', 'feed_scrip': 999920, 'chart_exch': 'N', 'chart_scrip': 999920000},
-            {'id': 'BANKNIFTY', 'label': 'BANK NIFTY','feed_exch': 'N', 'feed_scrip': 999921, 'chart_exch': 'N', 'chart_scrip': 999920005},
-            {'id': 'FINNIFTY',  'label': 'FIN NIFTY', 'feed_exch': 'N', 'feed_scrip': 999922, 'chart_exch': 'N', 'chart_scrip': 999920041},
-        ]
-
+# ── Auto Market Update (full AI refresh on schedule) ──────────────────────────
 
 def run_market_update():
     """
-    Send a combined Telegram message with LTP, OHLC, and nearest S/R levels
-    for all 4 indices. Runs at configurable frequency (default 5 min).
+    Full AI market update: fetch SENSEX LTP, option chain, cached context,
+    run Claude analysis, save to auto_updates table, send via Telegram.
+    Runs at configurable frequency (default 30 min).
     """
     if get_setting('market_update_enabled', 'false') != 'true':
         return
     if not _check_market_hours_gate('market_update_market_hours'):
         return
 
-    print('[MARKET_UPDATE] run_market_update called', flush=True)
+    print('[AUTO_UPDATE] Starting full market analysis…', flush=True)
 
-    from modules.auth import _restore_client
     client = _restore_client()
     if not client:
-        print('[MARKET_UPDATE] No saved session — skipping')
+        print('[AUTO_UPDATE] No saved session — skipping')
         return
 
-    all_indices  = _load_indices_cfg()
-    enabled_ids  = set(get_setting('market_update_indices', 'SENSEX,NIFTY,BANKNIFTY,FINNIFTY').split(','))
-    now_str      = datetime.now(_IST).strftime('%H:%M')
-    lines        = [f'📈 <b>Market Update — {now_str} IST</b>']
+    now_str  = datetime.now(_IST).strftime('%H:%M')
+    index_id = 'SENSEX'
 
-    for idx in all_indices:
-        if idx['id'] not in enabled_ids:
-            continue
-        try:
-            index_id = idx['id']
-            label    = idx.get('label', index_id)
-
-            # Fetch LTP + prev_close + change (chart_scrip for correct historical)
-            ltp_data   = get_index_ltp(client, idx['feed_exch'], idx['feed_scrip'], idx.get('opt_symbol'),
-                                       chart_scrip=idx.get('chart_scrip', idx['feed_scrip']))
-            ltp        = ltp_data.get('ltp', 0)
-            prev_close = ltp_data.get('prev_close', 0)
-            change     = ltp_data.get('change', 0)
-            change_pct = ltp_data.get('change_pct', 0)
-            if ltp == 0:
-                print(f'[MARKET_UPDATE] {index_id} LTP=0, skipping')
-                continue
-
-            direction = '▲' if change_pct >= 0 else '▼'
-            sign      = '+' if change >= 0 else ''
-
-            # Fetch today's OHLC using chart_exch / chart_scrip
-            ohlc_line = ''
-            try:
-                c_exch  = idx.get('chart_exch', idx['feed_exch'])
-                c_scrip = idx.get('chart_scrip', idx['feed_scrip'])
-                ohlc = get_today_ohlc(client, c_exch, c_scrip)
-                if 'error' not in ohlc:
-                    o = int(ohlc.get('open', 0))
-                    h = int(ohlc.get('high', 0))
-                    l = int(ohlc.get('low',  0))
-                    ohlc_line = f'O:{o:,} H:{h:,} L:{l:,}'
-            except Exception as oe:
-                print(f'[MARKET_UPDATE] {index_id} OHLC error: {oe}')
-
-            # Nearest S/R
-            sup_line = ''
-            res_line = ''
-            try:
-                history = get_sr_history(index_id, limit=1)
-                if history:
-                    latest      = history[0]
-                    supports    = [float(s['level']) for s in latest.get('supports', [])]
-                    resistances = [float(r['level']) for r in latest.get('resistances', [])]
-                    # Nearest support BELOW ltp
-                    below_sups = [s for s in supports if s < ltp]
-                    if below_sups:
-                        nearest_sup = max(below_sups)
-                        sup_dist    = abs(ltp - nearest_sup) / nearest_sup * 100
-                        sup_line    = f'🛡️ S: {int(nearest_sup):,} ({sup_dist:.2f}% away)'
-                    # Nearest resistance ABOVE ltp
-                    above_res = [r for r in resistances if r > ltp]
-                    if above_res:
-                        nearest_res = min(above_res)
-                        res_dist    = abs(nearest_res - ltp) / nearest_res * 100
-                        res_line    = f'🚧 R: {int(nearest_res):,} ({res_dist:.2f}% away)'
-            except Exception as sre:
-                print(f'[MARKET_UPDATE] {index_id} S/R error: {sre}')
-
-            # Build block for this index
-            block = f'\n<b>{label}</b>: ₹{ltp:,.2f} {direction} {sign}{change:.0f} ({sign}{change_pct:.2f}%)'
-            if prev_close > 0:
-                block += f'\nPrev close: ₹{prev_close:,.2f}'
-            if ohlc_line:
-                block += f'\n{ohlc_line}'
-            if sup_line or res_line:
-                block += f'\n{sup_line}  {res_line}'.rstrip()
-            lines.append(block)
-
-        except Exception as e:
-            print(f'[MARKET_UPDATE] Error for {idx.get("id","?")}: {e}')
-
-    # Append pending watchlist conditions
     try:
-        pending = get_pending_watchlist()
-        if pending:
-            wl_lines = ['\n📌 <b>Watchlist Tracking</b>']
-            for w in pending:
-                cond = '≥' if w['trigger_condition'] == 'above' else '≤'
-                wl_lines.append(
-                    f"• <b>{w['index_id']}</b> BUY {w['strike']} {w['option_type']} "
-                    f"@ ₹{w['premium']} — enter when {w['index_id']} {cond} {int(w['trigger_price']):,} "
-                    f"| SL ₹{w['sl']} | Tgt ₹{w['target']}"
-                )
-            lines.extend(wl_lines)
-    except Exception as _we:
-        print(f'[MARKET_UPDATE] watchlist section error: {_we}')
+        # 1. Live LTP
+        ltp_data   = get_index_ltp(client, 'B', 999901, 'SENSEX')
+        ltp        = ltp_data.get('ltp', 0)
+        prev_close = ltp_data.get('prev_close', 0)
+        change_abs = round(ltp - prev_close, 2) if prev_close else ltp_data.get('change', 0)
+        change_pct = round((ltp - prev_close) / prev_close * 100, 2) if prev_close else ltp_data.get('change_pct', 0)
+        if ltp == 0:
+            print('[AUTO_UPDATE] SENSEX LTP=0, aborting')
+            return
 
-    if len(lines) > 1:
-        send_message('\n'.join(lines))
+        # 2. Today's OHLC
+        ohlc_line = ''
+        try:
+            ohlc = get_today_ohlc(client, 'B', 999901)
+            if 'error' not in ohlc and ohlc.get('open', 0) > 0:
+                ohlc_line = (f"O:{int(ohlc['open']):,}  H:{int(ohlc['high']):,}  "
+                             f"L:{int(ohlc['low']):,}  C:{int(ltp):,}")
+        except Exception:
+            pass
+
+        # 3. Nearest expiry + option chain
+        expiry_data = get_expiry_dates(client, 'B', 'SENSEX')
+        if 'error' in expiry_data or not expiry_data.get('expiries'):
+            print('[AUTO_UPDATE] No expiry data')
+            return
+        expiry     = expiry_data['expiries'][0]
+        expiry_ts  = expiry['ts']
+        expiry_lbl = expiry['label']
+
+        chain = get_option_chain_data(client, 'B', 'SENSEX', expiry_ts)
+        if 'error' in chain or not chain.get('option_chain'):
+            print('[AUTO_UPDATE] No option chain data')
+            return
+
+        rows        = chain['option_chain']
+        total_ce_oi = sum(r['ce_oi'] for r in rows)
+        total_pe_oi = sum(r['pe_oi'] for r in rows)
+        pcr         = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
+
+        # Max pain
+        pain_list = []
+        for sr in rows:
+            pain = sum(
+                max(0, sr['strike'] - r['strike']) * r['ce_oi'] +
+                max(0, r['strike'] - sr['strike']) * r['pe_oi']
+                for r in rows
+            )
+            pain_list.append((pain, sr['strike']))
+        max_pain = min(pain_list, key=lambda x: x[0])[1] if pain_list else 0
+
+        top_ce    = sorted(rows, key=lambda r: r['ce_oi'], reverse=True)[:4]
+        top_pe    = sorted(rows, key=lambda r: r['pe_oi'], reverse=True)[:4]
+        near_rows = sorted(rows, key=lambda r: abs(r['strike'] - ltp))[:15]
+        chain_txt = 'Strike | CE_LTP | CE_OI | PE_LTP | PE_OI\n'
+        for r in near_rows:
+            chain_txt += f"{int(r['strike'])} | {r['ce_ltp']} | {r['ce_oi']} | {r['pe_ltp']} | {r['pe_oi']}\n"
+
+        # 4. Latest S/R from DB
+        sup_str, res_str = '—', '—'
+        nearest_sup, nearest_res = 0, 0
+        try:
+            sr_hist = get_sr_history(index_id, limit=1)
+            if sr_hist:
+                sr  = sr_hist[0]
+                sls = [float(s['level']) for s in (sr.get('supports') or [])]
+                rls = [float(r['level']) for r in (sr.get('resistances') or [])]
+                sup_str = ', '.join(str(int(s)) for s in sls[:3]) or '—'
+                res_str = ', '.join(str(int(r)) for r in rls[:3]) or '—'
+                below = [s for s in sls if s < ltp]
+                above = [r for r in rls if r > ltp]
+                nearest_sup = int(max(below)) if below else (int(sls[0]) if sls else 0)
+                nearest_res = int(min(above)) if above else (int(rls[0]) if rls else 0)
+        except Exception as _sre:
+            print(f'[AUTO_UPDATE] S/R error: {_sre}')
+
+        # 5. Cached global context (no slow external fetch)
+        ctx_text = ''
+        try:
+            cached_ctx = get_setting('market_context_cache', '')
+            if cached_ctx:
+                ctx = json.loads(cached_ctx)
+                ctx_text = ' | '.join(
+                    f"{q['label']}: {q['current']} "
+                    f"({'▲' if q['change_pct'] >= 0 else '▼'}{q['change_pct']}%)"
+                    for q in ctx.get('quotes', []) if q.get('current', 0) > 0
+                )
+        except Exception:
+            pass
+
+        # 6. Claude AI analysis
+        prompt = f"""SENSEX intraday auto-update. Respond ONLY in valid JSON.
+
+SENSEX: {ltp:,.0f} | Change: {change_abs:+.0f} ({change_pct:+.2f}%)
+Expiry: {expiry_lbl} | PCR: {pcr} | Max Pain: {int(max_pain):,}
+S/R Supports: {sup_str} | Resistances: {res_str}
+Top CE OI walls: {', '.join(f"{int(r['strike']):,}(OI:{r['ce_oi']:,})" for r in top_ce)}
+Top PE OI walls: {', '.join(f"{int(r['strike']):,}(OI:{r['pe_oi']:,})" for r in top_pe)}
+Global: {ctx_text or 'N/A'}
+
+Option chain (nearest strikes):
+{chain_txt}
+
+Respond ONLY in JSON (no markdown):
+{{
+  "direction": "bullish|bearish|neutral",
+  "bias_reason": "one concise sentence",
+  "key_support": 0,
+  "key_resistance": 0,
+  "signal": "one specific actionable intraday signal with level",
+  "risk": "one key risk or level to watch"
+}}"""
+
+        ac  = _anthropic.Anthropic()
+        rsp = ac.messages.create(
+            model='claude-haiku-4-5', max_tokens=400,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        raw = rsp.content[0].text.strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1]
+            if raw.startswith('json'): raw = raw[4:]
+        ai = json.loads(raw.strip())
+
+        direction    = ai.get('direction', 'neutral')
+        bias_reason  = ai.get('bias_reason', '')
+        key_sup      = int(ai.get('key_support', nearest_sup) or nearest_sup)
+        key_res      = int(ai.get('key_resistance', nearest_res) or nearest_res)
+        signal       = ai.get('signal', '')
+        risk         = ai.get('risk', '')
+
+        # 7. Build summary text for DB
+        summary_txt = (
+            f"Direction: {direction.upper()} — {bias_reason}\n"
+            f"Key S: {key_sup:,} | Key R: {key_res:,}\n"
+            f"Signal: {signal}\n"
+            f"Risk: {risk}"
+        )
+
+        # 8. Save to auto_updates table
+        save_auto_update(
+            index_id=index_id, ltp=ltp, change_pct=change_pct,
+            pcr=pcr, max_pain=max_pain, direction=direction,
+            summary=summary_txt, tg_sent=True,
+        )
+
+        # 9. Build and send Telegram message
+        dir_emoji = '🟢' if direction == 'bullish' else ('🔴' if direction == 'bearish' else '🟡')
+        chg_arrow = '▲' if change_pct >= 0 else '▼'
+        chg_sign  = '+' if change_pct >= 0 else ''
+
+        msg = (
+            f'{dir_emoji} <b>SENSEX Auto-Update — {now_str} IST</b>\n\n'
+            f'<b>LTP:</b> ₹{ltp:,.2f}  {chg_arrow} {chg_sign}{change_abs:.0f} ({chg_sign}{change_pct:.2f}%)\n'
+            + (f'<b>OHLC:</b> {ohlc_line}\n' if ohlc_line else '')
+            + f'<b>Expiry:</b> {expiry_lbl}  |  <b>PCR:</b> {pcr}  |  <b>Max Pain:</b> {int(max_pain):,}\n\n'
+            f'<b>Bias:</b> {direction.upper()} — {bias_reason}\n'
+            f'🛡️ Key Support: <b>{key_sup:,}</b>  |  🚧 Key Resistance: <b>{key_res:,}</b>\n\n'
+            f'⚡ <b>Signal:</b> {signal}\n'
+            f'⚠️ <b>Risk:</b> {risk}\n\n'
+            f'<i>S/R Levels → Sup: {sup_str} | Res: {res_str}</i>'
+            + (f'\n<i>Global: {ctx_text[:120]}</i>' if ctx_text else '')
+        )
+
+        send_message(msg)
         set_setting('market_update_last_sent', datetime.now(_IST).strftime('%Y-%m-%d %H:%M:%S'))
-        print(f'[MARKET_UPDATE] Sent update for {len(lines)-1} indices @ {now_str}')
-    else:
-        print('[MARKET_UPDATE] No data to send')
+        print(f'[AUTO_UPDATE] ✅ Sent @ {now_str} | LTP={ltp:,.0f} | {direction.upper()} | PCR={pcr}')
+
+    except json.JSONDecodeError as e:
+        print(f'[AUTO_UPDATE] Claude JSON error: {e}')
+    except Exception as e:
+        print(f'[AUTO_UPDATE] Error: {e}')
+        import traceback; traceback.print_exc()
 
 
 # ── Trade Watchlist Watcher ────────────────────────────────────────────────────
