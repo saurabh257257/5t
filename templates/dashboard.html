@@ -264,6 +264,63 @@ header {
 .buy-confirm-btn:disabled { background:#374151; color:#6b7280; cursor:not-allowed; }
 .buy-result { font-size:0.8em; margin-top:10px; }
 
+/* ── Option Chain Table ──────────────────────────────────────────────────────── */
+.chain-wrap { overflow-x:auto; }
+.chain-table { width:100%; border-collapse:collapse; font-size:0.79em; }
+.chain-table th { font-size:0.64em; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; padding:6px 10px; border-bottom:2px solid #2d2b4e; text-align:right; white-space:nowrap; }
+.chain-table th.csc { text-align:center; color:#a78bfa; }
+.chain-table td { padding:4px 10px; border-bottom:1px solid #1a1830; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.chain-table td.csc { text-align:center; font-weight:800; color:#e2e8f0; background:#12111f; position:sticky; }
+.chain-row:hover td { background:rgba(124,58,237,0.07) !important; }
+.chain-atm td { background:rgba(167,139,250,0.06) !important; }
+.chain-atm td.csc { background:rgba(167,139,250,0.18) !important; color:#a78bfa; }
+.chain-mp td.csc { color:#fbbf24; box-shadow:inset 0 0 0 2px #b45309; }
+.chain-ce-wall td.ce-oi-col { color:#f87171; font-weight:800; }
+.chain-pe-wall td.pe-oi-col { color:#34d399; font-weight:800; }
+.chg-p { color:#34d399; } .chg-n { color:#f87171; }
+.chain-ce-side td { } .chain-legend { display:flex; gap:14px; flex-wrap:wrap; padding:7px 14px; font-size:0.68em; border-top:1px solid #1e1c35; }
+.chain-legend span { display:flex; align-items:center; gap:5px; color:#6b7280; }
+.chain-legend span b { font-size:0.9em; }
+
+/* ── History tabs ─────────────────────────────────────────────────────────────── */
+.hist-tab { padding:4px 13px; border-radius:6px; font-size:0.74em; font-weight:600; cursor:pointer; border:1px solid #2d2b4e; background:transparent; color:#6b7280; transition:all 0.15s; }
+.hist-tab.active { background:#2d2b4e; color:#e2e8f0; border-color:#7c3aed; }
+.hist-tab:hover:not(.active) { border-color:#4c3f8a; color:#a78bfa; }
+.hist-row { padding:9px 14px; border-bottom:1px solid #1e1c35; }
+.hist-row:last-child { border-bottom:none; }
+.hist-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; flex-wrap:wrap; gap:4px; }
+.hist-time { font-size:0.68em; color:#6b7280; }
+.hist-body { font-size:0.75em; color:#94a3b8; line-height:1.5; margin-top:3px; }
+.hist-dir { font-size:0.66em; padding:2px 8px; border-radius:8px; font-weight:700; }
+.hist-dir.bull { background:rgba(52,211,153,0.12); color:#34d399; border:1px solid rgba(52,211,153,0.3); }
+.hist-dir.bear { background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.3); }
+.hist-dir.neu  { background:rgba(251,191,36,0.12);  color:#fbbf24; border:1px solid rgba(251,191,36,0.3); }
+
+/* ── Price alerts ─────────────────────────────────────────────────────────────── */
+.alert-inp { padding:5px 9px; background:#12111f; border:1px solid #2d2b4e; border-radius:6px; color:#e2e8f0; font-size:0.8em; outline:none; }
+.alert-inp:focus { border-color:#7c3aed; }
+.alert-item { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #1a1830; font-size:0.78em; }
+.alert-item:last-child { border-bottom:none; }
+.alert-price { font-weight:800; color:#e2e8f0; min-width:60px; }
+.alert-cond  { font-size:0.7em; padding:2px 7px; border-radius:8px; font-weight:700; }
+.alert-cond.above { background:rgba(52,211,153,0.12); color:#34d399; border:1px solid rgba(52,211,153,0.3); }
+.alert-cond.below { background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.3); }
+.alert-note { color:#94a3b8; flex:1; font-size:0.9em; }
+.alert-triggered .alert-price,.alert-triggered .alert-note { opacity:0.4; text-decoration:line-through; }
+.alert-del { padding:2px 8px; border-radius:5px; cursor:pointer; border:1px solid #374151; background:transparent; color:#6b7280; font-size:0.75em; }
+.alert-del:hover { border-color:#f87171; color:#f87171; }
+.alert-trig-badge { font-size:0.65em; padding:2px 7px; border-radius:8px; background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); }
+
+/* ── Update timestamp ─────────────────────────────────────────────────────────── */
+.upd-ts { font-size:0.63em; color:#4b5563; white-space:nowrap; }
+
+/* ── Toast ────────────────────────────────────────────────────────────────────── */
+#toastContainer { position:fixed; top:64px; right:16px; z-index:9000; display:flex; flex-direction:column; gap:8px; pointer-events:none; max-width:340px; }
+.toast { background:#1a1830; border:1px solid #7c3aed; border-radius:10px; padding:11px 15px; font-size:0.84em; color:#e2e8f0; box-shadow:0 4px 24px rgba(0,0,0,0.6); animation:toastIn 0.2s ease; pointer-events:auto; }
+.toast.alert-toast { border-color:#f59e0b; background:#1a1710; }
+.toast.ok-toast { border-color:#059669; background:#0d1a13; }
+@keyframes toastIn { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
+
 /* ── Responsive ──────────────────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .main-grid { grid-template-columns: 1fr; }
@@ -323,6 +380,7 @@ header {
       <div class="panel-card" id="ctxCard">
         <div class="card-hd">
           <span class="card-title">🌍 Global Context</span>
+          <span class="upd-ts" id="ctxUpdatedAt"></span>
           <span class="card-badge" id="ctxBadge" style="display:none">loading…</span>
         </div>
         <div class="card-body" id="ctxBody">
@@ -343,6 +401,7 @@ header {
       <div class="panel-card" id="msSummaryCard" style="display:none">
         <div class="card-hd">
           <span class="card-title">📊 Market Summary</span>
+          <span class="upd-ts" id="msUpdatedAt"></span>
           <span class="card-badge">Claude AI</span>
         </div>
         <!-- Stats row -->
@@ -413,6 +472,64 @@ header {
     </div><!-- /.col-right -->
 
   </div><!-- /.main-grid -->
+
+  <!-- ══ Option Chain (full-width) ══ -->
+  <div class="panel-card" id="chainPanel" style="margin-bottom:12px">
+    <div class="card-hd">
+      <span class="card-title">📋 Option Chain — SENSEX</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="upd-ts" id="chainUpdatedAt"></span>
+        <button class="btn-sm" onclick="loadChainTable()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="chainTableWrap" class="chain-wrap">
+      <div class="loading-row" style="justify-content:center"><div class="spinner"></div>Loading option chain…</div>
+    </div>
+    <div class="chain-legend" id="chainLegend" style="display:none">
+      <span><b style="color:#a78bfa">■</b> ATM Strike</span>
+      <span><b style="color:#fbbf24">■</b> Max Pain</span>
+      <span><b style="color:#f87171">●</b> Highest CE OI (resistance wall)</span>
+      <span><b style="color:#34d399">●</b> Highest PE OI (support wall)</span>
+    </div>
+  </div>
+
+  <!-- ══ Analysis History (full-width) ══ -->
+  <div class="panel-card" id="historyPanel" style="margin-bottom:12px">
+    <div class="card-hd">
+      <span class="card-title">🗂 Analysis History</span>
+      <div style="display:flex;gap:6px">
+        <button class="hist-tab active" id="htChain"   onclick="switchHistTab('chain')">⛓ Chain</button>
+        <button class="hist-tab"        id="htSummary" onclick="switchHistTab('summary')">📊 Market Summary</button>
+        <button class="hist-tab"        id="htSR"      onclick="switchHistTab('sr')">🛡 S/R Levels</button>
+      </div>
+    </div>
+    <div id="historyBody" style="max-height:340px;overflow-y:auto">
+      <div class="mc-log-empty">Loading history…</div>
+    </div>
+  </div>
+
+  <!-- ══ Price Alerts (full-width) ══ -->
+  <div class="panel-card" style="margin-bottom:12px" id="alertsPanel">
+    <div class="card-hd">
+      <span class="card-title">🔔 Price Alerts</span>
+      <span class="card-badge" id="alertCountBadge">0 active</span>
+    </div>
+    <div style="padding:12px 14px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <input class="alert-inp" type="number" id="alertPrice" placeholder="Price level" style="width:140px">
+        <select class="alert-inp" id="alertCond" style="width:110px">
+          <option value="above">Above ▲</option>
+          <option value="below">Below ▼</option>
+        </select>
+        <input class="alert-inp" type="text" id="alertNote" placeholder="Label (optional)" style="flex:1;min-width:120px;max-width:260px">
+        <button class="btn-sm" onclick="addAlert()" style="background:#1e3a2a;border-color:#065f46;color:#34d399">+ Add Alert</button>
+        <span style="font-size:0.7em;color:#4b5563">⚡ Checked every 30s — browser notification on trigger</span>
+      </div>
+      <div id="alertList">
+        <div style="font-size:0.76em;color:#4b5563;padding:4px 0">No alerts set. Add a price level above to get notified when SENSEX crosses it.</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Auto Market Update Config + History -->
   <div class="monitor-card">
@@ -487,6 +604,8 @@ header {
   </div>
 </div>
 
+
+<div id="toastContainer"></div>
 
 <script>
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -783,6 +902,7 @@ async function loadMarketContext(useCached = false) {
         ${cacheNote}
       </div>`;
     badge.style.display = 'none';
+    setUpdatedAt('ctxUpdatedAt');
   } catch(e) {
     body.innerHTML = `<div style="color:#4b5563;font-size:0.78em;padding:6px 0">Market context unavailable</div>`;
   }
@@ -835,6 +955,8 @@ async function loadLtp() {
 
   // Keep current-period candle in sync with live LTP
   if (lastLtp > 0) updateLiveCandle();
+  // Check price alerts on every LTP poll
+  checkAlerts();
 }
 
 async function loadOHLC() {
@@ -949,6 +1071,7 @@ async function loadChainSummary() {
   chgEl.className   = 'stat-val ' + (chg > 0 ? 'bull' : chg < 0 ? 'bear' : 'neu');
 
   body.innerHTML = d.structured ? renderMarketSummary(d) : `<div style="font-size:0.82em;color:#94a3b8;line-height:1.65;padding:4px 0">${d.summary||''}</div>`;
+  setUpdatedAt('msUpdatedAt');
 }
 
 // ── Try today's cached summary ────────────────────────────────────────────────
@@ -1004,7 +1127,11 @@ async function refreshAll() {
     // 5. Option chain market summary + ITM trades
     await loadChainSummary();
 
-    // 6. Reload auto-update history
+    // 6. Reload option chain + history
+    loadChainTable();
+    loadHistoryTab(_curHistTab);
+
+    // 7. Reload auto-update history
     loadAutoUpdates();
 
     document.getElementById('ctrlStatus').textContent = `Last refresh: ${nowStr()}`;
@@ -1173,6 +1300,265 @@ async function saveMarketUpdateConfig() {
   }
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type='', durationMs=5000) {
+  const div = document.createElement('div');
+  div.className = 'toast' + (type ? ' ' + type + '-toast' : '');
+  div.innerHTML = `<span style="cursor:pointer;float:right;margin-left:12px;color:#6b7280" onclick="this.parentNode.remove()">✕</span>${msg}`;
+  document.getElementById('toastContainer').appendChild(div);
+  setTimeout(() => div.remove(), durationMs);
+}
+
+// ── IST timestamp helper ──────────────────────────────────────────────────────
+function nowIST() {
+  return new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
+}
+function setUpdatedAt(elId) {
+  const el = document.getElementById(elId);
+  if (el) el.textContent = 'Updated ' + nowIST();
+}
+
+// ── Option Chain Table ────────────────────────────────────────────────────────
+async function loadChainTable() {
+  if (!currentExpiryTs) return;
+  const wrap = document.getElementById('chainTableWrap');
+  wrap.innerHTML = '<div class="loading-row" style="justify-content:center"><div class="spinner"></div>Fetching option chain…</div>';
+  document.getElementById('chainLegend').style.display = 'none';
+  try {
+    const d = await get(`/api/option-chain?index=SENSEX&expiry_ts=${currentExpiryTs}`);
+    const rows = d.option_chain || [];
+    if (!rows.length) {
+      wrap.innerHTML = '<div style="padding:14px;font-size:0.8em;color:#6b7280;text-align:center">No option chain data available</div>';
+      return;
+    }
+    const ltp = lastLtp || 0;
+
+    // Find ATM strike
+    const atmStrike = rows.reduce((best, r) =>
+      Math.abs(r.strike - ltp) < Math.abs(best - ltp) ? r.strike : best, rows[0].strike);
+
+    // Find max pain (strike where total pain for all options is lowest)
+    let mpStrike = rows[0].strike, minPain = Infinity;
+    for (const target of rows) {
+      let pain = 0;
+      for (const r of rows) {
+        if (r.strike < target.strike) pain += (target.strike - r.strike) * (r.pe_oi || 0);
+        if (r.strike > target.strike) pain += (r.strike - target.strike) * (r.ce_oi || 0);
+      }
+      if (pain < minPain) { minPain = pain; mpStrike = target.strike; }
+    }
+
+    // Highest CE OI (resistance wall) and PE OI (support wall)
+    let maxCeOi = 0, wallCeStrike = 0, maxPeOi = 0, wallPeStrike = 0;
+    rows.forEach(r => {
+      if ((r.ce_oi||0) > maxCeOi) { maxCeOi = r.ce_oi; wallCeStrike = r.strike; }
+      if ((r.pe_oi||0) > maxPeOi) { maxPeOi = r.pe_oi; wallPeStrike = r.strike; }
+    });
+
+    // Filter ±15 strikes around ATM
+    const strikes = rows.map(r => r.strike).sort((a,b) => a-b);
+    const atmIdx  = strikes.indexOf(atmStrike);
+    const lo = Math.max(0, atmIdx - 15);
+    const hi = Math.min(strikes.length - 1, atmIdx + 15);
+    const visible = rows.filter(r => r.strike >= strikes[lo] && r.strike <= strikes[hi]);
+
+    const fmtOi  = n => n >= 10000000 ? (n/10000000).toFixed(2)+'Cr' : n >= 100000 ? (n/100000).toFixed(1)+'L' : parseInt(n||0).toLocaleString('en-IN');
+    const fmtChg = n => {
+      if (!n) return '<span style="color:#4b5563">—</span>';
+      return `<span class="${n>0?'chg-p':'chg-n'}">${n>0?'+':''}${fmtOi(n)}</span>`;
+    };
+
+    let html = `<table class="chain-table">
+      <thead><tr>
+        <th class="ce-oi-col">CE OI</th>
+        <th>CE ΔOI</th>
+        <th>CE LTP</th>
+        <th class="csc">STRIKE</th>
+        <th>PE LTP</th>
+        <th>PE ΔOI</th>
+        <th class="pe-oi-col">PE OI</th>
+      </tr></thead><tbody>`;
+
+    for (const r of visible) {
+      const isAtm   = r.strike === atmStrike;
+      const isMp    = r.strike === mpStrike;
+      const isCeW   = r.strike === wallCeStrike;
+      const isPeW   = r.strike === wallPeStrike;
+      let cls = 'chain-row';
+      if (isAtm) cls += ' chain-atm';
+      if (isMp)  cls += ' chain-mp';
+      if (isCeW) cls += ' chain-ce-wall';
+      if (isPeW) cls += ' chain-pe-wall';
+
+      const atm = isAtm ? ' 🎯' : '';
+      const mp  = isMp  ? ' 💛' : '';
+      html += `<tr class="${cls}">
+        <td class="ce-oi-col">${fmtOi(r.ce_oi||0)}</td>
+        <td>${fmtChg(r.ce_chg_oi)}</td>
+        <td>${r.ce_ltp ? parseFloat(r.ce_ltp).toFixed(1) : '—'}</td>
+        <td class="csc">${parseInt(r.strike).toLocaleString('en-IN')}${atm}${mp}</td>
+        <td>${r.pe_ltp ? parseFloat(r.pe_ltp).toFixed(1) : '—'}</td>
+        <td>${fmtChg(r.pe_chg_oi)}</td>
+        <td class="pe-oi-col">${fmtOi(r.pe_oi||0)}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    document.getElementById('chainLegend').style.display = 'flex';
+    setUpdatedAt('chainUpdatedAt');
+  } catch(e) {
+    wrap.innerHTML = `<div style="padding:12px 14px;font-size:0.8em;color:#f87171">⚠ ${e.message}</div>`;
+  }
+}
+
+// ── Analysis History ──────────────────────────────────────────────────────────
+let _curHistTab = 'chain';
+async function switchHistTab(tab) {
+  _curHistTab = tab;
+  ['chain','summary','sr'].forEach(t => {
+    document.getElementById('ht'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.remove('active');
+  });
+  const idMap = { chain:'htChain', summary:'htSummary', sr:'htSR' };
+  document.getElementById(idMap[tab])?.classList.add('active');
+  await loadHistoryTab(tab);
+}
+
+async function loadHistoryTab(tab) {
+  const body = document.getElementById('historyBody');
+  body.innerHTML = '<div class="mc-log-empty"><div class="spinner" style="display:inline-block"></div> Loading…</div>';
+  try {
+    let url, items = [], html = '';
+    if (tab === 'chain') {
+      url = '/api/chain-analysis-history?index=SENSEX&limit=15';
+      const d = await get(url);
+      items = d.history || [];
+      if (!items.length) { body.innerHTML='<div class="mc-log-empty">No chain analysis saved yet.</div>'; return; }
+      html = items.map(r => {
+        const dir = r.direction || (r.analysis||'').toLowerCase().includes('bullish')?'bullish':(r.analysis||'').toLowerCase().includes('bearish')?'bearish':'neutral';
+        const dCls = dir==='bullish'?'bull':dir==='bearish'?'bear':'neu';
+        return `<div class="hist-row">
+          <div class="hist-meta">
+            <span class="hist-time">📅 ${r.date||''} ${r.time||''} IST</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${r.pcr!=null?`<span style="font-size:0.7em;color:#6b7280">PCR ${parseFloat(r.pcr||0).toFixed(2)}</span>`:''}
+              ${r.max_pain?`<span style="font-size:0.7em;color:#6b7280">MP ${parseInt(r.max_pain).toLocaleString()}</span>`:''}
+              ${r.ltp?`<span style="font-size:0.7em;color:#94a3b8">₹${parseInt(r.ltp).toLocaleString()}</span>`:''}
+            </div>
+          </div>
+          <div class="hist-body">${(r.analysis||'').substring(0,300)}${r.analysis?.length>300?'…':''}</div>
+        </div>`;
+      }).join('');
+    } else if (tab === 'summary') {
+      url = '/api/market-summary/history?index=SENSEX&limit=15';
+      const d = await get(url);
+      items = d.history || [];
+      if (!items.length) { body.innerHTML='<div class="mc-log-empty">No market summaries saved yet.</div>'; return; }
+      html = items.map(r => {
+        const s = (() => { try { return JSON.parse(r.structured||'{}'); } catch(_){return {};} })();
+        const dir = (s.direction||'').toLowerCase();
+        const dCls = dir==='bullish'?'bull':dir==='bearish'?'bear':'neu';
+        const dirLbl = dir==='bullish'?'▲ Bullish':dir==='bearish'?'▼ Bearish':dir?'◆ Neutral':'';
+        return `<div class="hist-row">
+          <div class="hist-meta">
+            <span class="hist-time">📅 ${r.date||''} ${r.time||''} IST</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${dirLbl?`<span class="hist-dir ${dCls}">${dirLbl}</span>`:''}
+              ${r.pcr!=null?`<span style="font-size:0.7em;color:#6b7280">PCR ${parseFloat(r.pcr||0).toFixed(2)}</span>`:''}
+              ${r.ltp?`<span style="font-size:0.7em;color:#94a3b8">₹${parseInt(r.ltp).toLocaleString()}</span>`:''}
+            </div>
+          </div>
+          <div class="hist-body">${s.context||r.analysis?.substring(0,250)||'—'}${(!s.context&&r.analysis?.length>250)?'…':''}</div>
+        </div>`;
+      }).join('');
+    } else {
+      url = '/api/sr-history?index=SENSEX&limit=15';
+      const d = await get(url);
+      items = d.history || [];
+      if (!items.length) { body.innerHTML='<div class="mc-log-empty">No S/R analyses saved yet.</div>'; return; }
+      html = items.map(r => {
+        const sups = (r.supports||[]).slice(0,4).map(s=>`<span class="sr-pill sup">🛡 ${parseInt(s.level||s).toLocaleString()}</span>`).join('');
+        const ress = (r.resistances||[]).slice(0,4).map(s=>`<span class="sr-pill res">🚧 ${parseInt(s.level||s).toLocaleString()}</span>`).join('');
+        return `<div class="hist-row">
+          <div class="hist-meta">
+            <span class="hist-time">📅 ${r.saved_at||''} IST</span>
+            ${r.ltp?`<span style="font-size:0.7em;color:#94a3b8">₹${parseInt(r.ltp).toLocaleString()}</span>`:''}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sups}${ress}</div>
+          ${r.verdict?`<div class="hist-body" style="margin-top:5px">${r.verdict.substring(0,200)}</div>`:''}
+        </div>`;
+      }).join('');
+    }
+    body.innerHTML = html;
+  } catch(e) {
+    body.innerHTML = `<div class="mc-log-empty" style="color:#f87171">⚠ ${e.message}</div>`;
+  }
+}
+
+// ── Price Alerts ──────────────────────────────────────────────────────────────
+let _alerts = [];
+function _saveAlerts() { try { localStorage.setItem('px_alerts', JSON.stringify(_alerts)); } catch(_){} }
+function _loadAlerts() {
+  try { _alerts = JSON.parse(localStorage.getItem('px_alerts') || '[]'); } catch(_){ _alerts=[]; }
+}
+
+function addAlert() {
+  const price = parseFloat(document.getElementById('alertPrice').value);
+  const cond  = document.getElementById('alertCond').value;
+  const note  = document.getElementById('alertNote').value.trim();
+  if (!price || isNaN(price)) { showToast('⚠ Enter a valid price level.'); return; }
+  _alerts.push({ id: Date.now(), price, cond, note, triggered: false });
+  _saveAlerts();
+  document.getElementById('alertPrice').value = '';
+  document.getElementById('alertNote').value  = '';
+  renderAlerts();
+  showToast(`✅ Alert added: ${cond === 'above' ? '▲' : '▼'} ₹${price.toLocaleString('en-IN')}`, 'ok');
+  // Request browser notification permission
+  if (Notification && Notification.permission === 'default') Notification.requestPermission();
+}
+
+function deleteAlert(id) {
+  _alerts = _alerts.filter(a => a.id !== id);
+  _saveAlerts(); renderAlerts();
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alertList');
+  const badge = document.getElementById('alertCountBadge');
+  const active = _alerts.filter(a => !a.triggered).length;
+  badge.textContent = `${active} active`;
+  if (!_alerts.length) {
+    el.innerHTML = '<div style="font-size:0.76em;color:#4b5563;padding:4px 0">No alerts set. Add a price level above to get notified when SENSEX crosses it.</div>';
+    return;
+  }
+  el.innerHTML = _alerts.map(a => `
+    <div class="alert-item ${a.triggered ? 'alert-triggered' : ''}">
+      <span class="alert-cond ${a.cond}">${a.cond === 'above' ? '▲ Above' : '▼ Below'}</span>
+      <span class="alert-price">₹${a.price.toLocaleString('en-IN')}</span>
+      <span class="alert-note">${a.note || ''}</span>
+      ${a.triggered ? '<span class="alert-trig-badge">✅ Triggered</span>' : ''}
+      <button class="alert-del" onclick="deleteAlert(${a.id})">✕</button>
+    </div>`).join('');
+}
+
+function checkAlerts() {
+  if (!lastLtp || !_alerts.length) return;
+  let changed = false;
+  _alerts.forEach(a => {
+    if (a.triggered) return;
+    const hit = (a.cond === 'above' && lastLtp >= a.price) ||
+                (a.cond === 'below' && lastLtp <= a.price);
+    if (hit) {
+      a.triggered = true; changed = true;
+      const msg = `🔔 SENSEX Alert! ${a.cond === 'above' ? '▲' : '▼'} ₹${a.price.toLocaleString('en-IN')} hit @ ₹${parseInt(lastLtp).toLocaleString('en-IN')}${a.note ? ' — ' + a.note : ''}`;
+      showToast(msg, 'alert', 10000);
+      if (Notification && Notification.permission === 'granted') {
+        new Notification('📊 SENSEX Alert', { body: msg.replace(/<[^>]+>/g,''), icon: '' });
+      }
+    }
+  });
+  if (changed) { _saveAlerts(); renderAlerts(); }
+}
+
 // ── Initialization ────────────────────────────────────────────────────────────
 async function init() {
   // Live LTP + OHLC (always fresh — lightweight polls)
@@ -1223,6 +1609,16 @@ async function init() {
   await loadExpiries();
   tryLoadTodaySummary();
 
+  // Option chain (after expiry known)
+  loadChainTable();
+
+  // Analysis history (default tab: chain)
+  loadHistoryTab('chain');
+
+  // Load alerts from localStorage
+  _loadAlerts();
+  renderAlerts();
+
   // Auto-update history
   loadAutoUpdates();
 
@@ -1231,6 +1627,8 @@ async function init() {
 
   // LTP poll every 30s
   setInterval(loadLtp, 30000);
+  // Chain table auto-refresh every 2 minutes
+  setInterval(loadChainTable, 120000);
 }
 
 init();
