@@ -510,6 +510,12 @@ let ltSeries = null, stSeries = null;
 let ltSrLines = [], stSrLines = [];
 const _LOT_SIZES = { SENSEX: 20, NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 30 };
 
+// Live candle tracking
+let ltIntervalSecs = 3600, stIntervalSecs = 900;
+const _IV_SECS = {'1m':60,'5m':300,'10m':600,'15m':900,'30m':1800,'60m':3600,'1d':86400};
+let _ltPeriod = 0, _ltOpen = 0, _ltHigh = 0, _ltLow = 0;
+let _stPeriod = 0, _stOpen = 0, _stHigh = 0, _stLow = 0;
+
 // ── LWC loader ────────────────────────────────────────────────────────────────
 function loadLWC(cb) {
   if (lwcLoaded) { cb(); return; }
@@ -575,6 +581,46 @@ function zoomChart(which, dir) {
 function resetChart(which) {
   const chart = which === 'lt' ? ltChart : stChart;
   if (chart) chart.timeScale().fitContent();
+}
+
+// ── Live candle update ────────────────────────────────────────────────────────
+// Returns the UTC unix timestamp of the start of the current candle period,
+// matching exactly how market.py encodes candle times (IST floored → UTC).
+function _currentPeriodStart(intervalSecs) {
+  const IST_OFFSET = 19800; // 5h 30m in seconds
+  const nowUTC  = Math.floor(Date.now() / 1000);
+  const nowIST  = nowUTC + IST_OFFSET;
+  return Math.floor(nowIST / intervalSecs) * intervalSecs - IST_OFFSET;
+}
+
+function updateLiveCandle() {
+  if (!lastLtp || lastLtp === 0) return;
+  const ltp = lastLtp;
+
+  if (ltSeries) {
+    const p = _currentPeriodStart(ltIntervalSecs);
+    if (p !== _ltPeriod) {
+      // New period — start fresh from current LTP
+      _ltPeriod = p; _ltOpen = ltp; _ltHigh = ltp; _ltLow = ltp;
+    } else {
+      if (ltp > _ltHigh) _ltHigh = ltp;
+      if (ltp < _ltLow)  _ltLow  = ltp;
+    }
+    try { ltSeries.update({ time: p, open: _ltOpen, high: _ltHigh, low: _ltLow, close: ltp }); }
+    catch(e) {}
+  }
+
+  if (stSeries) {
+    const p = _currentPeriodStart(stIntervalSecs);
+    if (p !== _stPeriod) {
+      _stPeriod = p; _stOpen = ltp; _stHigh = ltp; _stLow = ltp;
+    } else {
+      if (ltp > _stHigh) _stHigh = ltp;
+      if (ltp < _stLow)  _stLow  = ltp;
+    }
+    try { stSeries.update({ time: p, open: _stOpen, high: _stHigh, low: _stLow, close: ltp }); }
+    catch(e) {}
+  }
 }
 
 // ── Chart rendering ───────────────────────────────────────────────────────────
@@ -786,6 +832,9 @@ async function loadLtp() {
   if (lastOpen > 0) document.getElementById('hdOpen').textContent = fmt2(lastOpen);
   if (lastHigh > 0) document.getElementById('hdHigh').textContent = fmt2(lastHigh);
   if (lastLow  > 0) document.getElementById('hdLow').textContent  = fmt2(lastLow);
+
+  // Keep current-period candle in sync with live LTP
+  if (lastLtp > 0) updateLiveCandle();
 }
 
 async function loadOHLC() {
@@ -1144,6 +1193,8 @@ async function init() {
         if (d.candles?.length && ltSeries) {
           ltSeries.setData(d.candles);
           ltChart.timeScale().fitContent();
+          ltIntervalSecs = _IV_SECS[d.interval_used] || 3600;
+          _ltPeriod = 0; // reset so next updateLiveCandle seeds open correctly
           document.getElementById('ltChartBadge').textContent =
             `${(d.interval_used||'4H').toUpperCase()} · ${d.count||d.candles.length} candles`;
         }
@@ -1153,6 +1204,8 @@ async function init() {
         if (d.candles?.length && stSeries) {
           stSeries.setData(d.candles);
           stChart.timeScale().fitContent();
+          stIntervalSecs = _IV_SECS[d.interval_used] || 900;
+          _stPeriod = 0; // reset so next updateLiveCandle seeds open correctly
           document.getElementById('stChartBadge').textContent =
             `${(d.interval_used||'15m').toUpperCase()} · ${d.count||d.candles.length} candles`;
         }
@@ -1160,6 +1213,8 @@ async function init() {
     ]).then(() => {
       // Load saved S/R lines onto LT chart (no Claude call)
       loadSavedSR();
+      // Immediately paint a live candle so the chart matches the header LTP
+      updateLiveCandle();
     });
   });
 
