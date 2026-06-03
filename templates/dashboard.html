@@ -1766,8 +1766,18 @@ async function init() {
           _ltPeriod = 0; // reset so next updateLiveCandle seeds open correctly
           document.getElementById('ltChartBadge').textContent =
             `${(d.interval_used||'4H').toUpperCase()} · ${d.count||d.candles.length} candles`;
+        } else {
+          const msg = d.error || 'No data returned';
+          document.getElementById('ltChartInner').innerHTML =
+            `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f87171;font-size:0.82em;gap:6px;">` +
+            `<span style="font-size:1.4em">📉</span><span>LT chart unavailable</span>` +
+            `<span style="color:#6b7280;font-size:0.88em">${msg}</span></div>`;
+          document.getElementById('ltChartBadge').textContent = 'unavailable';
         }
-      }).catch(()=>{}),
+      }).catch(e => {
+        document.getElementById('ltChartInner').innerHTML =
+          `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:0.82em">⚠ LT chart failed to load</div>`;
+      }),
       get('/api/chart-data?index=SENSEX&interval=15m&days=7').then(d => {
         if (d.error === 'session_expired') return;
         if (d.candles?.length && stSeries) {
@@ -1777,8 +1787,18 @@ async function init() {
           _stPeriod = 0; // reset so next updateLiveCandle seeds open correctly
           document.getElementById('stChartBadge').textContent =
             `${(d.interval_used||'15m').toUpperCase()} · ${d.count||d.candles.length} candles`;
+        } else {
+          const msg = d.error || 'No data returned';
+          document.getElementById('stChartInner').innerHTML =
+            `<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f87171;font-size:0.82em;gap:6px;">` +
+            `<span style="font-size:1.4em">📉</span><span>ST chart unavailable</span>` +
+            `<span style="color:#6b7280;font-size:0.88em">${msg}</span></div>`;
+          document.getElementById('stChartBadge').textContent = 'unavailable';
         }
-      }).catch(()=>{})
+      }).catch(e => {
+        document.getElementById('stChartInner').innerHTML =
+          `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#f87171;font-size:0.82em">⚠ ST chart failed to load</div>`;
+      })
     ]).then(() => {
       // Load saved S/R lines onto LT chart (no Claude call)
       loadSavedSR();

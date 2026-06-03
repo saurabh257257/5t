@@ -56,28 +56,49 @@ def _fetch_hist_close(client, exch, scrip_code, days=10):
     return []
 
 
+def _parse_row_date(row):
+    """Extract a YYYY-MM-DD string from whatever 5paisa puts in the Datetime column."""
+    raw = str(row.get('Datetime') or row.get('datetime') or
+              row.get('Date')     or row.get('date')     or '')
+    raw = raw.strip()
+    if not raw:
+        return ''
+    # Already looks like a date/datetime string
+    if raw[0].isdigit() and len(raw) >= 10 and raw[4] == '-':
+        return raw[:10]          # YYYY-MM-DD
+    # Unix timestamp (int or float)
+    try:
+        from datetime import datetime as _dt2
+        ts = float(raw)
+        return _dt2.utcfromtimestamp(ts).strftime('%Y-%m-%d')
+    except Exception:
+        return raw[:10]
+
+
 def _fetch_prev_day_close(client, exch, scrip_code):
     """
-    Return the most recent completed trading day's close that is NOT today.
-    Looks back up to 12 days. Uses chart_scrip (e.g. 999920000 for NIFTY).
+    Return the most recent completed trading day's close that is NOT today (IST).
+    Tries exchange types C, D, I. Looks back 15 days.
     """
     from datetime import timedelta
-    today_str = _date.today().strftime('%Y-%m-%d')
-    from_date = (_date.today() - timedelta(days=12)).strftime('%Y-%m-%d')
-    for et in ('C', 'D'):
+    today_ist = datetime.now(_IST).date()
+    today_str = today_ist.strftime('%Y-%m-%d')
+    from_date = (today_ist - timedelta(days=15)).strftime('%Y-%m-%d')
+
+    for et in ('C', 'D', 'I'):
         try:
             df = client.historical_data(exch, et, int(scrip_code), '1d', from_date, today_str)
             if df is None or len(df) == 0:
                 continue
-            # Walk rows newest-first; return first close whose date != today
             rows = list(df.iterrows())
             for _, row in reversed(rows):
-                raw_dt = str(row.get('Datetime') or row.get('datetime') or '')
-                dt_str = raw_dt[:10]          # YYYY-MM-DD
+                dt_str = _parse_row_date(row)
                 c = float(row.get('Close') or row.get('close') or 0)
-                if c > 0 and dt_str != today_str:
+                if c > 0 and dt_str and dt_str != today_str:
+                    print(f'[PREV_CLOSE] exch={exch} et={et} scrip={scrip_code} → {c} on {dt_str}')
                     return c
-        except Exception:
+        except Exception as e:
+            print(f'[PREV_CLOSE] et={et} failed: {e}')
             continue
     return 0
 
@@ -114,19 +135,32 @@ def get_index_ltp(client, exch, scrip_code, opt_symbol=None, chart_scrip=None):
         except Exception:
             pass
 
-    # ── 3. prev_close — most recent historical close that is NOT today ────────
+    # ── 3. prev_close — most recent historical close that is NOT today (IST) ────
     # Feed's PreviousClose/CloseRate can return today's value; historical is reliable.
     h_scrip    = chart_scrip if chart_scrip else scrip_code
+    today_str  = datetime.now(_IST).strftime('%Y-%m-%d')
     prev_close = _fetch_prev_day_close(client, exch, h_scrip)
     if prev_close == 0:
-        # Last resort: raw close list fallback
-        closes = _fetch_hist_close(client, exch, h_scrip, days=25)
-        if closes:
-            if ltp == 0:
-                ltp = closes[-1]
-            prev_close = closes[-1] if market_open else (
-                closes[-2] if len(closes) >= 2 else closes[-1]
-            )
+        # Last-resort: walk daily candles and skip anything dated today
+        from datetime import timedelta as _td_pc
+        from_date = (datetime.now(_IST).date() - _td_pc(days=20)).strftime('%Y-%m-%d')
+        for et in ('C', 'D', 'I'):
+            try:
+                df = client.historical_data(exch, et, int(h_scrip), '1d', from_date, today_str)
+                if df is None or len(df) == 0:
+                    continue
+                for _, row in reversed(list(df.iterrows())):
+                    dt_str = _parse_row_date(row)
+                    c = float(row.get('Close') or row.get('close') or 0)
+                    if c > 0 and dt_str != today_str:
+                        prev_close = c
+                        if ltp == 0:
+                            ltp = c
+                        break
+                if prev_close > 0:
+                    break
+            except Exception:
+                continue
 
     # ── 4. Compute change vs prev_close ──────────────────────────────────────
     if prev_close > 0 and ltp > 0:
@@ -329,18 +363,24 @@ def get_chart_data(client, exch, scrip_code, interval='4h', days=365):
     ivl_list  = fallbacks.get(interval, ['60m', '1d'])
 
     for ivl in ivl_list:
-        for et in ('C', 'D'):
+        for et in ('C', 'D', 'I'):
             try:
                 df = client.historical_data(exch, et, int(scrip_code), ivl, from_date, today)
                 if df is None or isinstance(df, str) or len(df) < 5:
                     continue
                 candles = []
                 for _, row in df.iterrows():
-                    dt_val = row.get('Datetime') or row.get('datetime') or ''
+                    dt_val = row.get('Datetime') or row.get('datetime') or \
+                             row.get('Date')     or row.get('date')     or ''
                     try:
-                        s = str(dt_val)[:19].replace('T', ' ')
-                        dt = _dt.strptime(s, '%Y-%m-%d %H:%M:%S')
-                        unix_ts = int((dt - _dt(1970, 1, 1) - _td(hours=5, minutes=30)).total_seconds())
+                        s = str(dt_val).strip()
+                        # Unix timestamp (numeric string)?
+                        if s and s[0].isdigit() and (len(s) < 10 or s[4] != '-'):
+                            unix_ts = int(float(s))
+                        else:
+                            s = s[:19].replace('T', ' ')
+                            dt = _dt.strptime(s, '%Y-%m-%d %H:%M:%S')
+                            unix_ts = int((dt - _dt(1970, 1, 1) - _td(hours=5, minutes=30)).total_seconds())
                     except Exception:
                         continue
                     o = float(row.get('Open')   or row.get('open')   or 0)
