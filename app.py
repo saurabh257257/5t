@@ -491,14 +491,16 @@ def api_analyze_chain():
     # ── Pre-calculate best ITM CE/PE candidates (sorted by extrinsic value) ───
     # ITM CE: strike < LTP, intrinsic = LTP - strike, extrinsic = ce_ltp - intrinsic
     # ITM PE: strike > LTP, intrinsic = strike - LTP, extrinsic = pe_ltp - intrinsic
+    # Deep ITM threshold: intrinsic must be >= 0.5% of LTP (≈400 pts at SENSEX 80k)
+    ditm_min = max(200.0, ltp * 0.005)
     itm_ce_list = []
     itm_pe_list = []
     for r in rows:
         if r['strike'] < ltp and float(r.get('ce_ltp') or 0) > 0:
             intrinsic = ltp - r['strike']
             extrinsic = max(0.0, float(r['ce_ltp']) - intrinsic)
-            # Only deep ITM with significant intrinsic value
-            if intrinsic > 0 and extrinsic >= 0:
+            # Deep ITM only: intrinsic must clear the threshold
+            if intrinsic >= ditm_min:
                 itm_ce_list.append({
                     'strike': int(r['strike']), 'ltp': r['ce_ltp'],
                     'intrinsic': round(intrinsic), 'extrinsic': round(extrinsic, 2),
@@ -507,19 +509,19 @@ def api_analyze_chain():
         if r['strike'] > ltp and float(r.get('pe_ltp') or 0) > 0:
             intrinsic = r['strike'] - ltp
             extrinsic = max(0.0, float(r['pe_ltp']) - intrinsic)
-            if intrinsic > 0 and extrinsic >= 0:
+            if intrinsic >= ditm_min:
                 itm_pe_list.append({
                     'strike': int(r['strike']), 'ltp': r['pe_ltp'],
                     'intrinsic': round(intrinsic), 'extrinsic': round(extrinsic, 2),
                     'oi': r['pe_oi'], 'scrip': int(r.get('pe_scrip', 0)),
                 })
-    # Sort by extrinsic ascending (lowest time value first = best ITM)
+    # Sort by extrinsic ascending (lowest time value = best deep ITM — purest delta play)
     itm_ce_list.sort(key=lambda x: x['extrinsic'])
     itm_pe_list.sort(key=lambda x: x['extrinsic'])
-    best_ce = itm_ce_list[:5]   # top 5 ITM CE by lowest extrinsic
-    best_pe = itm_pe_list[:5]   # top 5 ITM PE by lowest extrinsic
-    best_ce_txt = ' | '.join(f"Strike {c['strike']} CE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_ce) or 'None found'
-    best_pe_txt = ' | '.join(f"Strike {c['strike']} PE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_pe) or 'None found'
+    best_ce = itm_ce_list[:8]   # top 8 deep ITM CE by lowest extrinsic
+    best_pe = itm_pe_list[:8]   # top 8 deep ITM PE by lowest extrinsic
+    best_ce_txt = ' | '.join(f"Strike {c['strike']} CE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_ce) or 'None found — no DITM CE available'
+    best_pe_txt = ' | '.join(f"Strike {c['strike']} PE ltp=₹{c['ltp']} intrinsic=₹{c['intrinsic']} extrinsic=₹{c['extrinsic']}" for c in best_pe) or 'None found — no DITM PE available'
 
     # ── Latest saved S/R from DB (set by "Analyze S/R" in chart modal) ───────
     sr_text = 'No S/R analysis saved — open the chart and run "Analyze S/R with Claude AI" first.'
@@ -611,9 +613,9 @@ S/R LEVELS (from chart analysis):
 OPTION CHAIN (20 strikes near LTP):
 {chain_txt}
 
-DEEP ITM CANDIDATES — sorted by extrinsic value (lowest = best, time-value waste ≈ 0):
-Best ITM CE (strike BELOW LTP — buy if bullish): {best_ce_txt}
-Best ITM PE (strike ABOVE LTP — buy if bearish): {best_pe_txt}
+DEEP ITM CANDIDATES (intrinsic ≥ {ditm_min:.0f} pts, sorted by extrinsic asc — lowest time waste = purest delta):
+Best Deep ITM CE (strike BELOW LTP, intrinsic ≥ {ditm_min:.0f} pts — use for bullish trade): {best_ce_txt}
+Best Deep ITM PE (strike ABOVE LTP, intrinsic ≥ {ditm_min:.0f} pts — use for bearish trade): {best_pe_txt}
 {prev_context}
 Respond ONLY with this JSON (no markdown, no text outside JSON):
 {{
@@ -656,10 +658,12 @@ Respond ONLY with this JSON (no markdown, no text outside JSON):
   ]
 }}
 
-TRADE RULES — DEEP ITM ONLY:
-- CE trade (resistance side): MUST pick from the Best ITM CE list above (strike BELOW LTP). Choose the one with LOWEST extrinsic value. trigger_condition = "above"; trigger_price = nearest resistance level from S/R.
-- PE trade (support side): MUST pick from the Best ITM PE list above (strike ABOVE LTP). Choose the one with LOWEST extrinsic value. trigger_condition = "below"; trigger_price = nearest support level from S/R.
-- ITM options have high delta — they move almost like the index — low time-value waste.
+TRADE RULES — DEEP ITM MANDATORY (BOTH TRADES):
+- BOTH trades MUST be DEEP In The Money. The candidates above are pre-filtered to intrinsic ≥ {ditm_min:.0f} pts (≥0.5% of LTP). DO NOT deviate outside those lists.
+- CE trade (resistance side): pick from Best Deep ITM CE list (strike well BELOW LTP). Choose lowest extrinsic value. trigger_condition = "above"; trigger_price = nearest resistance from S/R.
+- PE trade (support side): pick from Best Deep ITM PE list (strike well ABOVE LTP). Choose lowest extrinsic value. trigger_condition = "below"; trigger_price = nearest support from S/R.
+- A strike that is only 1–3 strikes ITM is NOT deep ITM — reject it. Minimum intrinsic ≥ {ditm_min:.0f} pts.
+- Deep ITM options move almost 1:1 with the index (delta ≈ 0.9+) — minimal time-value bleed.
 - sl = round(premium × 0.75) — 25% stop loss, INTEGER only
 - target = round(premium + 2 × (premium − sl)) — 1:2 R:R, INTEGER only
 - ALL numeric fields (premium, sl, target, trigger_price, strike) must be INTEGER whole numbers — NO decimals"""
